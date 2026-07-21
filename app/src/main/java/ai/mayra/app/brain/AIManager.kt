@@ -10,7 +10,9 @@ class AIManager(
     private var provider: AIProvider = DummyAIProvider(),
     private val memory: ConversationMemory = ConversationMemory(),
     private val skills: SkillRegistry = SkillRegistry(),
-    private val persistentMemory: PersistentMemoryService? = null
+    private val persistentMemory: PersistentMemoryService? = null,
+    private val promptBuilder: PromptBuilder = PromptBuilder(),
+    private val responsePipeline: ResponsePipeline = ResponsePipeline()
 ) {
     fun setProvider(newProvider: AIProvider) {
         provider = newProvider
@@ -40,11 +42,13 @@ class AIManager(
                 memory.remember(conversationId, MemoryEntry(MemoryEntry.Role.USER, cleanMessage))
                 memory.remember(conversationId, MemoryEntry(MemoryEntry.Role.MAYRA, result.text))
             }
-            return AIResponse(
-                text = result.text,
-                provider = "skill:${localSkill.id}",
-                isSuccess = result.isSuccess,
-                errorMessage = if (result.isSuccess) null else result.text
+            return responsePipeline.process(
+                AIResponse(
+                    text = result.text,
+                    provider = "skill:${localSkill.id}",
+                    isSuccess = result.isSuccess,
+                    errorMessage = if (result.isSuccess) null else result.text
+                )
             )
         }
 
@@ -59,7 +63,7 @@ class AIManager(
                 AIRequest(
                     message = cleanMessage,
                     conversationId = conversationId,
-                    systemPrompt = buildSystemPrompt(
+                    systemPrompt = promptBuilder.buildSystemPrompt(
                         basePrompt = systemPrompt,
                         longTermContext = longTermContext,
                         recentConversation = recentConversation
@@ -71,7 +75,8 @@ class AIManager(
                 )
             )
         }.fold(
-            onSuccess = { response ->
+            onSuccess = { rawResponse ->
+                val response = responsePipeline.process(rawResponse)
                 if (response.isSuccess) {
                     memory.remember(conversationId, MemoryEntry(MemoryEntry.Role.MAYRA, response.text))
                 }
@@ -100,32 +105,5 @@ class AIManager(
 
     fun clearConversation(conversationId: String = "default") {
         memory.clear(conversationId)
-    }
-
-    private fun buildSystemPrompt(
-        basePrompt: String?,
-        longTermContext: String,
-        recentConversation: String
-    ): String? {
-        if (basePrompt.isNullOrBlank() &&
-            longTermContext.isBlank() &&
-            recentConversation.isBlank()
-        ) return null
-
-        return buildString {
-            if (!basePrompt.isNullOrBlank()) append(basePrompt.trim())
-
-            if (longTermContext.isNotBlank()) {
-                if (isNotEmpty()) append("\n\n")
-                append("Relevant long-term memory:\n")
-                append(longTermContext)
-            }
-
-            if (recentConversation.isNotBlank()) {
-                if (isNotEmpty()) append("\n\n")
-                append("Recent conversation:\n")
-                append(recentConversation)
-            }
-        }
     }
 }
