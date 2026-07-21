@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,7 +49,10 @@ import ai.mayra.app.core.MayraMessage
 import ai.mayra.app.ui.theme.MayraAITheme
 import ai.mayra.app.voice.AndroidVoiceAssistant
 import ai.mayra.app.voice.AndroidVoiceState
+import ai.mayra.app.voice.ConversationMode
 import ai.mayra.app.voice.MicrophonePermission
+import ai.mayra.app.voice.VoiceSettings
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,12 +67,14 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val context = LocalContext.current
     var androidVoiceState by remember { mutableStateOf(AndroidVoiceState()) }
     var lastSpokenMessageCount by remember { mutableIntStateOf(0) }
+    var conversationActive by remember { mutableStateOf(false) }
+    var wasSpeaking by remember { mutableStateOf(false) }
+    var voiceSettings by remember { mutableStateOf(VoiceSettings()) }
 
     val voiceAssistant = remember {
         AndroidVoiceAssistant(context) { newState ->
             androidVoiceState = newState
             if (newState.isSpeaking) viewModel.onSpeechStarted()
-            else viewModel.onSpeechFinished()
             newState.error?.let(viewModel::onVoiceError)
         }
     }
@@ -84,15 +90,36 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         }
     }
 
-    LaunchedEffect(state.messages.size) {
+    LaunchedEffect(state.messages.size, voiceSettings.autoSpeak) {
         val latest = state.messages.lastOrNull()
         if (
+            voiceSettings.autoSpeak &&
             state.messages.size > lastSpokenMessageCount &&
             latest != null &&
             latest.sender == MayraMessage.Sender.MAYRA
         ) {
             lastSpokenMessageCount = state.messages.size
             voiceAssistant.speak(latest.text)
+        }
+    }
+
+    LaunchedEffect(androidVoiceState.isSpeaking) {
+        val speechJustFinished = wasSpeaking && !androidVoiceState.isSpeaking
+        wasSpeaking = androidVoiceState.isSpeaking
+
+        if (speechJustFinished) {
+            viewModel.onSpeechFinished()
+            val shouldRestart = conversationActive &&
+                voiceSettings.mode == ConversationMode.CONTINUOUS &&
+                voiceSettings.restartListeningAfterSpeech
+
+            if (shouldRestart) {
+                delay(450)
+                if (MicrophonePermission.isGranted(context)) {
+                    viewModel.startVoiceListening()
+                    voiceAssistant.startListening()
+                }
+            }
         }
     }
 
@@ -104,14 +131,17 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
+            conversationActive = true
             viewModel.startVoiceListening()
             voiceAssistant.startListening()
         } else {
+            conversationActive = false
             viewModel.onVoiceError("Microphone permission is required for voice input.")
         }
     }
 
     fun startVoice() {
+        conversationActive = true
         if (MicrophonePermission.isGranted(context)) {
             viewModel.startVoiceListening()
             voiceAssistant.startListening()
@@ -121,6 +151,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     }
 
     fun stopVoice() {
+        conversationActive = false
         voiceAssistant.stopListening()
         viewModel.stopVoiceListening()
     }
@@ -158,13 +189,41 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                             state.isThinking -> "Thinking…"
                             androidVoiceState.isSpeaking -> "Speaking…"
                             androidVoiceState.isListening -> "Listening…"
+                            conversationActive -> "Continuous mode ready"
                             else -> "● Ready to help"
                         }
                     )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Hands-free conversation", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (voiceSettings.mode == ConversationMode.CONTINUOUS) {
+                            "Mayra listens again after speaking"
+                        } else {
+                            "Press the microphone for each message"
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(
+                    checked = voiceSettings.mode == ConversationMode.CONTINUOUS,
+                    onCheckedChange = { enabled ->
+                        voiceSettings = voiceSettings.copy(
+                            mode = if (enabled) ConversationMode.CONTINUOUS else ConversationMode.MANUAL
+                        )
+                    }
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -207,13 +266,13 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             ) {
                 OutlinedButton(
                     onClick = {
-                        if (androidVoiceState.isListening) stopVoice() else startVoice()
+                        if (androidVoiceState.isListening || conversationActive) stopVoice() else startVoice()
                     },
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp)
                 ) {
-                    Text(if (androidVoiceState.isListening) "Stop" else "🎙 Voice")
+                    Text(if (conversationActive) "Stop" else "🎙 Voice")
                 }
                 Button(
                     onClick = viewModel::sendMessage,
