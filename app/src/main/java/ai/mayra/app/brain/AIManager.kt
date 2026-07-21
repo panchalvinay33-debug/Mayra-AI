@@ -2,13 +2,15 @@ package ai.mayra.app.brain
 
 import ai.mayra.app.memory.ConversationMemory
 import ai.mayra.app.memory.MemoryEntry
+import ai.mayra.app.memory.PersistentMemoryService
 import ai.mayra.app.skills.SkillRegistry
 
-/** Coordinates local skills, short-term memory, and provider switching outside UI code. */
+/** Coordinates local skills, short-term memory, persistent memory, and providers. */
 class AIManager(
     private var provider: AIProvider = DummyAIProvider(),
     private val memory: ConversationMemory = ConversationMemory(),
-    private val skills: SkillRegistry = SkillRegistry()
+    private val skills: SkillRegistry = SkillRegistry(),
+    private val persistentMemory: PersistentMemoryService? = null
 ) {
     fun setProvider(newProvider: AIProvider) {
         provider = newProvider
@@ -46,7 +48,10 @@ class AIManager(
             )
         }
 
-        val priorContext = memory.asPromptContext(conversationId)
+        val recentConversation = memory.asPromptContext(conversationId)
+        val longTermContext = persistentMemory
+            ?.contextFor(cleanMessage)
+            .orEmpty()
         memory.remember(conversationId, MemoryEntry(MemoryEntry.Role.USER, cleanMessage))
 
         return runCatching {
@@ -54,8 +59,15 @@ class AIManager(
                 AIRequest(
                     message = cleanMessage,
                     conversationId = conversationId,
-                    systemPrompt = buildSystemPrompt(systemPrompt, priorContext),
-                    metadata = mapOf("memoryEntries" to memory.recent(conversationId).size.toString())
+                    systemPrompt = buildSystemPrompt(
+                        basePrompt = systemPrompt,
+                        longTermContext = longTermContext,
+                        recentConversation = recentConversation
+                    ),
+                    metadata = mapOf(
+                        "memoryEntries" to memory.recent(conversationId).size.toString(),
+                        "hasPersistentMemory" to longTermContext.isNotBlank().toString()
+                    )
                 )
             )
         }.fold(
@@ -76,18 +88,43 @@ class AIManager(
         )
     }
 
+    suspend fun rememberUserFact(
+        content: String,
+        category: String = "general",
+        importance: Int = 3
+    ): Long? = persistentMemory?.rememberUserFact(
+        content = content,
+        category = category,
+        importance = importance
+    )
+
     fun clearConversation(conversationId: String = "default") {
         memory.clear(conversationId)
     }
 
-    private fun buildSystemPrompt(basePrompt: String?, context: String): String? {
-        if (basePrompt.isNullOrBlank() && context.isBlank()) return null
+    private fun buildSystemPrompt(
+        basePrompt: String?,
+        longTermContext: String,
+        recentConversation: String
+    ): String? {
+        if (basePrompt.isNullOrBlank() &&
+            longTermContext.isBlank() &&
+            recentConversation.isBlank()
+        ) return null
+
         return buildString {
             if (!basePrompt.isNullOrBlank()) append(basePrompt.trim())
-            if (context.isNotBlank()) {
+
+            if (longTermContext.isNotBlank()) {
+                if (isNotEmpty()) append("\n\n")
+                append("Relevant long-term memory:\n")
+                append(longTermContext)
+            }
+
+            if (recentConversation.isNotBlank()) {
                 if (isNotEmpty()) append("\n\n")
                 append("Recent conversation:\n")
-                append(context)
+                append(recentConversation)
             }
         }
     }
