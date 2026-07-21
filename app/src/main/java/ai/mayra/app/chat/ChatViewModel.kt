@@ -2,8 +2,7 @@ package ai.mayra.app.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import ai.mayra.app.core.LocalMayraAssistant
-import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.brain.AIManager
 import ai.mayra.app.core.MayraMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,8 +11,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ChatViewModel(
-    private val assistant: MayraAssistant = LocalMayraAssistant()
+    private val aiManager: AIManager = AIManager()
 ) : ViewModel() {
+    private val conversationId = "main-chat"
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
@@ -24,21 +24,46 @@ class ChatViewModel(
         if (text.isEmpty() || _uiState.value.isThinking) return
 
         val userMessage = MayraMessage(text, MayraMessage.Sender.USER)
-        _uiState.update { it.copy(messages = it.messages + userMessage, input = "", isThinking = true) }
+        _uiState.update {
+            it.copy(
+                messages = it.messages + userMessage,
+                input = "",
+                isThinking = true,
+                error = null
+            )
+        }
 
         viewModelScope.launch {
-            assistant.reply(text)
-                .onSuccess { reply ->
-                    _uiState.update {
-                        it.copy(
-                            messages = it.messages + MayraMessage(reply, MayraMessage.Sender.MAYRA),
-                            isThinking = false
-                        )
-                    }
+            val response = aiManager.replyTo(
+                message = text,
+                conversationId = conversationId,
+                systemPrompt = "You are Mayra, a warm and practical personal AI assistant."
+            )
+
+            if (response.isSuccess) {
+                _uiState.update {
+                    it.copy(
+                        messages = it.messages + MayraMessage(
+                            response.text,
+                            MayraMessage.Sender.MAYRA
+                        ),
+                        isThinking = false,
+                        error = null
+                    )
                 }
-                .onFailure { error ->
-                    _uiState.update { it.copy(isThinking = false, error = error.message ?: "Something went wrong") }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isThinking = false,
+                        error = response.errorMessage ?: response.text
+                    )
                 }
+            }
         }
+    }
+
+    fun clearConversation() {
+        aiManager.clearConversation(conversationId)
+        _uiState.update { ChatUiState() }
     }
 }
