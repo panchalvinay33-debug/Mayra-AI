@@ -2,7 +2,11 @@ package ai.mayra.app.skills
 
 /** Finds the first registered local skill that can safely handle a message. */
 class SkillRegistry(
-    skills: List<MayraSkill> = listOf(HelpSkill(), ClearMemorySkill())
+    skills: List<MayraSkill> = listOf(
+        HelpSkill(),
+        ClearMemorySkill(),
+        CalculatorSkill()
+    )
 ) {
     private val registered = skills.toMutableList()
 
@@ -24,7 +28,7 @@ class HelpSkill : MayraSkill {
         message.trim().lowercase() in setOf("help", "/help", "what can you do", "tum kya kar sakti ho")
 
     override suspend fun execute(message: String): SkillResult = SkillResult(
-        text = "I can chat, accept voice input, remember recent conversation context, and run registered local skills."
+        text = "I can chat, accept voice input, remember recent conversation context, and run registered local skills including offline calculations."
     )
 }
 
