@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -66,10 +67,8 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val voiceAssistant = remember {
         AndroidVoiceAssistant(context) { newState ->
             androidVoiceState = newState
-            when {
-                newState.isSpeaking -> viewModel.onSpeechStarted()
-                !newState.isSpeaking -> viewModel.onSpeechFinished()
-            }
+            if (newState.isSpeaking) viewModel.onSpeechStarted()
+            else viewModel.onSpeechFinished()
             newState.error?.let(viewModel::onVoiceError)
         }
     }
@@ -89,7 +88,8 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         val latest = state.messages.lastOrNull()
         if (
             state.messages.size > lastSpokenMessageCount &&
-            latest?.sender == MayraMessage.Sender.MAYRA
+            latest != null &&
+            latest.sender == MayraMessage.Sender.MAYRA
         ) {
             lastSpokenMessageCount = state.messages.size
             voiceAssistant.speak(latest.text)
