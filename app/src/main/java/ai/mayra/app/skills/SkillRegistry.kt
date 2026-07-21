@@ -6,7 +6,8 @@ class SkillRegistry(
         HelpSkill(),
         ClearMemorySkill(),
         CalculatorSkill(),
-        DateTimeSkill()
+        DateTimeSkill(),
+        UnitConversionSkill()
     )
 ) {
     private val registered = skills.toMutableList()
@@ -29,7 +30,7 @@ class HelpSkill : MayraSkill {
         message.trim().lowercase() in setOf("help", "/help", "what can you do", "tum kya kar sakti ho")
 
     override suspend fun execute(message: String): SkillResult = SkillResult(
-        text = "I can chat, accept voice input, remember recent conversation context, run registered local skills, calculate offline, and tell the current local date or time."
+        text = "I can chat, accept voice input, remember recent conversation context, calculate offline, tell the current local date or time, and convert common units without internet."
     )
 }
 
