@@ -8,7 +8,8 @@ class SkillRegistry(
         CalculatorSkill(),
         DateTimeSkill(),
         UnitConversionSkill(),
-        PercentageSkill()
+        PercentageSkill(),
+        AgeCalculatorSkill()
     )
 ) {
     private val registered = skills.toMutableList()
@@ -28,10 +29,16 @@ class HelpSkill : MayraSkill {
     override val description = "Shows Mayra's currently available local capabilities"
 
     override fun canHandle(message: String): Boolean =
-        message.trim().lowercase() in setOf("help", "/help", "what can you do", "tum kya kar sakti ho")
+        message.trim().lowercase() in setOf(
+            "help",
+            "/help",
+            "what can you do",
+            "tum kya kar sakti ho",
+            "तुम क्या कर सकती हो"
+        )
 
     override suspend fun execute(message: String): SkillResult = SkillResult(
-        text = "I can chat, accept voice input, remember recent conversation context, calculate offline, work with percentages, tell the current local date or time, and convert common units without internet."
+        text = "I can chat, understand English, Hindi and Hinglish commands, accept voice input, remember recent conversation context, calculate offline, work with percentages, calculate age and next birthday, tell the current local date or time, and convert common units without internet."
     )
 }
 
@@ -41,7 +48,13 @@ class ClearMemorySkill : MayraSkill {
     override val description = "Clears the current conversation memory"
 
     override fun canHandle(message: String): Boolean =
-        message.trim().lowercase() in setOf("/clear", "clear memory", "forget this chat")
+        message.trim().lowercase() in setOf(
+            "/clear",
+            "clear memory",
+            "forget this chat",
+            "memory clear karo",
+            "यह बातचीत भूल जाओ"
+        )
 
     override suspend fun execute(message: String): SkillResult = SkillResult(
         text = "Conversation memory cleared.",
