@@ -8,21 +8,23 @@ class ConversationMemoryExtractor(
         require(maxCandidates > 0) { "Maximum candidates must be positive." }
     }
 
-    fun extract(messages: List<ConversationMessage>): List<MemoryCandidate> = messages
-        .asSequence()
-        .filter { it.role == ConversationRole.USER }
-        .map { it.content.trim().replace(Regex("\\s+"), " ") }
-        .filter(String::isNotBlank)
-        .filter(::looksDurable)
-        .distinctBy { normalize(it) }
-        .takeLast(maxCandidates)
-        .map { content ->
+    fun extract(messages: List<ConversationMessage>): List<MemoryCandidate> {
+        val durable = messages
+            .asSequence()
+            .filter { it.role == ConversationRole.USER }
+            .map { it.content.trim().replace(Regex("\\s+"), " ") }
+            .filter(String::isNotBlank)
+            .filter(::looksDurable)
+            .distinctBy { normalize(it) }
+            .toList()
+
+        return durable.takeLast(maxCandidates).map { content ->
             MemoryCandidate(
                 content = content,
                 tags = inferTags(content)
             )
         }
-        .toList()
+    }
 
     private fun looksDurable(content: String): Boolean {
         val value = content.lowercase()
