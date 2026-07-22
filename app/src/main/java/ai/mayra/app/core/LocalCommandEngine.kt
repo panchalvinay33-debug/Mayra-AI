@@ -6,10 +6,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Small, deterministic offline command engine used while a cloud AI provider is not configured.
- * It keeps the app useful without network access and provides a clean routing boundary for Phase 2.
+ * Deterministic offline command engine used while a cloud AI provider is not configured.
+ *
+ * Common commands are first parsed into structured intents. Commands that require Android
+ * integrations return clear, actionable responses instead of silently pretending they ran.
  */
 class LocalCommandEngine(
+    private val intentEngine: AssistantIntentEngine = AssistantIntentEngine(),
     private val dateProvider: () -> LocalDate = LocalDate::now,
     private val timeProvider: () -> LocalTime = LocalTime::now
 ) {
@@ -17,16 +20,45 @@ class LocalCommandEngine(
         val clean = message.trim()
         require(clean.isNotEmpty()) { "Message cannot be empty" }
 
-        val normalized = clean.lowercase(Locale.ROOT)
+        return when (val intent = intentEngine.parse(clean)) {
+            is AssistantIntent.Invalid -> intent.reason
+            AssistantIntent.ClearConversation ->
+                "Use the Clear button to remove this conversation. Voice-controlled clearing will be connected with the app action layer."
+
+            is AssistantIntent.DeviceInfo -> when (intent.type) {
+                DeviceInfoType.TIME -> currentTime()
+                DeviceInfoType.BATTERY ->
+                    "Battery reading needs Android device access. The command is understood and ready for the device-action layer."
+            }
+
+            is AssistantIntent.OpenApp ->
+                "I understood that you want to open ${intent.appName}. App launching will work after the Android action executor is connected."
+
+            is AssistantIntent.CallContact ->
+                "I understood that you want to call ${intent.contact}. I’ll ask for confirmation before placing calls once contacts and phone permissions are connected."
+
+            is AssistantIntent.ComposeMessage -> {
+                val body = intent.message?.let { " with the message: “$it”" }.orEmpty()
+                "I understood that you want to message ${intent.recipient}$body. Sending will require your confirmation after the messaging action is connected."
+            }
+
+            is AssistantIntent.CreateReminder ->
+                "I understood this reminder: “${intent.request}”. Reminder scheduling will be enabled when the Android scheduler is connected."
+
+            is AssistantIntent.Chat -> respondToChat(intent.message, recentMessages)
+        }
+    }
+
+    private fun respondToChat(message: String, recentMessages: List<MayraMessage>): String {
+        val normalized = message.lowercase(Locale.ROOT)
         return when {
             normalized.isGreeting() -> greeting()
             normalized.containsAny("who are you", "tum kaun", "aap kaun", "तुम कौन", "आप कौन") ->
-                "I’m Mayra, your personal AI assistant. Right now I can chat, accept voice input, tell the date or time, and run a small set of offline commands."
+                "I’m Mayra, your personal AI assistant. I can already chat, accept voice input, remember the current conversation, understand common phone commands, and work offline."
 
             normalized.containsAny("help", "what can you do", "kya kar sakti", "क्या कर सकती", "madad", "मदद") ->
-                "You can ask me the date or time, speak using the microphone, or chat with me. My secure online AI and phone-action skills will be connected in the next phase."
+                "You can ask for the date or time, use voice input, or say commands such as open an app, call someone, send a message, create a reminder, check battery, or clear chat. Device actions are being connected safely with confirmation."
 
-            normalized.containsAny("time", "samay", "kitne baje", "समय", "कितने बजे") -> currentTime()
             normalized.containsAny("date", "today", "aaj", "tarikh", "आज", "तारीख") -> currentDate()
             normalized.containsAny("thank", "thanks", "dhanyavad", "shukriya", "धन्यवाद", "शुक्रिया") ->
                 "You’re welcome 😊"
@@ -34,7 +66,7 @@ class LocalCommandEngine(
             normalized.containsAny("bye", "good night", "alvida", "बाय", "शुभ रात्रि", "अलविदा") ->
                 "Take care. I’ll be here when you need me."
 
-            else -> contextualFallback(clean, recentMessages)
+            else -> contextualFallback(message, recentMessages)
         }
     }
 
