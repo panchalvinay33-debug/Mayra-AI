@@ -19,15 +19,30 @@ class ChatViewModel(
 
     fun updateInput(value: String) = _uiState.update { it.copy(input = value, error = null) }
 
+    fun dismissError() = _uiState.update { it.copy(error = null) }
+
+    fun clearConversation() {
+        if (_uiState.value.isThinking) return
+        _uiState.value = ChatUiState()
+    }
+
     fun sendMessage() {
         val text = _uiState.value.input.trim()
         if (text.isEmpty() || _uiState.value.isThinking) return
 
         val userMessage = MayraMessage(text, MayraMessage.Sender.USER)
-        _uiState.update { it.copy(messages = it.messages + userMessage, input = "", isThinking = true) }
+        val conversation = _uiState.value.messages + userMessage
+        _uiState.update {
+            it.copy(
+                messages = conversation,
+                input = "",
+                isThinking = true,
+                error = null
+            )
+        }
 
         viewModelScope.launch {
-            assistant.reply(text)
+            assistant.reply(text, conversation)
                 .onSuccess { reply ->
                     _uiState.update {
                         it.copy(
@@ -37,7 +52,12 @@ class ChatViewModel(
                     }
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isThinking = false, error = error.message ?: "Something went wrong") }
+                    _uiState.update {
+                        it.copy(
+                            isThinking = false,
+                            error = error.message ?: "Something went wrong"
+                        )
+                    }
                 }
         }
     }
