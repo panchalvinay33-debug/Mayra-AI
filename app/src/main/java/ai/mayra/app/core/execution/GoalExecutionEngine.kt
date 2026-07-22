@@ -34,6 +34,12 @@ data class GoalSession(
             state == GoalState.CANCELLED
 }
 
+data class PersistedGoal(
+    val id: String,
+    val goal: String,
+    val createdAt: Long
+)
+
 data class GoalExecutionSnapshot(
     val sessions: List<GoalSession>,
     val queuedCount: Int,
@@ -42,6 +48,47 @@ data class GoalExecutionSnapshot(
     val failedCount: Int,
     val cancelledCount: Int
 )
+
+sealed interface GoalExecutionEvent {
+    val sessionId: String
+
+    data class Queued(
+        override val sessionId: String,
+        val goal: String,
+        val queuePosition: Int
+    ) : GoalExecutionEvent
+
+    data class Started(
+        override val sessionId: String,
+        val goal: String
+    ) : GoalExecutionEvent
+
+    data class Planned(
+        override val sessionId: String,
+        val totalSteps: Int
+    ) : GoalExecutionEvent
+
+    data class Finished(
+        override val sessionId: String,
+        val state: GoalState,
+        val completedSteps: Int,
+        val totalSteps: Int,
+        val failureMessage: String?
+    ) : GoalExecutionEvent
+
+    data class Cancelled(
+        override val sessionId: String
+    ) : GoalExecutionEvent
+
+    data class Restored(
+        override val sessionId: String,
+        val queuePosition: Int
+    ) : GoalExecutionEvent
+}
+
+fun interface GoalExecutionEventListener {
+    fun onEvent(event: GoalExecutionEvent)
+}
 
 /**
  * Coordinates planning and dependency-aware execution for user goals.
@@ -55,7 +102,8 @@ class GoalExecutionEngine(
     private val action: StepAction,
     private val clock: () -> Long = System::currentTimeMillis,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
-    private val historyLimit: Int = DEFAULT_HISTORY_LIMIT
+    private val historyLimit: Int = DEFAULT_HISTORY_LIMIT,
+    private val eventListener: GoalExecutionEventListener = GoalExecutionEventListener { }
 ) {
     init {
         require(historyLimit > 0) { "historyLimit must be greater than zero." }
@@ -67,9 +115,7 @@ class GoalExecutionEngine(
 
     @Synchronized
     fun submit(goal: String): GoalSession {
-        val normalizedGoal = goal.trim().replace(WHITESPACE_REGEX, " ")
-        require(normalizedGoal.isNotBlank()) { "Goal cannot be blank." }
-
+        val normalizedGoal = normalizeGoal(goal)
         val session = GoalSession(
             id = idFactory(),
             goal = normalizedGoal,
@@ -82,7 +128,39 @@ class GoalExecutionEngine(
         sessions[session.id] = session
         queue.addLast(session.id)
         trimHistory()
+        eventListener.onEvent(
+            GoalExecutionEvent.Queued(session.id, session.goal, queue.size)
+        )
         return session
+    }
+
+    @Synchronized
+    fun restoreQueue(goals: Iterable<PersistedGoal>): Int {
+        check(runningSessionId == null) { "Cannot restore while a goal is running." }
+        var restored = 0
+        goals.forEach { persisted ->
+            require(persisted.id.isNotBlank()) { "Persisted goal ID cannot be blank." }
+            require(persisted.createdAt >= 0L) { "Persisted goal timestamp cannot be negative." }
+            if (persisted.id in sessions) return@forEach
+
+            val session = GoalSession(
+                id = persisted.id,
+                goal = normalizeGoal(persisted.goal),
+                state = GoalState.QUEUED,
+                createdAt = persisted.createdAt
+            )
+            sessions[session.id] = session
+            queue.addLast(session.id)
+            restored += 1
+            eventListener.onEvent(GoalExecutionEvent.Restored(session.id, queue.size))
+        }
+        trimHistory()
+        return restored
+    }
+
+    @Synchronized
+    fun exportQueue(): List<PersistedGoal> = queue.mapNotNull { id ->
+        sessions[id]?.let { PersistedGoal(it.id, it.goal, it.createdAt) }
     }
 
     @Synchronized
@@ -102,6 +180,7 @@ class GoalExecutionEngine(
             finishedAt = clock()
         )
         trimHistory()
+        eventListener.onEvent(GoalExecutionEvent.Cancelled(sessionId))
         return true
     }
 
@@ -111,6 +190,7 @@ class GoalExecutionEngine(
         return try {
             val plan = planner.plan(running.goal)
             updateRunning(running.id) { it.copy(plan = plan) }
+            eventListener.onEvent(GoalExecutionEvent.Planned(running.id, plan.steps.size))
 
             val report = PlanExecutor(action).execute(plan)
             val failed = report.results.filterIsInstance<StepExecutionResult.Failed>().firstOrNull()
@@ -132,7 +212,7 @@ class GoalExecutionEngine(
         }
     }
 
-    /** Drains all goals that were queued when execution began, including newly queued goals. */
+    /** Drains all queued goals, including goals submitted while execution is active. */
     suspend fun runUntilIdle(): List<GoalSession> {
         val completed = mutableListOf<GoalSession>()
         while (true) {
@@ -162,6 +242,7 @@ class GoalExecutionEngine(
         val running = queued.copy(state = GoalState.RUNNING, startedAt = clock())
         sessions[sessionId] = running
         runningSessionId = sessionId
+        eventListener.onEvent(GoalExecutionEvent.Started(running.id, running.goal))
         return running
     }
 
@@ -190,6 +271,15 @@ class GoalExecutionEngine(
         sessions[sessionId] = finished
         runningSessionId = null
         trimHistory()
+        eventListener.onEvent(
+            GoalExecutionEvent.Finished(
+                sessionId = sessionId,
+                state = state,
+                completedSteps = report?.completedSteps ?: 0,
+                totalSteps = report?.plan?.steps?.size ?: finished.plan?.steps?.size ?: 0,
+                failureMessage = failureMessage
+            )
+        )
         return finished
     }
 
@@ -205,6 +295,12 @@ class GoalExecutionEngine(
         while (sessions.size > historyLimit && removableIds.hasNext()) {
             sessions.remove(removableIds.next())
         }
+    }
+
+    private fun normalizeGoal(goal: String): String {
+        val normalized = goal.trim().replace(WHITESPACE_REGEX, " ")
+        require(normalized.isNotBlank()) { "Goal cannot be blank." }
+        return normalized
     }
 
     private companion object {
