@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         GoalEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class MayraDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
