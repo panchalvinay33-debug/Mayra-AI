@@ -62,11 +62,14 @@ class ConversationRuntimeDiagnostics(
             failedTurns = list.count { !it.success },
             cacheHits = list.count { it.fromCache },
             totalAttempts = list.sumOf { it.attempts },
-            averagePromptCharacters = list.map { it.promptCharacters }.averageOrZero(),
-            averageDurationMillis = list.map { it.duration.toMillis().toDouble() }.averageOrZero()
+            averagePromptCharacters = averageInts(list.map { it.promptCharacters }),
+            averageDurationMillis = averageDoubles(list.map { it.duration.toMillis().toDouble() })
         )
     }
 
-    private fun List<Double>.averageOrZero(): Double = if (isEmpty()) 0.0 else average()
-    private fun List<Int>.averageOrZero(): Double = if (isEmpty()) 0.0 else average()
+    private fun averageDoubles(values: List<Double>): Double =
+        if (values.isEmpty()) 0.0 else values.average()
+
+    private fun averageInts(values: List<Int>): Double =
+        if (values.isEmpty()) 0.0 else values.average()
 }
