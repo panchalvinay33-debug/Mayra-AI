@@ -8,19 +8,26 @@ import java.util.Locale
 /**
  * Deterministic offline command engine used while a cloud AI provider is not configured.
  *
- * Common commands are first parsed into structured intents. Commands that require Android
- * integrations return clear, actionable responses instead of silently pretending they ran.
+ * Common commands are parsed into structured intents. Device commands are delegated to
+ * [ActionDispatcher], while conversational requests remain local and network-free.
  */
 class LocalCommandEngine(
     private val intentEngine: AssistantIntentEngine = AssistantIntentEngine(),
+    private val actionDispatcher: ActionDispatcher = ActionDispatcher(),
     private val dateProvider: () -> LocalDate = LocalDate::now,
     private val timeProvider: () -> LocalTime = LocalTime::now
 ) {
-    fun respond(message: String, recentMessages: List<MayraMessage> = emptyList()): String {
+    suspend fun respond(
+        message: String,
+        recentMessages: List<MayraMessage> = emptyList()
+    ): String {
         val clean = message.trim()
         require(clean.isNotEmpty()) { "Message cannot be empty" }
 
-        return when (val intent = intentEngine.parse(clean)) {
+        val intent = intentEngine.parse(clean)
+        actionDispatcher.dispatch(intent)?.let { return it }
+
+        return when (intent) {
             is AssistantIntent.Invalid -> intent.reason
             AssistantIntent.ClearConversation ->
                 "Use the Clear button to remove this conversation. Voice-controlled clearing will be connected with the app action layer."
@@ -31,21 +38,14 @@ class LocalCommandEngine(
                     "Battery reading needs Android device access. The command is understood and ready for the device-action layer."
             }
 
-            is AssistantIntent.OpenApp ->
-                "I understood that you want to open ${intent.appName}. App launching will work after the Android action executor is connected."
-
-            is AssistantIntent.CallContact ->
-                "I understood that you want to call ${intent.contact}. I’ll ask for confirmation before placing calls once contacts and phone permissions are connected."
-
-            is AssistantIntent.ComposeMessage -> {
-                val body = intent.message?.let { " with the message: “$it”" }.orEmpty()
-                "I understood that you want to message ${intent.recipient}$body. Sending will require your confirmation after the messaging action is connected."
-            }
-
-            is AssistantIntent.CreateReminder ->
-                "I understood this reminder: “${intent.request}”. Reminder scheduling will be enabled when the Android scheduler is connected."
-
             is AssistantIntent.Chat -> respondToChat(intent.message, recentMessages)
+
+            // These intents are handled by ActionDispatcher before this branch.
+            is AssistantIntent.OpenApp,
+            is AssistantIntent.CallContact,
+            is AssistantIntent.ComposeMessage,
+            is AssistantIntent.CreateReminder ->
+                "I understood the action, but it could not be dispatched."
         }
     }
 
