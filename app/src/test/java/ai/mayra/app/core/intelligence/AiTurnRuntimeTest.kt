@@ -34,25 +34,24 @@ class AiTurnRuntimeTest {
     @Test
     fun `identical request uses execution cache`() = runTest {
         val store = InMemoryMemoryStore()
+        val cache = PromptCache()
+        val provider = FixedProvider("remote", "Cached answer.")
         val sessions = ConversationSessionManager(idFactory = { "session-1" })
         sessions.create()
-        val provider = FixedProvider("remote", "Cached answer.")
-        val runtime = runtime(sessions, store, provider, PromptCache())
+        val runtime = runtime(sessions, store, provider, cache)
 
         val request = AiTurnRuntimeRequest(sessionId = "session-1", userInput = "Hello Mayra")
         val first = runtime.execute(request)
-        sessions.delete("session-1")
 
         val freshSessions = ConversationSessionManager(idFactory = { "session-1" })
         freshSessions.create()
-        val secondRuntime = runtime(freshSessions, store, provider, sharedCache)
+        val secondRuntime = runtime(freshSessions, store, provider, cache)
         val second = secondRuntime.execute(request)
 
         assertFalse(first.execution.fromCache)
         assertTrue(second.execution.fromCache)
+        assertEquals(1, provider.calls)
     }
-
-    private val sharedCache = PromptCache()
 
     private fun runtime(
         sessions: ConversationSessionManager,
