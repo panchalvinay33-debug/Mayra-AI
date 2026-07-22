@@ -8,13 +8,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,7 +40,9 @@ class MainActivity : ComponentActivity() {
 private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val listState = rememberLazyListState()
     var voiceState by remember { mutableStateOf(VoiceState()) }
+    var lastSpokenMessageId by remember { mutableStateOf<Long?>(null) }
     val voiceAssistant = remember {
         AndroidVoiceAssistant(context) { newState -> voiceState = newState }
     }
@@ -44,6 +50,16 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
     }
+
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+        val latest = state.messages.lastOrNull()
+        if (latest?.sender == MayraMessage.Sender.MAYRA && latest.timestamp != lastSpokenMessageId) {
+            lastSpokenMessageId = latest.timestamp
+            voiceAssistant.speak(latest.text)
+        }
+    }
+
     DisposableEffect(Unit) { onDispose { voiceAssistant.release() } }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -67,18 +83,33 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     }
                 }
                 Spacer(Modifier.width(14.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text("Mayra AI", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(when { state.isThinking -> "Thinking…"; voiceState.isListening -> "Listening…"; else -> "● Ready to help" })
+                    Text(
+                        when {
+                            state.isThinking -> "Thinking…"
+                            voiceState.isListening -> "Listening…"
+                            else -> "● Ready to help"
+                        }
+                    )
+                }
+                if (state.messages.isNotEmpty()) {
+                    TextButton(onClick = viewModel::clearConversation, enabled = !state.isThinking) {
+                        Text("Clear")
+                    }
                 }
             }
 
             Spacer(Modifier.height(20.dp))
-            LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 if (state.messages.isEmpty()) item {
                     Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium)
                 }
-                items(state.messages) { message ->
+                items(state.messages, key = { it.timestamp }) { message ->
                     val label = if (message.sender == MayraMessage.Sender.USER) "You" else "Mayra"
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp)) {
@@ -98,14 +129,25 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Ask Mayra anything…") },
                 enabled = !state.isThinking,
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() })
             )
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = { if (voiceState.isListening) voiceAssistant.stopListening() else startVoice() }, modifier = Modifier.weight(1f).height(52.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        if (voiceState.isListening) voiceAssistant.stopListening() else startVoice()
+                    },
+                    modifier = Modifier.weight(1f).height(52.dp)
+                ) {
                     Text(if (voiceState.isListening) "Stop" else "🎙 Voice")
                 }
-                Button(onClick = viewModel::sendMessage, enabled = state.input.isNotBlank() && !state.isThinking, modifier = Modifier.weight(2f).height(52.dp)) {
+                Button(
+                    onClick = viewModel::sendMessage,
+                    enabled = state.input.isNotBlank() && !state.isThinking,
+                    modifier = Modifier.weight(2f).height(52.dp)
+                ) {
                     Text(if (state.isThinking) "Thinking…" else "Send to Mayra")
                 }
             }
