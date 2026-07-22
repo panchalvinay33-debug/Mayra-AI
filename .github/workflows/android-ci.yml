@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: [main, phase-5-testing-foundation]
+    branches: [main, phase-5-testing-foundation, phase-7-ai-orchestrator]
   pull_request:
-    branches: [main]
+    branches: [main, phase-5-testing-foundation]
 
 permissions:
   contents: read
