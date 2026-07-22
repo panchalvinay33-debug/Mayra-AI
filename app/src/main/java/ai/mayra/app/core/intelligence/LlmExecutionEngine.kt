@@ -43,13 +43,7 @@ class LlmExecutionEngine(
                 if (validation.valid) {
                     val normalized = cached.copy(content = validation.normalizedContent)
                     telemetry.record(
-                        event(
-                            prompt = prompt,
-                            response = normalized,
-                            outcome = LlmExecutionOutcome.CACHE_HIT,
-                            attempts = 0,
-                            startedAt = startedAt
-                        )
+                        event(prompt, normalized, LlmExecutionOutcome.CACHE_HIT, 0, startedAt)
                     )
                     return LlmExecutionResult(normalized, 0, true, cacheKey, validation)
                 }
@@ -58,47 +52,13 @@ class LlmExecutionEngine(
         }
 
         var attempt = 1
-        var lastError: Throwable? = null
         while (attempt <= retryPolicy.maxAttempts) {
-            try {
-                val generated = router.generate(execution.request, execution.preferredProviderId)
-                val validation = validator.validate(generated.content)
-                if (!validation.valid) {
-                    healthTracker.recordFailure(generated.providerId)
-                    val error = IllegalArgumentException(
-                        "Invalid LLM response: ${validation.violations.joinToString()}"
-                    )
-                    if (!retryPolicy.shouldRetry(attempt, error)) {
-                        telemetry.record(
-                            event(
-                                prompt = prompt,
-                                response = generated,
-                                outcome = LlmExecutionOutcome.VALIDATION_FAILED,
-                                attempts = attempt,
-                                startedAt = startedAt,
-                                detail = error.message
-                            )
-                        )
-                        throw error
-                    }
-                    lastError = error
-                } else {
-                    val normalized = generated.copy(content = validation.normalizedContent)
-                    healthTracker.recordSuccess(normalized.providerId)
-                    if (execution.cacheable) cache?.put(cacheKey, normalized)
-                    telemetry.record(
-                        event(
-                            prompt = prompt,
-                            response = normalized,
-                            outcome = LlmExecutionOutcome.SUCCESS,
-                            attempts = attempt,
-                            startedAt = startedAt
-                        )
-                    )
-                    return LlmExecutionResult(normalized, attempt, false, cacheKey, validation)
-                }
-            } catch (error: Throwable) {
-                lastError = error
+            val generation = runCatching {
+                router.generate(execution.request, execution.preferredProviderId)
+            }
+
+            if (generation.isFailure) {
+                val error = generation.exceptionOrNull()!!
                 execution.preferredProviderId?.let(healthTracker::recordFailure)
                 if (!retryPolicy.shouldRetry(attempt, error)) {
                     telemetry.record(
@@ -113,13 +73,43 @@ class LlmExecutionEngine(
                     )
                     throw error
                 }
+            } else {
+                val generated = generation.getOrThrow()
+                val validation = validator.validate(generated.content)
+                if (validation.valid) {
+                    val normalized = generated.copy(content = validation.normalizedContent)
+                    healthTracker.recordSuccess(normalized.providerId)
+                    if (execution.cacheable) cache?.put(cacheKey, normalized)
+                    telemetry.record(
+                        event(prompt, normalized, LlmExecutionOutcome.SUCCESS, attempt, startedAt)
+                    )
+                    return LlmExecutionResult(normalized, attempt, false, cacheKey, validation)
+                }
+
+                healthTracker.recordFailure(generated.providerId)
+                val error = IllegalArgumentException(
+                    "Invalid LLM response: ${validation.violations.joinToString()}"
+                )
+                if (!retryPolicy.shouldRetry(attempt, error)) {
+                    telemetry.record(
+                        event(
+                            prompt = prompt,
+                            response = generated,
+                            outcome = LlmExecutionOutcome.VALIDATION_FAILED,
+                            attempts = attempt,
+                            startedAt = startedAt,
+                            detail = error.message
+                        )
+                    )
+                    throw error
+                }
             }
 
             attempt += 1
             sleeper(retryPolicy.delayBeforeAttempt(attempt))
         }
 
-        error("LLM execution exhausted unexpectedly: ${lastError?.message}")
+        error("LLM execution exhausted unexpectedly.")
     }
 
     fun providerHealth(providerId: String): LlmProviderHealth = healthTracker.snapshot(providerId)
