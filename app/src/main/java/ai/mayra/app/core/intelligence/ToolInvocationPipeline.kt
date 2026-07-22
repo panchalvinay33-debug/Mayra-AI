@@ -57,8 +57,14 @@ class ToolInvocationPipeline(
             )
         }
 
+        val executionInvocation = invocation.copy(
+            context = invocation.context.copy(
+                metadata = invocation.context.metadata + (CONFIRMED_METADATA_KEY to confirmed.toString())
+            )
+        )
+
         return try {
-            val result = tool.execute(invocation)
+            val result = tool.execute(executionInvocation)
             finish(result.copy(toolId = tool.manifest.id), startedAt)
         } catch (error: Throwable) {
             finish(
@@ -94,5 +100,9 @@ class ToolInvocationPipeline(
     private fun record(event: ToolInvocationEvent) {
         events.addLast(event)
         while (events.size > maxEvents) events.removeFirst()
+    }
+
+    companion object {
+        const val CONFIRMED_METADATA_KEY: String = "tool.confirmed"
     }
 }
