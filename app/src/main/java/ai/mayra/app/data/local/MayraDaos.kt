@@ -64,6 +64,9 @@ interface ReminderDao {
     @Delete
     suspend fun delete(reminder: ReminderEntity)
 
+    @Query("SELECT * FROM reminders WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): ReminderEntity?
+
     @Query("SELECT * FROM reminders WHERE completed = 0 ORDER BY triggerAt ASC")
     fun observePending(): Flow<List<ReminderEntity>>
 
@@ -72,6 +75,9 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET completed = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long): Int
+
+    @Query("UPDATE reminders SET triggerAt = :triggerAt, completed = 0 WHERE id = :id")
+    suspend fun reschedule(id: Long, triggerAt: Long): Int
 }
 
 @Dao
