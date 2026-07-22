@@ -10,9 +10,9 @@ class ConversationMemoryExtractorTest {
     fun `extracts durable user facts with inferred tags`() {
         val candidates = ConversationMemoryExtractor().extract(
             listOf(
-                ConversationMessage(ConversationRole.USER, "My name is Vinay."),
-                ConversationMessage(ConversationRole.ASSISTANT, "Nice to meet you."),
-                ConversationMessage(ConversationRole.USER, "I prefer concise Hindi replies.")
+                ConversationMessage(role = ConversationRole.USER, content = "My name is Vinay."),
+                ConversationMessage(role = ConversationRole.ASSISTANT, content = "Nice to meet you."),
+                ConversationMessage(role = ConversationRole.USER, content = "I prefer concise Hindi replies.")
             )
         )
 
@@ -25,9 +25,9 @@ class ConversationMemoryExtractorTest {
     fun `ignores transient and assistant messages`() {
         val candidates = ConversationMemoryExtractor().extract(
             listOf(
-                ConversationMessage(ConversationRole.USER, "Today I like tea."),
-                ConversationMessage(ConversationRole.ASSISTANT, "Remember that the user likes coffee."),
-                ConversationMessage(ConversationRole.USER, "What is the weather?")
+                ConversationMessage(role = ConversationRole.USER, content = "Today I like tea."),
+                ConversationMessage(role = ConversationRole.ASSISTANT, content = "Remember that the user likes coffee."),
+                ConversationMessage(role = ConversationRole.USER, content = "What is the weather?")
             )
         )
 
@@ -39,10 +39,10 @@ class ConversationMemoryExtractorTest {
         val extractor = ConversationMemoryExtractor(maxCandidates = 2)
         val candidates = extractor.extract(
             listOf(
-                ConversationMessage(ConversationRole.USER, "My name is Vinay"),
-                ConversationMessage(ConversationRole.USER, "My name is Vinay!"),
-                ConversationMessage(ConversationRole.USER, "My goal is to build Mayra"),
-                ConversationMessage(ConversationRole.USER, "I prefer accurate answers")
+                ConversationMessage(role = ConversationRole.USER, content = "My name is Vinay"),
+                ConversationMessage(role = ConversationRole.USER, content = "My name is Vinay!"),
+                ConversationMessage(role = ConversationRole.USER, content = "My goal is to build Mayra"),
+                ConversationMessage(role = ConversationRole.USER, content = "I prefer accurate answers")
             )
         )
 
