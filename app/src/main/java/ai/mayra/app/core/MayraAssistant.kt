@@ -1,15 +1,24 @@
 package ai.mayra.app.core
 
 interface MayraAssistant {
-    suspend fun reply(message: String): Result<String>
+    suspend fun reply(
+        message: String,
+        conversation: List<MayraMessage> = emptyList()
+    ): Result<String>
 }
 
-class LocalMayraAssistant : MayraAssistant {
-    override suspend fun reply(message: String): Result<String> {
-        val clean = message.trim()
-        if (clean.isEmpty()) return Result.failure(IllegalArgumentException("Message cannot be empty"))
-        return Result.success(
-            "I heard you: \"$clean\". My AI connection will be added in the next development phase."
-        )
+/**
+ * Offline-first assistant used until a remote AI provider is configured.
+ * The command engine is intentionally deterministic, private, and network-free.
+ */
+class LocalMayraAssistant(
+    private val commandEngine: LocalCommandEngine = LocalCommandEngine()
+) : MayraAssistant {
+
+    override suspend fun reply(
+        message: String,
+        conversation: List<MayraMessage>
+    ): Result<String> = runCatching {
+        commandEngine.respond(message, conversation)
     }
 }
