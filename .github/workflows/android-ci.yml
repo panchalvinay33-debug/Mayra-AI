@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -29,8 +29,14 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Run lint and unit tests
-        run: gradle --no-daemon lintDebug testDebugUnitTest
+      - name: Compile debug sources
+        run: gradle --no-daemon --stacktrace compileDebugKotlin
+
+      - name: Run unit tests
+        run: gradle --no-daemon --stacktrace testDebugUnitTest
+
+      - name: Run Android lint
+        run: gradle --no-daemon --stacktrace lintDebug
 
       - name: Upload reports
         if: always()
@@ -40,4 +46,5 @@ jobs:
           path: |
             app/build/reports/lint-results-debug.html
             app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
