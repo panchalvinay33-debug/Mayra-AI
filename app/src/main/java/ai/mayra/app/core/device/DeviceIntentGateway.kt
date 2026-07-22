@@ -10,10 +10,10 @@ interface DeviceIntentGateway {
     fun openSettings(section: String?): Boolean
 }
 
-interface DeviceClipboardGateway {
+fun interface DeviceClipboardGateway {
     fun copy(label: String, text: String): Boolean
 }
 
-interface DeviceNotificationGateway {
+fun interface DeviceNotificationGateway {
     fun show(channelId: String, title: String, message: String): Boolean
 }
