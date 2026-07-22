@@ -32,8 +32,10 @@ class ConversationRepository(private val dao: ConversationDao) {
 class ReminderRepository(private val dao: ReminderDao) {
     fun observePending(): Flow<List<ReminderEntity>> = dao.observePending()
     suspend fun schedule(reminder: ReminderEntity): Long = dao.upsert(reminder)
+    suspend fun get(id: Long): ReminderEntity? = dao.getById(id)
     suspend fun due(now: Long = System.currentTimeMillis()): List<ReminderEntity> = dao.due(now)
     suspend fun complete(id: Long): Boolean = dao.markCompleted(id) > 0
+    suspend fun reschedule(id: Long, triggerAt: Long): Boolean = dao.reschedule(id, triggerAt) > 0
     suspend fun cancel(reminder: ReminderEntity) = dao.delete(reminder)
 }
 
