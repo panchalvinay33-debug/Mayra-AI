@@ -68,6 +68,11 @@ sealed interface GoalExecutionEvent {
         val totalSteps: Int
     ) : GoalExecutionEvent
 
+    data class Progress(
+        override val sessionId: String,
+        val event: StepProgressEvent
+    ) : GoalExecutionEvent
+
     data class Finished(
         override val sessionId: String,
         val state: GoalState,
@@ -112,6 +117,7 @@ class GoalExecutionEngine(
     private val sessions = linkedMapOf<String, GoalSession>()
     private val queue = ArrayDeque<String>()
     private var runningSessionId: String? = null
+    private var runningCancellationToken: ExecutionCancellationToken? = null
 
     @Synchronized
     fun submit(goal: String): GoalSession {
@@ -172,16 +178,25 @@ class GoalExecutionEngine(
     @Synchronized
     fun cancel(sessionId: String): Boolean {
         val current = sessions[sessionId] ?: return false
-        if (current.state != GoalState.QUEUED) return false
+        return when (current.state) {
+            GoalState.QUEUED -> {
+                queue.remove(sessionId)
+                sessions[sessionId] = current.copy(
+                    state = GoalState.CANCELLED,
+                    finishedAt = clock()
+                )
+                trimHistory()
+                eventListener.onEvent(GoalExecutionEvent.Cancelled(sessionId))
+                true
+            }
 
-        queue.remove(sessionId)
-        sessions[sessionId] = current.copy(
-            state = GoalState.CANCELLED,
-            finishedAt = clock()
-        )
-        trimHistory()
-        eventListener.onEvent(GoalExecutionEvent.Cancelled(sessionId))
-        return true
+            GoalState.RUNNING -> {
+                if (runningSessionId != sessionId) return false
+                runningCancellationToken?.cancel() ?: false
+            }
+
+            else -> false
+        }
     }
 
     /** Executes the next queued goal, or returns null when the queue is empty. */
@@ -192,13 +207,30 @@ class GoalExecutionEngine(
             updateRunning(running.id) { it.copy(plan = plan) }
             eventListener.onEvent(GoalExecutionEvent.Planned(running.id, plan.steps.size))
 
-            val report = PlanExecutor(action).execute(plan)
+            val token = ExecutionCancellationToken()
+            setRunningCancellationToken(running.id, token)
+            val controlledAction = ControllableStepAction(
+                delegate = action,
+                cancellationToken = token,
+                totalSteps = plan.steps.size,
+                listener = StepProgressListener { progress ->
+                    eventListener.onEvent(GoalExecutionEvent.Progress(running.id, progress))
+                }
+            )
+            val report = PlanExecutor(controlledAction).execute(plan)
             val failed = report.results.filterIsInstance<StepExecutionResult.Failed>().firstOrNull()
+            val cancelled = token.isCancellationRequested ||
+                failed?.error is StepExecutionCancelledException
+
             finish(
                 sessionId = running.id,
-                state = if (report.isSuccessful) GoalState.COMPLETED else GoalState.FAILED,
+                state = when {
+                    cancelled -> GoalState.CANCELLED
+                    report.isSuccessful -> GoalState.COMPLETED
+                    else -> GoalState.FAILED
+                },
                 report = report,
-                failureMessage = failed?.error?.message
+                failureMessage = if (cancelled) null else failed?.error?.message
                     ?: report.results.filterIsInstance<StepExecutionResult.Blocked>()
                         .firstOrNull()
                         ?.let { "Execution blocked by: ${it.unmetDependencies.joinToString()}" }
@@ -206,8 +238,16 @@ class GoalExecutionEngine(
         } catch (error: Throwable) {
             finish(
                 sessionId = running.id,
-                state = GoalState.FAILED,
-                failureMessage = error.message ?: "Goal execution failed."
+                state = if (error is StepExecutionCancelledException) {
+                    GoalState.CANCELLED
+                } else {
+                    GoalState.FAILED
+                },
+                failureMessage = if (error is StepExecutionCancelledException) {
+                    null
+                } else {
+                    error.message ?: "Goal execution failed."
+                }
             )
         }
     }
@@ -242,8 +282,18 @@ class GoalExecutionEngine(
         val running = queued.copy(state = GoalState.RUNNING, startedAt = clock())
         sessions[sessionId] = running
         runningSessionId = sessionId
+        runningCancellationToken = null
         eventListener.onEvent(GoalExecutionEvent.Started(running.id, running.goal))
         return running
+    }
+
+    @Synchronized
+    private fun setRunningCancellationToken(
+        sessionId: String,
+        token: ExecutionCancellationToken
+    ) {
+        check(runningSessionId == sessionId) { "Goal is not the active session." }
+        runningCancellationToken = token
     }
 
     @Synchronized
@@ -259,7 +309,11 @@ class GoalExecutionEngine(
         report: PlanExecutionReport? = null,
         failureMessage: String? = null
     ): GoalSession {
-        check(state == GoalState.COMPLETED || state == GoalState.FAILED)
+        check(
+            state == GoalState.COMPLETED ||
+                state == GoalState.FAILED ||
+                state == GoalState.CANCELLED
+        )
         check(runningSessionId == sessionId) { "Goal is not the active session." }
 
         val finished = requireNotNull(sessions[sessionId]).copy(
@@ -270,7 +324,11 @@ class GoalExecutionEngine(
         )
         sessions[sessionId] = finished
         runningSessionId = null
+        runningCancellationToken = null
         trimHistory()
+        if (state == GoalState.CANCELLED) {
+            eventListener.onEvent(GoalExecutionEvent.Cancelled(sessionId))
+        }
         eventListener.onEvent(
             GoalExecutionEvent.Finished(
                 sessionId = sessionId,
