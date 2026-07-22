@@ -2,6 +2,12 @@ package ai.mayra.app.core.orchestration
 
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.MayraMessage
+import ai.mayra.app.core.execution.GoalExecutionEngine
+import ai.mayra.app.core.execution.GoalSession
+import ai.mayra.app.core.execution.GoalState
+import ai.mayra.app.core.memory.LongTermMemoryEngine
+import ai.mayra.app.core.memory.MemoryKind
+import ai.mayra.app.core.planning.StepAction
 import ai.mayra.app.core.runtime.RuntimeKernel
 import ai.mayra.app.core.runtime.RuntimeTask
 import ai.mayra.app.core.runtime.TaskPriority
@@ -10,7 +16,8 @@ import ai.mayra.app.core.voice.VoiceConversationEvent
 import ai.mayra.app.core.voice.VoiceConversationSnapshot
 
 /**
- * Coordinates user input, conversation context, runtime execution, and voice-state transitions.
+ * Coordinates user input, conversation context, runtime execution, goal planning, memory, and
+ * voice-state transitions.
  *
  * This class deliberately contains no Android framework dependencies. UI, SpeechRecognizer,
  * TextToSpeech, and persistence adapters can call it from their own lifecycle-aware boundaries.
@@ -19,6 +26,7 @@ class MayraAiOrchestrator(
     private val commandEngine: LocalCommandEngine = LocalCommandEngine(),
     private val runtimeKernel: RuntimeKernel = RuntimeKernel(),
     private val voiceEngine: VoiceConversationEngine = VoiceConversationEngine(),
+    private val memoryEngine: LongTermMemoryEngine = LongTermMemoryEngine(),
     private val clock: () -> Long = System::currentTimeMillis
 ) {
     suspend fun processText(
@@ -64,6 +72,45 @@ class MayraAiOrchestrator(
         )
     }
 
+    /**
+     * Plans and executes a potentially multi-step goal through the same runtime used by normal
+     * assistant turns. Successful and failed outcomes are recorded in long-term project memory.
+     */
+    suspend fun processGoal(
+        goal: String,
+        recentMessages: List<MayraMessage> = emptyList(),
+        priority: TaskPriority = TaskPriority.NORMAL
+    ): GoalOrchestrationResult {
+        val normalizedGoal = goal.trim().replace(WHITESPACE_REGEX, " ")
+        if (normalizedGoal.isBlank()) {
+            return GoalOrchestrationResult.Rejected("Please provide a goal.")
+        }
+
+        val engine = GoalExecutionEngine(
+            action = StepAction { step ->
+                when (val result = processText(step.command, recentMessages, priority)) {
+                    is OrchestrationResult.Completed -> result.response
+                    is OrchestrationResult.Rejected -> error(result.reason)
+                    is OrchestrationResult.Failed -> throw result.cause
+                }
+            },
+            clock = clock
+        )
+
+        val submitted = engine.submit(normalizedGoal)
+        val finished = requireNotNull(engine.runNext()) { "Submitted goal was not executed." }
+        recordGoalOutcome(finished)
+
+        return if (finished.state == GoalState.COMPLETED) {
+            GoalOrchestrationResult.Completed(finished)
+        } else {
+            GoalOrchestrationResult.Failed(
+                session = finished,
+                message = finished.failureMessage ?: "Mayra could not complete that goal."
+            )
+        }
+    }
+
     suspend fun processVoiceTurn(
         current: VoiceConversationSnapshot,
         transcript: String,
@@ -106,7 +153,32 @@ class MayraAiOrchestrator(
         }
     }
 
+    fun memorySnapshot() = memoryEngine.snapshot()
+
+    private fun recordGoalOutcome(session: GoalSession) {
+        val timestamp = session.finishedAt ?: clock()
+        val status = session.state.name.lowercase()
+        val completed = session.report?.completedSteps ?: 0
+        val total = session.plan?.steps?.size ?: 0
+        val detail = buildString {
+            append("status=").append(status)
+            append("; completed=").append(completed).append('/').append(total)
+            session.failureMessage?.let { append("; error=").append(it) }
+        }
+
+        memoryEngine.remember(
+            namespace = GOAL_MEMORY_NAMESPACE,
+            key = session.id,
+            value = "${session.goal}; $detail",
+            kind = MemoryKind.PROJECT,
+            confidence = 1.0,
+            timestamp = timestamp,
+            source = "goal-execution"
+        )
+    }
+
     private companion object {
+        const val GOAL_MEMORY_NAMESPACE = "goal_history"
         val WHITESPACE_REGEX = Regex("\\s+")
     }
 }
@@ -125,6 +197,12 @@ sealed interface OrchestrationResult {
         val message: String,
         val cause: Throwable
     ) : OrchestrationResult
+}
+
+sealed interface GoalOrchestrationResult {
+    data class Completed(val session: GoalSession) : GoalOrchestrationResult
+    data class Failed(val session: GoalSession, val message: String) : GoalOrchestrationResult
+    data class Rejected(val reason: String) : GoalOrchestrationResult
 }
 
 sealed interface VoiceOrchestrationResult {
