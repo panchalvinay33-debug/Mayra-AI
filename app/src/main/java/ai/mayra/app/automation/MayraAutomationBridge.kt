@@ -133,12 +133,21 @@ class MayraAutomationBridge(
         val control = required(action, "control").lowercase()
         val operation = action.payload["operation"].orEmpty().lowercase()
         val request = when (control) {
-            "wifi" -> AutomationRequest(AutomationType.OPEN_WIFI_SETTINGS)
-            "bluetooth" -> AutomationRequest(AutomationType.OPEN_BLUETOOTH_SETTINGS)
-            "torch" -> AutomationRequest(AutomationType.SET_FLASHLIGHT, mapOf("enabled" to (operation != "off").toString()))
-            "volume" -> AutomationRequest(AutomationType.CHANGE_MEDIA_VOLUME, mapOf("operation" to operation.ifBlank { "increase" }))
-            "brightness" -> AutomationRequest(AutomationType.SET_BRIGHTNESS, mapOf("value" to brightnessValue(operation)))
-            "silent mode" -> AutomationRequest(AutomationType.OPEN_DND_SETTINGS)
+            "wifi" -> AutomationRequest(type = AutomationType.OPEN_WIFI_SETTINGS)
+            "bluetooth" -> AutomationRequest(type = AutomationType.OPEN_BLUETOOTH_SETTINGS)
+            "torch" -> AutomationRequest(
+                type = AutomationType.SET_FLASHLIGHT,
+                parameters = mapOf("enabled" to (operation != "off").toString())
+            )
+            "volume" -> AutomationRequest(
+                type = AutomationType.CHANGE_MEDIA_VOLUME,
+                parameters = mapOf("operation" to operation.ifBlank { "increase" })
+            )
+            "brightness" -> AutomationRequest(
+                type = AutomationType.SET_BRIGHTNESS,
+                parameters = mapOf("value" to brightnessValue(operation))
+            )
+            "silent mode" -> AutomationRequest(type = AutomationType.OPEN_DND_SETTINGS)
             else -> return MayraAutomationOutcome.Unsupported("Unsupported device control: $control")
         }
         return MayraAutomationOutcome.Android(android.execute(request))
