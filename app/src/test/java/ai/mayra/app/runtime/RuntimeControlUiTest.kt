@@ -71,7 +71,31 @@ class RuntimeControlUiTest {
     fun `freshness warns when snapshot is old`() {
         assertEquals(
             "Snapshot may be stale · updated 2m ago",
-            runtimeSnapshotFreshness(capturedAt = 0L + 1_000L, now = 121_000L)
+            runtimeSnapshotFreshness(capturedAt = 1_000L, now = 121_000L)
+        )
+    }
+
+    @Test
+    fun `workflow progress reports partial completion`() {
+        assertEquals(
+            50 to "2/4 completed · 1 failed · 1 waiting",
+            workflowProgress(totalSteps = 4, completedSteps = 2, failedSteps = 1, waitingSteps = 1)
+        )
+    }
+
+    @Test
+    fun `workflow progress handles empty plan`() {
+        assertEquals(
+            0 to "0/0 completed · 0 failed · 0 waiting",
+            workflowProgress(totalSteps = 0, completedSteps = 0, failedSteps = 0, waitingSteps = 0)
+        )
+    }
+
+    @Test
+    fun `workflow progress clamps invalid completed count`() {
+        assertEquals(
+            100 to "5/2 completed · 0 failed · 0 waiting",
+            workflowProgress(totalSteps = 2, completedSteps = 5, failedSteps = 0, waitingSteps = 0)
         )
     }
 }
