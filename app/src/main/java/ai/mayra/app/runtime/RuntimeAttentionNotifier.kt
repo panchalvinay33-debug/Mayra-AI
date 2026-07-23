@@ -68,6 +68,7 @@ object RuntimeAttentionNotifier {
 
     fun scanAndNotify(context: Context, snapshot: RuntimeControlSnapshot): Boolean {
         val appContext = context.applicationContext
+        RuntimeAttentionScheduler.sync(appContext)
         val alert = snapshot.toAttentionAlert() ?: run {
             appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(LAST_FINGERPRINT).apply()
