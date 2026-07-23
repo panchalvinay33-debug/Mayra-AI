@@ -205,7 +205,10 @@ class DeviceActionSafetyGate(
     }
 
     @Synchronized
-    fun reject(token: String, reason: String = "User cancelled the action."): ActionGateDecision {
+    fun reject(
+        token: String,
+        reason: String = "User cancelled the action."
+    ): ActionGateDecision.Rejected {
         require(token.isNotBlank()) { "Confirmation token cannot be blank." }
         val pending = confirmations.remove(token)
             ?: return rejectedUnknownToken(token, clock())
