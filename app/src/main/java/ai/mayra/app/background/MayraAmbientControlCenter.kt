@@ -40,8 +40,11 @@ class AmbientPreferenceStore(context: Context) {
             .putBoolean(KEY_EVENING_BRIEFING, updated.eveningBriefingEnabled)
             .putBoolean(KEY_SENSITIVE_BRIEFINGS, updated.sensitiveContentInBriefings)
             .apply()
+        MayraBriefingScheduler.sync(preferencesContext)
         return updated
     }
+
+    private val preferencesContext: Context = context.applicationContext
 
     private companion object {
         const val FILE_NAME = "mayra_ambient_preferences"
@@ -59,6 +62,10 @@ data class AmbientHealthSnapshot(
     val listenerEnabled: Boolean,
     val lastHeartbeat: Long,
     val storedEvents: Int,
+    val pendingBackgroundTasks: Int,
+    val failedBackgroundTasks: Int,
+    val pendingConfirmations: Int,
+    val auditEntries: Int,
     val runtimeHealthy: Boolean
 )
 
@@ -69,6 +76,7 @@ object MayraAmbientControlCenter {
         val enabledPackages = NotificationManagerCompat.getEnabledListenerPackages(appContext)
         val listenerEnabled = appContext.packageName in enabledPackages
         val eventStore = AmbientEventStore(appContext)
+        val taskSnapshot = BackgroundTaskQueue(appContext).snapshot()
         val lastHeartbeat = eventStore.lastHeartbeat()
         val heartbeatFresh = lastHeartbeat > 0L && now - lastHeartbeat <= HEALTH_WINDOW_MILLIS
         return AmbientHealthSnapshot(
@@ -76,6 +84,10 @@ object MayraAmbientControlCenter {
             listenerEnabled = listenerEnabled && component.packageName == appContext.packageName,
             lastHeartbeat = lastHeartbeat,
             storedEvents = eventStore.snapshot().size,
+            pendingBackgroundTasks = taskSnapshot.count { it.state == BackgroundTaskState.PENDING },
+            failedBackgroundTasks = taskSnapshot.count { it.state == BackgroundTaskState.FAILED },
+            pendingConfirmations = PendingActionStore(appContext).waiting(now).size,
+            auditEntries = TrustAuditStore(appContext).snapshot().size,
             runtimeHealthy = heartbeatFresh
         )
     }
@@ -88,6 +100,10 @@ object MayraAmbientControlCenter {
             .edit()
             .remove("events")
             .apply()
+    }
+
+    fun clearAuditHistory(context: Context) {
+        TrustAuditStore(context).clear()
     }
 
     private const val HEALTH_WINDOW_MILLIS = 45L * 60L * 1000L
