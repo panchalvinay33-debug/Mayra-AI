@@ -98,7 +98,12 @@ class MayraApplication : Application() {
         val brain = MayraBrainCoordinator(eventBus, contextProvider)
         val planRuntime = MayraPlanRuntime(taskPlanner, planStore, skillRegistry, contextProvider)
         val orchestrator = MayraRuntimeOrchestrator(
-            applicationContext, brain, skillRegistry, taskPlanner, contextMemory, pendingActions
+            context = applicationContext,
+            brain = brain,
+            skills = skillRegistry,
+            planner = taskPlanner,
+            memory = contextMemory,
+            pendingActions = pendingActions
         )
         val controlCenter = MayraRuntimeControlCenter(
             applicationContext, orchestrator, planRuntime, planStore, pendingActions
