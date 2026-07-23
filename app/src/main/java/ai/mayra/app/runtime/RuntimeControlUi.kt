@@ -1,5 +1,6 @@
 package ai.mayra.app.runtime
 
+import ai.mayra.app.MayraRuntime
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -109,10 +110,20 @@ fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
 @Composable
 fun RuntimeControlDialog(
     state: RuntimeControlUiState,
-    onApprove: (String) -> Unit,
-    onReject: (String) -> Unit,
     onRefresh: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onApprove: (String) -> Unit = { actionId ->
+        if (MayraRuntime.installed) {
+            MayraRuntime.controlCenter.approvePendingAction(actionId)
+            onRefresh()
+        }
+    },
+    onReject: (String) -> Unit = { actionId ->
+        if (MayraRuntime.installed) {
+            MayraRuntime.controlCenter.rejectPendingAction(actionId)
+            onRefresh()
+        }
+    }
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
