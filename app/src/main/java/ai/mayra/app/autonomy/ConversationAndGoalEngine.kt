@@ -109,15 +109,25 @@ class ConversationStateEngine(context: Context) {
     private fun encodeSession(session: ConversationSession): String {
         val turns = session.turns.joinToString(TURN_SEPARATOR) { turn ->
             listOf(
-                turn.id, turn.role.name, turn.text, turn.timestamp,
-                turn.intent.orEmpty(), encodeMap(turn.attributes)
-            ).joinToString(FIELD_SEPARATOR, transform = ::sanitize)
+                turn.id,
+                turn.role.name,
+                turn.text,
+                turn.timestamp,
+                turn.intent.orEmpty(),
+                encodeMap(turn.attributes)
+            ).joinToString(FIELD_SEPARATOR) { value -> sanitize(value.toString()) }
         }
         return listOf(
-            session.id, session.title, session.createdAt, session.updatedAt,
-            session.state.name, session.summary, session.pendingQuestion.orEmpty(),
-            session.activeGoalId.orEmpty(), turns
-        ).joinToString(SESSION_SEPARATOR, transform = ::sanitizeSession)
+            session.id,
+            session.title,
+            session.createdAt,
+            session.updatedAt,
+            session.state.name,
+            session.summary,
+            session.pendingQuestion.orEmpty(),
+            session.activeGoalId.orEmpty(),
+            turns
+        ).joinToString(SESSION_SEPARATOR) { value -> sanitizeSession(value.toString()) }
     }
 
     private fun decodeSession(raw: String): ConversationSession? {
@@ -284,13 +294,24 @@ class GoalEngine(context: Context) {
 
     private fun encode(goal: MayraGoal): String {
         val milestones = goal.milestones.joinToString(MILESTONE_SEPARATOR) {
-            listOf(it.id, it.title, it.completed, it.completedAt ?: -1L).joinToString(FIELD_SEPARATOR, transform = ::sanitize)
+            listOf(it.id, it.title, it.completed, it.completedAt ?: -1L)
+                .joinToString(FIELD_SEPARATOR) { value -> sanitize(value.toString()) }
         }
         return listOf(
-            goal.id, goal.title, goal.description, goal.state.name, goal.priority.name,
-            goal.createdAt, goal.updatedAt, goal.dueAt ?: -1L, goal.parentGoalId.orEmpty(),
-            goal.progressPercent, milestones, goal.tags.joinToString(TAG_SEPARATOR), goal.lastError.orEmpty()
-        ).joinToString(GOAL_SEPARATOR, transform = ::sanitizeGoal)
+            goal.id,
+            goal.title,
+            goal.description,
+            goal.state.name,
+            goal.priority.name,
+            goal.createdAt,
+            goal.updatedAt,
+            goal.dueAt ?: -1L,
+            goal.parentGoalId.orEmpty(),
+            goal.progressPercent,
+            milestones,
+            goal.tags.joinToString(TAG_SEPARATOR),
+            goal.lastError.orEmpty()
+        ).joinToString(GOAL_SEPARATOR) { value -> sanitizeGoal(value.toString()) }
     }
 
     private fun decode(raw: String): MayraGoal? {
