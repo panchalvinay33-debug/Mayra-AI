@@ -92,6 +92,9 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val installedAppsCount = remember(context, readinessRefresh) {
         runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0)
     }
+    val microphoneReady = remember(context, readinessRefresh) {
+        MicrophonePermission.isGranted(context)
+    }
 
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
@@ -217,6 +220,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
 
     if (showReadiness) {
         DeviceReadinessDialog(
+            microphoneReady = microphoneReady,
             grantedPermissions = permissionSnapshot.granted,
             installedAppsCount = installedAppsCount,
             onRequestPermissions = ::requestDevicePermissions,
@@ -228,6 +232,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
 
 @Composable
 private fun DeviceReadinessDialog(
+    microphoneReady: Boolean,
     grantedPermissions: Set<DevicePermission>,
     installedAppsCount: Int,
     onRequestPermissions: () -> Unit,
@@ -235,29 +240,27 @@ private fun DeviceReadinessDialog(
     onDismiss: () -> Unit
 ) {
     val rows = listOf(
-        DevicePermission.RECORD_AUDIO to "Voice input",
         DevicePermission.READ_CONTACTS to "Find contacts",
         DevicePermission.CALL_PHONE to "Start phone calls",
-        DevicePermission.SEND_SMS to "Prepare messages",
+        DevicePermission.SEND_MESSAGES to "Prepare messages",
         DevicePermission.POST_NOTIFICATIONS to "Assistant notifications",
         DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders",
         DevicePermission.QUERY_APPS to "Open installed apps"
     )
-    val readyCount = rows.count { it.first in grantedPermissions }
+    val readyCount = rows.count { it.first in grantedPermissions } + if (microphoneReady) 1 else 0
+    val totalCount = rows.size + 1
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Device readiness") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("$readyCount of ${rows.size} capabilities ready")
+                Text("$readyCount of $totalCount capabilities ready")
                 Text("$installedAppsCount launchable apps detected")
                 HorizontalDivider()
+                ReadinessRow("Voice input", microphoneReady)
                 rows.forEach { (permission, label) ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(label, modifier = Modifier.weight(1f))
-                        Text(if (permission in grantedPermissions) "Ready ✓" else "Permission needed")
-                    }
+                    ReadinessRow(label, permission in grantedPermissions)
                 }
                 Text(
                     "Exact reminders may require enabling special access from Android settings.",
@@ -275,6 +278,14 @@ private fun DeviceReadinessDialog(
             }
         }
     )
+}
+
+@Composable
+private fun ReadinessRow(label: String, ready: Boolean) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, modifier = Modifier.weight(1f))
+        Text(if (ready) "Ready ✓" else "Permission needed")
+    }
 }
 
 private fun runtimePermissionNames(): Array<String> = buildList {
