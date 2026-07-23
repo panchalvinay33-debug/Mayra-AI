@@ -28,6 +28,8 @@ import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.device.MayraDeviceRuntime
+import ai.mayra.app.device.androidDeviceRuntime
 import ai.mayra.app.knowledge.MayraKnowledgeStore
 import ai.mayra.app.knowledge.MayraPersonalIntelligence
 import ai.mayra.app.knowledge.MayraPersonalMemory
@@ -70,6 +72,7 @@ class MayraApplication : Application() {
         val agentRuntime = MayraAgentRuntime(agentTools.snapshot())
         val contextRuntime = MayraContextRuntime()
         MayraContextHolder.runtime = contextRuntime
+        val deviceRuntime = androidDeviceRuntime(applicationContext)
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -108,7 +111,8 @@ class MayraApplication : Application() {
             agentTools = agentTools,
             agentPlanner = agentPlanner,
             agentRuntime = agentRuntime,
-            contextRuntime = contextRuntime
+            contextRuntime = contextRuntime,
+            deviceRuntime = deviceRuntime
         )
 
         contextMemory.prune()
@@ -117,6 +121,7 @@ class MayraApplication : Application() {
         pendingActions.prune()
         autonomy.maintenance()
         personalIntelligence.prune()
+        deviceRuntime.capture(force = true)
         MayraBackgroundRuntime.initialize(applicationContext)
         MayraBriefingScheduler.sync(applicationContext)
     }
@@ -205,13 +210,16 @@ object MayraRuntime {
         private set
     lateinit var contextRuntime: MayraContextRuntime
         private set
+    lateinit var deviceRuntime: MayraDeviceRuntime
+        private set
 
     val installed: Boolean
         get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized &&
             ::autonomy.isInitialized && ::personalIntelligence.isInitialized &&
             ::voice.isInitialized && ::vision.isInitialized &&
             ::agentTools.isInitialized && ::agentPlanner.isInitialized &&
-            ::agentRuntime.isInitialized && ::contextRuntime.isInitialized
+            ::agentRuntime.isInitialized && ::contextRuntime.isInitialized &&
+            ::deviceRuntime.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -229,7 +237,8 @@ object MayraRuntime {
         agentTools: MayraAgentToolRegistry,
         agentPlanner: MayraAgentPlanner,
         agentRuntime: MayraAgentRuntime,
-        contextRuntime: MayraContextRuntime
+        contextRuntime: MayraContextRuntime,
+        deviceRuntime: MayraDeviceRuntime
     ) {
         this.brain = brain
         this.skills = skills
@@ -247,5 +256,6 @@ object MayraRuntime {
         this.agentPlanner = agentPlanner
         this.agentRuntime = agentRuntime
         this.contextRuntime = contextRuntime
+        this.deviceRuntime = deviceRuntime
     }
 }
