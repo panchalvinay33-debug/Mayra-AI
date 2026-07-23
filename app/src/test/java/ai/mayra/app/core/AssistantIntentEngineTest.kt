@@ -11,11 +11,9 @@ class AssistantIntentEngineTest {
 
     @Test
     fun emptyInputReturnsInvalidIntent() {
-        val result = engine.parse("   ")
-
         assertEquals(
             AssistantIntent.Invalid("Please say or type a command."),
-            result
+            engine.parse("   ")
         )
     }
 
@@ -36,10 +34,34 @@ class AssistantIntentEngineTest {
     }
 
     @Test
+    fun naturalHinglishOpenCommandCanContainWordsBeforeAction() {
+        assertEquals(
+            AssistantIntent.OpenApp("whatsapp"),
+            engine.parse("Mayra please mera WhatsApp open karo")
+        )
+    }
+
+    @Test
     fun callCommandReturnsContactIntent() {
         assertEquals(
             AssistantIntent.CallContact("rahul"),
             engine.parse("Call Rahul")
+        )
+    }
+
+    @Test
+    fun reportedNaturalSentenceExtractsMummyAsCallTarget() {
+        assertEquals(
+            AssistantIntent.CallContact("mummy"),
+            engine.parse("Mera open contact and call mummy")
+        )
+    }
+
+    @Test
+    fun hinglishCallSentenceRemovesCommandFillers() {
+        assertEquals(
+            AssistantIntent.CallContact("papa"),
+            engine.parse("Mayra jara contact Papa ko call karo")
         )
     }
 
@@ -51,6 +73,17 @@ class AssistantIntentEngineTest {
                 message = "meeting at five"
             ),
             engine.parse("Send message to Rahul: meeting at five")
+        )
+    }
+
+    @Test
+    fun hinglishMessageCommandSeparatesRecipientAndBody() {
+        assertEquals(
+            AssistantIntent.ComposeMessage(
+                recipient = "Mummy",
+                message = "main thodi der me aaunga"
+            ),
+            engine.parse("Mummy ko message likho main thodi der me aaunga")
         )
     }
 
