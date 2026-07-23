@@ -38,6 +38,7 @@ import ai.mayra.app.knowledge.MayraPersonalIntelligence
 import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import ai.mayra.app.runtime.MayraRuntimeControlCenter
+import ai.mayra.app.runtime.RuntimeAttentionNotifier
 import ai.mayra.app.vision.MayraVisionCoordinator
 import ai.mayra.app.vision.MayraVisionMemory
 import ai.mayra.app.vision.MayraVisionRuntime
@@ -142,6 +143,7 @@ class MayraApplication : Application() {
         executionCoordinator.restore()
         MayraBackgroundRuntime.initialize(applicationContext)
         MayraBriefingScheduler.sync(applicationContext)
+        RuntimeAttentionNotifier.scanAndNotify(applicationContext, controlCenter.snapshot())
     }
 
     private fun defaultAgentToolPlaceholders() = listOf(
