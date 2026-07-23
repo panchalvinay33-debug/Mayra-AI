@@ -9,7 +9,9 @@ import ai.mayra.app.platform.device.DevicePermissionSnapshotProvider
 import ai.mayra.app.ui.theme.MayraAITheme
 import ai.mayra.app.voice.AndroidVoiceAssistant
 import ai.mayra.app.voice.MicrophonePermission
+import ai.mayra.app.voice.RealtimeVoiceLoopPolicy
 import ai.mayra.app.voice.VoiceState
+import ai.mayra.app.voice.VoiceTransportState
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
@@ -76,9 +78,9 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
     var voiceState by remember { mutableStateOf(VoiceState()) }
-    var lastSpokenMessageId by remember { mutableStateOf<Long?>(null) }
     var showReadiness by remember { mutableStateOf(false) }
     var readinessRefresh by remember { mutableIntStateOf(0) }
+    val voiceLoopPolicy = remember { RealtimeVoiceLoopPolicy() }
     val voiceAssistant = remember {
         AndroidVoiceAssistant(context) { newState -> voiceState = newState }
     }
@@ -96,27 +98,68 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         MicrophonePermission.isGranted(context)
     }
 
-    LaunchedEffect(voiceState.transcript, voiceState.isListening) {
-        if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
+    LaunchedEffect(voiceState.partialTranscript, voiceState.isFinalTranscript) {
+        if (!voiceState.isFinalTranscript && voiceState.partialTranscript.isNotBlank()) {
+            viewModel.updateInput(voiceState.partialTranscript)
+        }
+    }
+
+    LaunchedEffect(
+        voiceState.isFinalTranscript,
+        voiceState.transcript,
+        voiceState.recognitionConfidence,
+        state.isThinking
+    ) {
+        val decision = voiceLoopPolicy.onVoiceState(voiceState, assistantBusy = state.isThinking)
+        decision.submitTranscript?.let { transcript ->
+            voiceAssistant.stopListening()
+            viewModel.updateInput(transcript)
+            viewModel.sendMessage()
+        }
     }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
         val latest = state.messages.lastOrNull()
-        if (latest?.sender == MayraMessage.Sender.MAYRA && latest.timestamp != lastSpokenMessageId) {
-            lastSpokenMessageId = latest.timestamp
-            voiceAssistant.speak(latest.text)
+        if (latest?.sender == MayraMessage.Sender.MAYRA) {
+            val decision = voiceLoopPolicy.onAssistantResponse(
+                responseText = latest.text,
+                responseKey = latest.timestamp.toString(),
+                continuousMode = voiceState.continuousMode
+            )
+            decision.speakResponse?.let {
+                voiceAssistant.speak(it, listenAfter = decision.listenAfterSpeech)
+            }
         }
     }
 
-    DisposableEffect(Unit) { onDispose { voiceAssistant.release() } }
+    LaunchedEffect(state.error) {
+        if (state.error != null) {
+            val decision = voiceLoopPolicy.onAssistantFailure(voiceState.continuousMode)
+            if (decision.startListening) voiceAssistant.startListening()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceLoopPolicy.reset()
+            voiceAssistant.release()
+        }
+    }
 
     val microphoneLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         readinessRefresh++
-        if (granted) voiceAssistant.startListening()
-        else voiceState = VoiceState(error = "Microphone permission is required for voice input")
+        if (granted) {
+            voiceAssistant.setContinuousMode(true)
+            voiceAssistant.startListening()
+        } else {
+            voiceState = VoiceState(
+                transportState = VoiceTransportState.ERROR,
+                error = "Microphone permission is required for voice input"
+            )
+        }
     }
 
     val devicePermissionsLauncher = rememberLauncherForActivityResult(
@@ -125,9 +168,18 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         readinessRefresh++
     }
 
-    fun startVoice() {
-        if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening()
-        else microphoneLauncher.launch(MicrophonePermission.permission)
+    fun startVoiceConversation() {
+        if (MicrophonePermission.isGranted(context)) {
+            voiceAssistant.setContinuousMode(true)
+            voiceAssistant.startListening()
+        } else {
+            microphoneLauncher.launch(MicrophonePermission.permission)
+        }
+    }
+
+    fun stopVoiceConversation() {
+        voiceAssistant.setContinuousMode(false)
+        voiceAssistant.stopListening()
     }
 
     fun requestDevicePermissions() {
@@ -145,20 +197,20 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Mayra AI", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        when {
-                            state.isThinking -> "Thinking…"
-                            voiceState.isListening -> "Listening…"
-                            else -> "● Ready to help"
-                        }
-                    )
+                    Text(voiceStatusText(state.isThinking, voiceState))
                 }
                 AssistChip(
                     onClick = { showReadiness = true },
                     label = { Text("Device") }
                 )
                 if (state.messages.isNotEmpty()) {
-                    TextButton(onClick = viewModel::clearConversation, enabled = !state.isThinking) {
+                    TextButton(
+                        onClick = {
+                            voiceLoopPolicy.reset()
+                            viewModel.clearConversation()
+                        },
+                        enabled = !state.isThinking
+                    ) {
                         Text("Clear")
                     }
                 }
@@ -186,6 +238,12 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
 
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             voiceState.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (voiceState.isListening && voiceState.partialTranscript.isNotBlank()) {
+                Text(
+                    "Heard: ${voiceState.partialTranscript}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = state.input,
@@ -201,11 +259,21 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = {
-                        if (voiceState.isListening) voiceAssistant.stopListening() else startVoice()
+                        when {
+                            voiceState.isSpeaking -> voiceAssistant.interruptSpeech(resumeListening = true)
+                            voiceState.continuousMode -> stopVoiceConversation()
+                            else -> startVoiceConversation()
+                        }
                     },
                     modifier = Modifier.weight(1f).height(52.dp)
                 ) {
-                    Text(if (voiceState.isListening) "Stop" else "🎙 Voice")
+                    Text(
+                        when {
+                            voiceState.isSpeaking -> "Interrupt"
+                            voiceState.continuousMode -> "Stop voice"
+                            else -> "🎙 Talk"
+                        }
+                    )
                 }
                 Button(
                     onClick = viewModel::sendMessage,
@@ -221,6 +289,8 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     if (showReadiness) {
         DeviceReadinessDialog(
             microphoneReady = microphoneReady,
+            speechAvailable = voiceState.speechAvailable,
+            ttsReady = voiceState.ttsReady,
             grantedPermissions = permissionSnapshot.granted,
             installedAppsCount = installedAppsCount,
             onRequestPermissions = ::requestDevicePermissions,
@@ -230,9 +300,21 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     }
 }
 
+private fun voiceStatusText(isThinking: Boolean, voiceState: VoiceState): String = when {
+    isThinking -> "Thinking…"
+    voiceState.isSpeaking -> "Speaking… tap Interrupt to talk"
+    voiceState.isListening -> "Listening…"
+    voiceState.transportState == VoiceTransportState.PROCESSING -> "Understanding…"
+    voiceState.continuousMode -> "Voice conversation active"
+    !voiceState.speechAvailable -> "Speech recognition unavailable"
+    else -> "● Ready to help"
+}
+
 @Composable
 private fun DeviceReadinessDialog(
     microphoneReady: Boolean,
+    speechAvailable: Boolean,
+    ttsReady: Boolean,
     grantedPermissions: Set<DevicePermission>,
     installedAppsCount: Int,
     onRequestPermissions: () -> Unit,
@@ -247,8 +329,9 @@ private fun DeviceReadinessDialog(
         DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders",
         DevicePermission.QUERY_APPS to "Open installed apps"
     )
-    val readyCount = rows.count { it.first in grantedPermissions } + if (microphoneReady) 1 else 0
-    val totalCount = rows.size + 1
+    val voiceReadyCount = listOf(microphoneReady, speechAvailable, ttsReady).count { it }
+    val readyCount = rows.count { it.first in grantedPermissions } + voiceReadyCount
+    val totalCount = rows.size + 3
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -258,12 +341,14 @@ private fun DeviceReadinessDialog(
                 Text("$readyCount of $totalCount capabilities ready")
                 Text("$installedAppsCount launchable apps detected")
                 HorizontalDivider()
-                ReadinessRow("Voice input", microphoneReady)
+                ReadinessRow("Microphone permission", microphoneReady)
+                ReadinessRow("Speech recognition service", speechAvailable)
+                ReadinessRow("Mayra voice output", ttsReady)
                 rows.forEach { (permission, label) ->
                     ReadinessRow(label, permission in grantedPermissions)
                 }
                 Text(
-                    "Exact reminders may require enabling special access from Android settings.",
+                    "Voice recognition quality and offline availability depend on the speech service installed on the phone.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
