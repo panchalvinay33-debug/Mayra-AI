@@ -1,5 +1,6 @@
 package ai.mayra.app.core.actions
 
+import android.app.Application
 import android.content.Intent
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -10,7 +11,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], application = Application::class)
 class AndroidDeviceActionRunnerTest {
     @Test
     fun callIntentIsBuiltAndStarted() = runBlocking {
