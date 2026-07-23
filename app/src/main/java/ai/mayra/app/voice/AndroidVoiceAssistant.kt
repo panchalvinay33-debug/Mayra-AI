@@ -19,116 +19,84 @@ class AndroidVoiceAssistant(
     private val onState: (VoiceState) -> Unit
 ) : VoiceAssistantContract, RecognitionListener, TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val recognizerAvailable = SpeechRecognizer.isRecognitionAvailable(appContext)
-    private val recognizer = if (recognizerAvailable) SpeechRecognizer.createSpeechRecognizer(appContext) else null
+    private val handler = Handler(Looper.getMainLooper())
+    private val recognitionAvailable = SpeechRecognizer.isRecognitionAvailable(appContext)
+    private val recognizer = if (recognitionAvailable) SpeechRecognizer.createSpeechRecognizer(appContext) else null
     private val tts = TextToSpeech(appContext, this)
 
-    private var state = VoiceState(speechAvailable = recognizerAvailable)
+    private var state = VoiceState(speechAvailable = recognitionAvailable)
     private var released = false
-    private var ttsReady = false
-    private var continuousMode = false
-    private var restartAfterSpeech = false
     private var recognitionActive = false
-    private var lastStartAt = 0L
+    private var continuous = false
+    private var listenAfterSpeech = false
+    private var ttsReady = false
     private var restartAttempts = 0
+    private var lastStartAt = 0L
 
     init {
         recognizer?.setRecognitionListener(this)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {
-                publish(
-                    state.copy(
-                        transportState = VoiceTransportState.SPEAKING,
-                        isSpeaking = true,
-                        isListening = false,
-                        lastUtteranceId = utteranceId,
-                        error = null
-                    )
+            override fun onStart(id: String?) = emitFromAnyThread(
+                state.copy(
+                    transportState = VoiceTransportState.SPEAKING,
+                    isListening = false,
+                    isSpeaking = true,
+                    lastUtteranceId = id,
+                    error = null
                 )
-            }
+            )
 
-            override fun onDone(utteranceId: String?) {
-                mainHandler.post {
+            override fun onDone(id: String?) {
+                handler.post {
                     if (released) return@post
-                    publish(
-                        state.copy(
-                            transportState = VoiceTransportState.IDLE,
-                            isSpeaking = false,
-                            lastUtteranceId = utteranceId
-                        )
-                    )
-                    val shouldListen = restartAfterSpeech || continuousMode
-                    restartAfterSpeech = false
-                    if (shouldListen) scheduleListening(RESTART_AFTER_TTS_MS)
+                    emit(state.copy(transportState = VoiceTransportState.IDLE, isSpeaking = false, lastUtteranceId = id))
+                    val reopen = listenAfterSpeech || continuous
+                    listenAfterSpeech = false
+                    if (reopen) scheduleStart(RESTART_AFTER_SPEECH_MS)
                 }
             }
 
             @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) {
-                onError(utteranceId, TextToSpeech.ERROR)
-            }
+            override fun onError(id: String?) = onError(id, TextToSpeech.ERROR)
 
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                mainHandler.post {
-                    publishError("Text to speech error ($errorCode)", recoverable = true)
-                    val shouldListen = restartAfterSpeech || continuousMode
-                    restartAfterSpeech = false
-                    if (shouldListen) scheduleListening(RESTART_AFTER_ERROR_MS)
+            override fun onError(id: String?, errorCode: Int) {
+                handler.post {
+                    fail("Text to speech error ($errorCode)", true)
+                    val reopen = listenAfterSpeech || continuous
+                    listenAfterSpeech = false
+                    if (reopen) scheduleStart(RESTART_AFTER_ERROR_MS)
                 }
             }
 
-            override fun onStop(utteranceId: String?, interrupted: Boolean) {
-                mainHandler.post {
-                    publish(
-                        state.copy(
-                            transportState = if (interrupted) VoiceTransportState.INTERRUPTED else VoiceTransportState.IDLE,
-                            isSpeaking = false,
-                            lastUtteranceId = utteranceId
-                        )
-                    )
-                }
-            }
+            override fun onStop(id: String?, interrupted: Boolean) = emitFromAnyThread(
+                state.copy(
+                    transportState = if (interrupted) VoiceTransportState.INTERRUPTED else VoiceTransportState.IDLE,
+                    isSpeaking = false,
+                    lastUtteranceId = id
+                )
+            )
         })
-        publish(state)
+        emit(state)
     }
 
     override fun startListening() {
-        if (released) return
-        if (!recognizerAvailable || recognizer == null) {
-            publish(
-                state.copy(
-                    transportState = VoiceTransportState.UNAVAILABLE,
-                    speechAvailable = false,
-                    error = "Speech recognition is not available on this device"
-                )
-            )
+        if (released || recognitionActive) return
+        val speechRecognizer = recognizer
+        if (!recognitionAvailable || speechRecognizer == null) {
+            emit(state.copy(transportState = VoiceTransportState.UNAVAILABLE, speechAvailable = false, error = "Speech recognition is not available"))
             return
         }
-        if (recognitionActive) return
         if (state.isSpeaking) tts.stop()
 
-        val now = System.currentTimeMillis()
-        if (now - lastStartAt < MIN_START_INTERVAL_MS) {
-            scheduleListening(MIN_START_INTERVAL_MS - (now - lastStartAt))
+        val elapsed = System.currentTimeMillis() - lastStartAt
+        if (elapsed in 0 until MIN_START_INTERVAL_MS) {
+            scheduleStart(MIN_START_INTERVAL_MS - elapsed)
             return
-        }
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, preferredLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, MAX_RECOGNITION_RESULTS)
-            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, COMPLETE_SILENCE_MS)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, POSSIBLY_COMPLETE_SILENCE_MS)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, MINIMUM_INPUT_MS)
         }
 
         recognitionActive = true
-        lastStartAt = now
-        publish(
+        lastStartAt = System.currentTimeMillis()
+        emit(
             state.copy(
                 transportState = VoiceTransportState.PREPARING,
                 isListening = false,
@@ -141,70 +109,63 @@ class AndroidVoiceAssistant(
                 recoverableError = false
             )
         )
-        runCatching { recognizer.startListening(intent) }
+
+        runCatching { speechRecognizer.startListening(recognitionIntent()) }
             .onFailure {
                 recognitionActive = false
-                publishError("Unable to start voice recognition: ${it.message.orEmpty()}", recoverable = true)
-                recoverIfContinuous()
+                fail("Unable to start recognition: ${it.message.orEmpty()}", true)
+                recover()
             }
     }
 
+    /** Pauses the current recognition turn but intentionally preserves continuous mode. */
     override fun stopListening() {
-        continuousMode = false
-        restartAfterSpeech = false
         recognitionActive = false
         runCatching { recognizer?.stopListening() }
-        publish(
-            state.copy(
-                transportState = VoiceTransportState.IDLE,
-                isListening = false,
-                continuousMode = false
-            )
-        )
+        emit(state.copy(transportState = VoiceTransportState.IDLE, isListening = false))
     }
 
     override fun speak(text: String, listenAfter: Boolean) {
         if (released || text.isBlank()) return
-        restartAfterSpeech = listenAfter
+        listenAfterSpeech = listenAfter
         recognitionActive = false
         runCatching { recognizer?.cancel() }
         if (!ttsReady) {
-            publishError("Text to speech is not ready yet", recoverable = true)
-            if (listenAfter || continuousMode) scheduleListening(RESTART_AFTER_ERROR_MS)
+            fail("Text to speech is not ready", true)
+            if (listenAfter || continuous) scheduleStart(RESTART_AFTER_ERROR_MS)
             return
         }
-        val utteranceId = "mayra-${UUID.randomUUID()}"
-        val result = tts.speak(text.trim(), TextToSpeech.QUEUE_FLUSH, null, utteranceId)
-        if (result == TextToSpeech.ERROR) {
-            publishError("Unable to speak the response", recoverable = true)
-            if (listenAfter || continuousMode) scheduleListening(RESTART_AFTER_ERROR_MS)
+        val id = "mayra-${UUID.randomUUID()}"
+        if (tts.speak(text.trim(), TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.ERROR) {
+            fail("Unable to speak response", true)
+            if (listenAfter || continuous) scheduleStart(RESTART_AFTER_ERROR_MS)
         }
     }
 
     override fun interruptSpeech(resumeListening: Boolean) {
-        restartAfterSpeech = false
+        listenAfterSpeech = false
         runCatching { tts.stop() }
-        publish(
-            state.copy(
-                transportState = VoiceTransportState.INTERRUPTED,
-                isSpeaking = false,
-                isListening = false
-            )
-        )
-        if (resumeListening) scheduleListening(INTERRUPT_TO_LISTEN_MS)
+        emit(state.copy(transportState = VoiceTransportState.INTERRUPTED, isSpeaking = false, isListening = false))
+        if (resumeListening) scheduleStart(INTERRUPT_DELAY_MS)
     }
 
     override fun setContinuousMode(enabled: Boolean) {
-        continuousMode = enabled
-        publish(state.copy(continuousMode = enabled))
-        if (enabled && !state.isListening && !state.isSpeaking) startListening()
-        if (!enabled && state.isListening) stopListening()
+        continuous = enabled
+        emit(state.copy(continuousMode = enabled))
+        if (enabled && !state.isListening && !state.isSpeaking && !recognitionActive) startListening()
+        if (!enabled) {
+            listenAfterSpeech = false
+            recognitionActive = false
+            handler.removeCallbacks(startRunnable)
+            runCatching { recognizer?.cancel() }
+            emit(state.copy(transportState = VoiceTransportState.IDLE, isListening = false, continuousMode = false))
+        }
     }
 
     override fun release() {
         if (released) return
         released = true
-        mainHandler.removeCallbacksAndMessages(null)
+        handler.removeCallbacksAndMessages(null)
         recognitionActive = false
         runCatching { recognizer?.cancel() }
         runCatching { recognizer?.destroy() }
@@ -215,189 +176,129 @@ class AndroidVoiceAssistant(
     override fun onInit(status: Int) {
         ttsReady = status == TextToSpeech.SUCCESS
         if (ttsReady) {
-            val preferred = Locale.forLanguageTag(preferredLanguageTag())
-            val support = tts.isLanguageAvailable(preferred)
-            tts.language = if (support >= TextToSpeech.LANG_AVAILABLE) preferred else Locale.getDefault()
-            tts.setSpeechRate(DEFAULT_SPEECH_RATE)
-            tts.setPitch(DEFAULT_PITCH)
+            val preferred = Locale.forLanguageTag(languageTag())
+            tts.language = if (tts.isLanguageAvailable(preferred) >= TextToSpeech.LANG_AVAILABLE) preferred else Locale.getDefault()
+            tts.setSpeechRate(0.96f)
+            tts.setPitch(1.02f)
         }
-        publish(
-            state.copy(
-                ttsReady = ttsReady,
-                error = if (ttsReady) state.error else "Text to speech initialization failed",
-                recoverableError = !ttsReady
-            )
-        )
+        emit(state.copy(ttsReady = ttsReady, error = if (ttsReady) state.error else "Text to speech initialization failed"))
     }
 
     override fun onReadyForSpeech(params: Bundle?) {
         restartAttempts = 0
-        publish(
-            state.copy(
-                transportState = VoiceTransportState.LISTENING,
-                isListening = true,
-                isSpeaking = false,
-                error = null,
-                recoverableError = false
-            )
-        )
+        emit(state.copy(transportState = VoiceTransportState.LISTENING, isListening = true, isSpeaking = false, error = null))
     }
 
-    override fun onBeginningOfSpeech() {
-        publish(state.copy(transportState = VoiceTransportState.LISTENING, isListening = true))
-    }
-
-    override fun onRmsChanged(rmsdB: Float) {
-        publish(state.copy(rmsDb = max(0f, rmsdB)))
-    }
-
+    override fun onBeginningOfSpeech() = emit(state.copy(transportState = VoiceTransportState.LISTENING, isListening = true))
+    override fun onRmsChanged(rmsdB: Float) = emit(state.copy(rmsDb = max(0f, rmsdB)))
     override fun onBufferReceived(buffer: ByteArray?) = Unit
+    override fun onEndOfSpeech() = emit(state.copy(transportState = VoiceTransportState.PROCESSING, isListening = false))
 
-    override fun onEndOfSpeech() {
-        publish(state.copy(transportState = VoiceTransportState.PROCESSING, isListening = false))
+    override fun onPartialResults(results: Bundle?) {
+        val text = recognitionTexts(results).firstOrNull().orEmpty().trim()
+        emit(state.copy(transportState = VoiceTransportState.LISTENING, isListening = true, transcript = text, partialTranscript = text, isFinalTranscript = false))
     }
 
     override fun onResults(results: Bundle?) {
         recognitionActive = false
-        val candidates = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-        val confidences = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
-        val best = candidates.firstOrNull().orEmpty().trim()
-        val confidence = confidences?.firstOrNull()?.toDouble()?.takeIf { it >= 0.0 } ?: DEFAULT_CONFIDENCE
-        publish(
+        val text = recognitionTexts(results).firstOrNull().orEmpty().trim()
+        val confidence = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)?.firstOrNull()?.toDouble()
+            ?.takeIf { it >= 0.0 } ?: 0.72
+        emit(
             state.copy(
                 transportState = VoiceTransportState.IDLE,
                 isListening = false,
-                transcript = best,
-                partialTranscript = best,
-                isFinalTranscript = best.isNotBlank(),
-                recognitionConfidence = confidence.coerceIn(0.0, 1.0),
-                error = null,
-                recoverableError = false
-            )
-        )
-        if (best.isBlank()) recoverIfContinuous()
-    }
-
-    override fun onPartialResults(partialResults: Bundle?) {
-        val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            ?.firstOrNull().orEmpty().trim()
-        publish(
-            state.copy(
-                transportState = VoiceTransportState.LISTENING,
-                isListening = true,
-                partialTranscript = text,
                 transcript = text,
-                isFinalTranscript = false
+                partialTranscript = text,
+                isFinalTranscript = text.isNotBlank(),
+                recognitionConfidence = confidence.coerceIn(0.0, 1.0),
+                error = null
             )
         )
+        if (text.isBlank()) recover()
     }
 
     override fun onError(error: Int) {
         recognitionActive = false
-        val mapped = mapRecognitionError(error)
-        if (mapped.silent) {
-            publish(
-                state.copy(
-                    transportState = VoiceTransportState.IDLE,
-                    isListening = false,
-                    error = null,
-                    recoverableError = true
-                )
-            )
-        } else {
-            publishError(mapped.message, mapped.recoverable)
-        }
-        if (mapped.recoverable) recoverIfContinuous()
+        val failure = recognitionFailure(error)
+        if (failure.silent) emit(state.copy(transportState = VoiceTransportState.IDLE, isListening = false, error = null, recoverableError = true))
+        else fail(failure.message, failure.recoverable)
+        if (failure.recoverable) recover()
     }
 
     override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
-    private fun recoverIfContinuous() {
-        if (!continuousMode || released) return
+    private fun recognitionIntent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag())
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag())
+        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 950L)
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 450L)
+    }
+
+    private fun recognitionTexts(bundle: Bundle?) = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+
+    private fun recover() {
+        if (!continuous || released) return
         restartAttempts++
-        if (restartAttempts > MAX_RESTART_ATTEMPTS) {
-            continuousMode = false
-            publishError("Voice loop paused after repeated recognition failures", recoverable = true)
-            publish(state.copy(continuousMode = false))
+        if (restartAttempts > 5) {
+            continuous = false
+            fail("Voice loop paused after repeated failures", true)
+            emit(state.copy(continuousMode = false))
             return
         }
-        val delay = (RESTART_BASE_DELAY_MS * restartAttempts).coerceAtMost(RESTART_MAX_DELAY_MS)
-        scheduleListening(delay)
+        scheduleStart((500L * restartAttempts).coerceAtMost(3_000L))
     }
 
-    private fun scheduleListening(delayMs: Long) {
-        if (released) return
-        mainHandler.removeCallbacks(startListeningRunnable)
-        mainHandler.postDelayed(startListeningRunnable, delayMs.coerceAtLeast(0L))
+    private fun scheduleStart(delay: Long) {
+        if (released || !continuous) return
+        handler.removeCallbacks(startRunnable)
+        handler.postDelayed(startRunnable, delay.coerceAtLeast(0L))
     }
 
-    private val startListeningRunnable = Runnable {
-        if (!released && !state.isSpeaking && !recognitionActive) startListening()
+    private val startRunnable = Runnable {
+        if (!released && continuous && !state.isSpeaking && !recognitionActive) startListening()
     }
 
-    private fun publishError(message: String, recoverable: Boolean) {
-        publish(
-            state.copy(
-                transportState = VoiceTransportState.ERROR,
-                isListening = false,
-                isSpeaking = false,
-                error = message,
-                recoverableError = recoverable
-            )
-        )
-    }
-
-    private fun publish(next: VoiceState) {
-        state = next.copy(
-            continuousMode = continuousMode,
-            speechAvailable = recognizerAvailable,
-            ttsReady = ttsReady
-        )
-        mainHandler.post { if (!released) onState(state) }
-    }
-
-    private fun preferredLanguageTag(): String {
-        val locale = Locale.getDefault()
-        return when (locale.language.lowercase(Locale.ROOT)) {
-            "hi" -> "hi-IN"
-            "en" -> if (locale.country.equals("IN", true)) "en-IN" else locale.toLanguageTag()
-            else -> locale.toLanguageTag().ifBlank { "hi-IN" }
-        }
-    }
-
-    private fun mapRecognitionError(error: Int): RecognitionFailure = when (error) {
-        SpeechRecognizer.ERROR_AUDIO -> RecognitionFailure("Microphone audio error", true)
-        SpeechRecognizer.ERROR_CLIENT -> RecognitionFailure("Voice recognition client error", true)
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> RecognitionFailure("Microphone permission is required", false)
-        SpeechRecognizer.ERROR_NETWORK -> RecognitionFailure("Voice recognition network error", true)
-        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> RecognitionFailure("Voice recognition network timeout", true)
-        SpeechRecognizer.ERROR_NO_MATCH -> RecognitionFailure("No clear speech detected", true, silent = continuousMode)
-        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> RecognitionFailure("Voice recognizer is busy", true, silent = true)
-        SpeechRecognizer.ERROR_SERVER -> RecognitionFailure("Voice recognition service error", true)
-        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> RecognitionFailure("Listening timed out", true, silent = continuousMode)
-        else -> RecognitionFailure("Voice recognition error ($error)", true)
-    }
-
-    private data class RecognitionFailure(
-        val message: String,
-        val recoverable: Boolean,
-        val silent: Boolean = false
+    private fun fail(message: String, recoverable: Boolean) = emit(
+        state.copy(transportState = VoiceTransportState.ERROR, isListening = false, isSpeaking = false, error = message, recoverableError = recoverable)
     )
 
+    private fun emitFromAnyThread(next: VoiceState) = handler.post { emit(next) }
+
+    private fun emit(next: VoiceState) {
+        state = next.copy(continuousMode = continuous, speechAvailable = recognitionAvailable, ttsReady = ttsReady)
+        if (!released) onState(state)
+    }
+
+    private fun languageTag(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
+        "hi" -> "hi-IN"
+        "en" -> if (Locale.getDefault().country.equals("IN", true)) "en-IN" else Locale.getDefault().toLanguageTag()
+        else -> Locale.getDefault().toLanguageTag().ifBlank { "hi-IN" }
+    }
+
+    private fun recognitionFailure(error: Int): Failure = when (error) {
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> Failure("Microphone permission is required", false)
+        SpeechRecognizer.ERROR_AUDIO -> Failure("Microphone audio error", true)
+        SpeechRecognizer.ERROR_NETWORK -> Failure("Voice recognition network error", true)
+        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> Failure("Voice recognition network timeout", true)
+        SpeechRecognizer.ERROR_NO_MATCH -> Failure("No clear speech detected", true, continuous)
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> Failure("Voice recognizer is busy", true, true)
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> Failure("Listening timed out", true, continuous)
+        SpeechRecognizer.ERROR_SERVER -> Failure("Voice recognition service error", true)
+        else -> Failure("Voice recognition error ($error)", true)
+    }
+
+    private data class Failure(val message: String, val recoverable: Boolean, val silent: Boolean = false)
+
     companion object {
-        private const val MAX_RECOGNITION_RESULTS = 3
-        private const val COMPLETE_SILENCE_MS = 950L
-        private const val POSSIBLY_COMPLETE_SILENCE_MS = 600L
-        private const val MINIMUM_INPUT_MS = 450L
         private const val MIN_START_INTERVAL_MS = 450L
-        private const val RESTART_AFTER_TTS_MS = 280L
+        private const val RESTART_AFTER_SPEECH_MS = 280L
         private const val RESTART_AFTER_ERROR_MS = 700L
-        private const val INTERRUPT_TO_LISTEN_MS = 180L
-        private const val RESTART_BASE_DELAY_MS = 500L
-        private const val RESTART_MAX_DELAY_MS = 3_000L
-        private const val MAX_RESTART_ATTEMPTS = 5
-        private const val DEFAULT_CONFIDENCE = 0.72
-        private const val DEFAULT_SPEECH_RATE = 0.96f
-        private const val DEFAULT_PITCH = 1.02f
+        private const val INTERRUPT_DELAY_MS = 180L
     }
 }
