@@ -36,7 +36,24 @@ class MayraMemoryManager(
     suspend fun recall(query: String, limit: Int = DEFAULT_RECALL_LIMIT): List<MemoryEntity> {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isEmpty()) return emptyList()
-        return memoryRepository.find(normalizedQuery, limit.coerceIn(1, MAX_RECALL_LIMIT))
+
+        val safeLimit = limit.coerceIn(1, MAX_RECALL_LIMIT)
+        val exactMatches = memoryRepository.find(normalizedQuery, safeLimit)
+        if (exactMatches.size >= safeLimit) return exactMatches
+
+        val matchesById = LinkedHashMap<Long, MemoryEntity>()
+        exactMatches.forEach { matchesById[it.id] = it }
+
+        recallTerms(normalizedQuery).forEach { term ->
+            if (matchesById.size >= safeLimit) return@forEach
+            memoryRepository.find(term, safeLimit).forEach { memory ->
+                if (matchesById.size < safeLimit) {
+                    matchesById.putIfAbsent(memory.id, memory)
+                }
+            }
+        }
+
+        return matchesById.values.toList()
     }
 
     suspend fun appendUserMessage(sessionId: String, message: String): Long =
@@ -74,6 +91,16 @@ class MayraMemoryManager(
         )
     }
 
+    private fun recallTerms(query: String): List<String> = query
+        .lowercase()
+        .split(NON_WORD_REGEX)
+        .asSequence()
+        .map(String::trim)
+        .filter { it.length >= MIN_RECALL_TERM_LENGTH }
+        .filterNot(STOP_WORDS::contains)
+        .distinct()
+        .toList()
+
     companion object {
         const val CATEGORY_GENERAL = "general"
         const val ROLE_USER = "user"
@@ -85,5 +112,12 @@ class MayraMemoryManager(
         const val MAX_RECALL_LIMIT = 50
         const val DEFAULT_CONVERSATION_LIMIT = 30
         const val MAX_CONVERSATION_LIMIT = 100
+
+        private const val MIN_RECALL_TERM_LENGTH = 3
+        private val NON_WORD_REGEX = Regex("[^\\p{L}\\p{N}]+")
+        private val STOP_WORDS = setOf(
+            "the", "and", "for", "with", "from", "that", "this", "please", "reply",
+            "hai", "hain", "ka", "ki", "ke", "ko", "se", "me", "mein", "aur"
+        )
     }
 }
