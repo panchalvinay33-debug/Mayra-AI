@@ -1,5 +1,6 @@
 package ai.mayra.app
 
+import ai.mayra.app.autonomy.MayraAutonomyCoordinator
 import ai.mayra.app.background.BackgroundTaskQueue
 import ai.mayra.app.background.MayraAmbientControlCenter
 import ai.mayra.app.background.MayraBackgroundRuntime
@@ -81,6 +82,11 @@ class MayraApplication : Application() {
             planStore = planStore,
             pendingActions = pendingActions
         )
+        val autonomy = MayraAutonomyCoordinator(
+            context = applicationContext,
+            skills = skillRegistry,
+            contextProvider = contextProvider
+        )
 
         MayraRuntime.install(
             brain = brain,
@@ -90,13 +96,15 @@ class MayraApplication : Application() {
             planStore = planStore,
             planRuntime = planRuntime,
             orchestrator = orchestrator,
-            controlCenter = controlCenter
+            controlCenter = controlCenter,
+            autonomy = autonomy
         )
 
         contextMemory.prune()
         planStore.prune()
         pendingActions.expireDue()
         pendingActions.prune()
+        autonomy.maintenance()
         MayraBackgroundRuntime.initialize(applicationContext)
         MayraBriefingScheduler.sync(applicationContext)
     }
@@ -123,9 +131,11 @@ object MayraRuntime {
         private set
     lateinit var controlCenter: MayraRuntimeControlCenter
         private set
+    lateinit var autonomy: MayraAutonomyCoordinator
+        private set
 
     val installed: Boolean
-        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized
+        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized && ::autonomy.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -135,7 +145,8 @@ object MayraRuntime {
         planStore: MayraPlanStore,
         planRuntime: MayraPlanRuntime,
         orchestrator: MayraRuntimeOrchestrator,
-        controlCenter: MayraRuntimeControlCenter
+        controlCenter: MayraRuntimeControlCenter,
+        autonomy: MayraAutonomyCoordinator
     ) {
         this.brain = brain
         this.skills = skills
@@ -145,5 +156,6 @@ object MayraRuntime {
         this.planRuntime = planRuntime
         this.orchestrator = orchestrator
         this.controlCenter = controlCenter
+        this.autonomy = autonomy
     }
 }
