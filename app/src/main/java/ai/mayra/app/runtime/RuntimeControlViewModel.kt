@@ -10,6 +10,14 @@ class RuntimeControlViewModel(
     private val snapshotProvider: () -> RuntimeControlSnapshot = {
         check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
         MayraRuntime.controlCenter.snapshot()
+    },
+    private val approveAction: (String) -> RuntimeControlResult = { actionId ->
+        check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
+        MayraRuntime.controlCenter.approvePendingAction(actionId)
+    },
+    private val rejectAction: (String) -> RuntimeControlResult = { actionId ->
+        check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
+        MayraRuntime.controlCenter.rejectPendingAction(actionId)
     }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RuntimeControlUiState.Loading)
@@ -20,7 +28,34 @@ class RuntimeControlViewModel(
     }
 
     fun refresh() {
-        _uiState.value = runCatching { snapshotProvider().toUiState() }
+        val notice = _uiState.value.notice
+        _uiState.value = runCatching { snapshotProvider().toUiState().copy(notice = notice) }
             .getOrElse { RuntimeControlUiState.failure(it.message ?: "Runtime snapshot failed.") }
+    }
+
+    fun approve(actionId: String) = performAction { approveAction(actionId) }
+
+    fun reject(actionId: String) = performAction { rejectAction(actionId) }
+
+    private fun performAction(action: () -> RuntimeControlResult) {
+        val result = runCatching(action).getOrElse {
+            _uiState.value = _uiState.value.copy(
+                notice = null,
+                error = it.message ?: "Runtime action failed."
+            )
+            return
+        }
+        val message = when (result) {
+            is RuntimeControlResult.Success -> result.message
+            is RuntimeControlResult.NotFound -> result.message
+            is RuntimeControlResult.InvalidState -> result.message
+            is RuntimeControlResult.Failure -> result.message
+        }
+        val succeeded = result is RuntimeControlResult.Success
+        _uiState.value = _uiState.value.copy(
+            notice = message.takeIf { succeeded },
+            error = message.takeUnless { succeeded }
+        )
+        if (succeeded) refresh()
     }
 }
