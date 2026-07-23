@@ -5,6 +5,7 @@ import ai.mayra.app.agent.AgentRun
 import ai.mayra.app.agent.AgentRunState
 import ai.mayra.app.agent.AgentStep
 import ai.mayra.app.agent.AgentStepKind
+import ai.mayra.app.agent.AgentStepState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -108,14 +109,27 @@ class MayraExecutionControlPlaneTest {
         val plane = plane()
         val request = plane.enqueue(request("agent"))
         assertNotNull(plane.acquireNext("worker"))
+        val completedStep = AgentStep(
+            order = 0,
+            title = "Checkpoint",
+            kind = AgentStepKind.CHECKPOINT,
+            state = AgentStepState.COMPLETED,
+            completedAt = clock
+        )
         val plan = AgentPlan(
             title = "Plan",
             objective = "Complete work",
             createdAt = clock,
             expiresAt = clock + 60_000,
-            steps = listOf(AgentStep(order = 0, title = "Checkpoint", kind = AgentStepKind.CHECKPOINT))
+            steps = listOf(completedStep)
         )
-        val run = AgentRun(plan = plan, state = AgentRunState.COMPLETED, steps = plan.steps, createdAt = clock, updatedAt = clock)
+        val run = AgentRun(
+            plan = plan,
+            state = AgentRunState.COMPLETED,
+            steps = plan.steps,
+            createdAt = clock,
+            updatedAt = clock
+        )
 
         val updated = plane.updateFromAgent(request.id, "worker", run)
 
