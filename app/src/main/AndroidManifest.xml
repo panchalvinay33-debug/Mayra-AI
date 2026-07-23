@@ -15,6 +15,7 @@
     </queries>
 
     <application
+        android:name=".MayraApplication"
         android:allowBackup="true"
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
