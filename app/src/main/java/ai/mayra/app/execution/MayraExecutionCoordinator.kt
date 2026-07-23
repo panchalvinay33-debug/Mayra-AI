@@ -3,7 +3,7 @@ package ai.mayra.app.execution
 import ai.mayra.app.agent.AgentRun
 import ai.mayra.app.agent.AgentRunState
 import ai.mayra.app.agent.MayraAgentRuntime
-import ai.mayra.app.device.DeviceWorkDecision
+import ai.mayra.app.device.DeviceWorkGate
 import ai.mayra.app.device.MayraDeviceRuntime
 
 interface ExecutionCheckpointStore {
@@ -96,9 +96,11 @@ class MayraExecutionCoordinator(
         val gate = deviceGate(request)
         if (!gate.allowed) {
             blockedByDevice++
-            val failed = controlPlane.fail(lease.requestId, ownerId, gate.reason ?: "Device conditions are not suitable", retryable = gate.retryable)
+            val reason = gate.reasons.joinToString(" ").ifBlank { "Device conditions are not suitable" }
+            val retryable = gate.retryWhenConnected || gate.retryAfterCooldown
+            val failed = controlPlane.fail(lease.requestId, ownerId, reason, retryable = retryable)
             persist()
-            return ExecutionDispatchResult(failed, run, leased = true, waiting = gate.retryable, blockedReason = gate.reason)
+            return ExecutionDispatchResult(failed, run, leased = true, waiting = retryable, blockedReason = reason)
         }
 
         controlPlane.markRunning(lease.requestId, ownerId)
@@ -193,13 +195,13 @@ class MayraExecutionCoordinator(
         return ExecutionResource.entries.toSet() - blocked
     }
 
-    private fun deviceGate(request: ExecutionRequest): DeviceWorkDecision {
+    private fun deviceGate(request: ExecutionRequest): DeviceWorkGate {
         val needsNetwork = ExecutionResource.NETWORK in request.resources
         val heavy = ExecutionResource.CPU_HEAVY in request.resources
-        return deviceRuntime.canRunWork(
-            requiresNetwork = needsNetwork,
-            allowMetered = request.priority >= ExecutionPriority.HIGH,
-            heavy = heavy
+        if (!heavy && !needsNetwork) return DeviceWorkGate(true, emptyList())
+        return deviceRuntime.gateHeavyWork(
+            requireNetwork = needsNetwork,
+            allowMetered = request.priority >= ExecutionPriority.HIGH
         )
     }
 
