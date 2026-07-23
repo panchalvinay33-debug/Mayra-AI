@@ -32,9 +32,10 @@ class MayraRuntimeIntegrationTest {
         memory = MayraContextMemory(context)
         registry = MayraSkillRegistry()
         planner = MayraTaskPlanner()
-        brain = MayraBrainCoordinator(BrainEventBus()) {
-            BrainContextSnapshot(10, 0, 0, true, 0)
-        }
+        brain = MayraBrainCoordinator(
+            eventBus = BrainEventBus(),
+            contextProvider = { BrainContextSnapshot(10, 0, 0, true, 0) }
+        )
     }
 
     @Test
@@ -113,9 +114,12 @@ class MayraRuntimeIntegrationTest {
         )
         val plan = planner.createPlan("Call", "call mummy", listOf(step))
         store.upsert(plan)
-        val runtime = MayraPlanRuntime(planner, store, registry) {
-            BrainContextSnapshot(10, 0, 0, true, 0)
-        }
+        val runtime = MayraPlanRuntime(
+            planner = planner,
+            store = store,
+            skills = registry,
+            contextProvider = { BrainContextSnapshot(10, 0, 0, true, 0) }
+        )
 
         val blocked = runtime.executeNext(plan.id)
         assertTrue(blocked.waitingForConfirmation)
