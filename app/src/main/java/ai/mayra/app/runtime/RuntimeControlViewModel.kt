@@ -8,6 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+internal fun workflowHistoryCleanupMessage(removed: Int): String = when (removed.coerceAtLeast(0)) {
+    0 -> "No completed workflow history to clear."
+    1 -> "Cleared 1 completed workflow."
+    else -> "Cleared ${removed.coerceAtLeast(0)} completed workflows."
+}
+
 class RuntimeControlViewModel(
     private val snapshotProvider: () -> RuntimeControlSnapshot = {
         check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
@@ -45,7 +51,7 @@ class RuntimeControlViewModel(
         if (_uiState.value.isBusy) return
         val notice = _uiState.value.notice
         _uiState.value = runCatching { snapshotProvider().toUiState().copy(notice = notice) }
-            .getOrElse { RuntimeControlUiState.failure(it.message ?: "Runtime snapshot failed.") }
+            .getOrElse { RuntimeControlUiState.failure(it.message ?: "Runtime snapshot failed.").copy(notice = notice) }
     }
 
     fun approve(actionId: String) = performAction("Approving action…") { approveAction(actionId) }
@@ -60,12 +66,7 @@ class RuntimeControlViewModel(
             finishFailure(it.message ?: "Workflow history could not be cleared.")
             return
         }
-        finishResult(
-            RuntimeControlResult.Success(
-                if (removed == 0) "No completed workflow history to clear."
-                else "Cleared $removed completed workflow${if (removed == 1) "" else "s"}."
-            )
-        )
+        finishResult(RuntimeControlResult.Success(workflowHistoryCleanupMessage(removed)))
     }
 
     fun runNext(planId: String) {
