@@ -30,7 +30,7 @@ import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.device.MayraDeviceRuntime
 import ai.mayra.app.device.androidDeviceRuntime
-import ai.mayra.app.execution.InMemoryExecutionCheckpointStore
+import ai.mayra.app.execution.AndroidExecutionCheckpointStore
 import ai.mayra.app.execution.MayraExecutionControlPlane
 import ai.mayra.app.execution.MayraExecutionCoordinator
 import ai.mayra.app.knowledge.MayraKnowledgeStore
@@ -81,7 +81,7 @@ class MayraApplication : Application() {
             controlPlane = executionControlPlane,
             agentRuntime = agentRuntime,
             deviceRuntime = deviceRuntime,
-            checkpointStore = InMemoryExecutionCheckpointStore()
+            checkpointStore = AndroidExecutionCheckpointStore(applicationContext)
         )
 
         val contextProvider = {
