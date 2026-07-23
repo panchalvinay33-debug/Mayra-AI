@@ -77,8 +77,13 @@ class DeviceActionCoordinator(
     }
 
     fun reject(token: String, reason: String = "User cancelled the action."): DeviceActionExecutionResult {
-        val decision = safetyGate.reject(token, reason)
-        return DeviceActionExecutionResult.Rejected(decision.request, decision.reason)
+        return when (val decision = safetyGate.reject(token, reason)) {
+            is ActionGateDecision.Rejected -> DeviceActionExecutionResult.Rejected(
+                decision.request,
+                decision.reason
+            )
+            else -> error("Reject must always produce a rejected decision.")
+        }
     }
 
     fun snapshot(): ActionSafetySnapshot = safetyGate.snapshot()
