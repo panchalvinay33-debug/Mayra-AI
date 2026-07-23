@@ -1,10 +1,11 @@
 package ai.mayra.app.chat
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,5 +61,18 @@ class ChatViewModel(
                     }
                 }
         }
+    }
+
+    companion object {
+        fun factory(assistant: MayraAssistant): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    require(modelClass.isAssignableFrom(ChatViewModel::class.java)) {
+                        "Unsupported ViewModel: ${modelClass.name}"
+                    }
+                    return ChatViewModel(assistant) as T
+                }
+            }
     }
 }
