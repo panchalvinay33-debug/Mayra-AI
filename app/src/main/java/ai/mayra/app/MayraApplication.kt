@@ -1,5 +1,11 @@
 package ai.mayra.app
 
+import ai.mayra.app.agent.AgentRisk
+import ai.mayra.app.agent.AgentToolDescriptor
+import ai.mayra.app.agent.MayraAgentPlanner
+import ai.mayra.app.agent.MayraAgentRuntime
+import ai.mayra.app.agent.MayraAgentToolRegistry
+import ai.mayra.app.agent.UnavailableAgentTool
 import ai.mayra.app.autonomy.MayraAutonomyCoordinator
 import ai.mayra.app.background.BackgroundTaskQueue
 import ai.mayra.app.background.MayraAmbientControlCenter
@@ -57,6 +63,9 @@ class MayraApplication : Application() {
             runtime = MayraVisionRuntime(listOf(UnavailableVisionProvider())),
             memory = MayraVisionMemory()
         )
+        val agentTools = MayraAgentToolRegistry(defaultAgentToolPlaceholders())
+        val agentPlanner = MayraAgentPlanner(agentTools)
+        val agentRuntime = MayraAgentRuntime(agentTools.snapshot())
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -91,7 +100,10 @@ class MayraApplication : Application() {
             autonomy = autonomy,
             personalIntelligence = personalIntelligence,
             voice = voice,
-            vision = vision
+            vision = vision,
+            agentTools = agentTools,
+            agentPlanner = agentPlanner,
+            agentRuntime = agentRuntime
         )
 
         contextMemory.prune()
@@ -103,6 +115,53 @@ class MayraApplication : Application() {
         MayraBackgroundRuntime.initialize(applicationContext)
         MayraBriefingScheduler.sync(applicationContext)
     }
+
+    private fun defaultAgentToolPlaceholders() = listOf(
+        unavailableTool(
+            id = "communication",
+            operations = setOf("compose_message", "compose_whatsapp", "call"),
+            risk = AgentRisk.HIGH,
+            reason = "Communication agent adapter is not installed yet. Existing direct device actions remain available."
+        ),
+        unavailableTool(
+            id = "personal",
+            operations = setOf("create_reminder", "create_note"),
+            reason = "Personal intelligence agent adapter is not installed yet."
+        ),
+        unavailableTool(
+            id = "calendar",
+            operations = setOf("create_event", "list_events"),
+            reason = "Calendar agent provider is not installed yet."
+        ),
+        unavailableTool(
+            id = "search",
+            operations = setOf("weather", "unified_search"),
+            requiresNetwork = true,
+            reason = "Search and weather agent provider is not installed yet."
+        ),
+        unavailableTool(
+            id = "vision",
+            operations = setOf("analyze"),
+            reason = "A real vision provider is not installed yet."
+        )
+    )
+
+    private fun unavailableTool(
+        id: String,
+        operations: Set<String>,
+        risk: AgentRisk = AgentRisk.LOW,
+        requiresNetwork: Boolean = false,
+        reason: String
+    ) = UnavailableAgentTool(
+        descriptor = AgentToolDescriptor(
+            id = id,
+            displayName = id.replaceFirstChar(Char::uppercase),
+            operations = operations,
+            risk = risk,
+            requiresNetwork = requiresNetwork
+        ),
+        reason = reason
+    )
 }
 
 /** Application-level service container shared by chat, background workers and future UI screens. */
@@ -133,11 +192,18 @@ object MayraRuntime {
         private set
     lateinit var vision: MayraVisionCoordinator
         private set
+    lateinit var agentTools: MayraAgentToolRegistry
+        private set
+    lateinit var agentPlanner: MayraAgentPlanner
+        private set
+    lateinit var agentRuntime: MayraAgentRuntime
+        private set
 
     val installed: Boolean
         get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized &&
             ::autonomy.isInitialized && ::personalIntelligence.isInitialized &&
-            ::voice.isInitialized && ::vision.isInitialized
+            ::voice.isInitialized && ::vision.isInitialized &&
+            ::agentTools.isInitialized && ::agentPlanner.isInitialized && ::agentRuntime.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -151,7 +217,10 @@ object MayraRuntime {
         autonomy: MayraAutonomyCoordinator,
         personalIntelligence: MayraPersonalIntelligence,
         voice: MayraVoiceCoordinator,
-        vision: MayraVisionCoordinator
+        vision: MayraVisionCoordinator,
+        agentTools: MayraAgentToolRegistry,
+        agentPlanner: MayraAgentPlanner,
+        agentRuntime: MayraAgentRuntime
     ) {
         this.brain = brain
         this.skills = skills
@@ -165,5 +234,8 @@ object MayraRuntime {
         this.personalIntelligence = personalIntelligence
         this.voice = voice
         this.vision = vision
+        this.agentTools = agentTools
+        this.agentPlanner = agentPlanner
+        this.agentRuntime = agentRuntime
     }
 }
