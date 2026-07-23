@@ -28,6 +28,10 @@ class RuntimeControlViewModel(
     private val runNextAction: suspend (String) -> RuntimeControlResult = { planId ->
         check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
         MayraRuntime.controlCenter.executeNextPlanStep(planId)
+    },
+    private val clearHistoryAction: () -> Int = {
+        check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
+        MayraRuntime.controlCenter.clearCompletedHistory()
     }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RuntimeControlUiState.Loading)
@@ -49,6 +53,20 @@ class RuntimeControlViewModel(
     fun reject(actionId: String) = performAction("Rejecting action…") { rejectAction(actionId) }
 
     fun cancelPlan(planId: String) = performAction("Cancelling workflow…") { cancelPlanAction(planId) }
+
+    fun clearCompletedHistory() {
+        if (!beginAction("Clearing completed workflow history…")) return
+        val removed = runCatching(clearHistoryAction).getOrElse {
+            finishFailure(it.message ?: "Workflow history could not be cleared.")
+            return
+        }
+        finishResult(
+            RuntimeControlResult.Success(
+                if (removed == 0) "No completed workflow history to clear."
+                else "Cleared $removed completed workflow${if (removed == 1) "" else "s"}."
+            )
+        )
+    }
 
     fun runNext(planId: String) {
         if (!beginAction("Running next workflow step…")) return
