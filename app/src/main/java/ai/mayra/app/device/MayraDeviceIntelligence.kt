@@ -321,14 +321,19 @@ class MayraDeviceIntelligence(
     fun recent(limit: Int = 20): List<DeviceSnapshot> = snapshots.toList().takeLast(limit.coerceIn(1, policy.maxSnapshots)).reversed()
 
     @Synchronized
-    fun diagnostics(): DeviceDiagnostics = DeviceDiagnostics(
-        snapshots = snapshots.size,
-        generatedInsights = generatedInsights,
-        suppressedDuplicates = suppressedDuplicates,
-        lastCapturedAt = snapshots.lastOrNull()?.capturedAt,
-        activeCriticalInsights = planner.plan(snapshots.lastOrNull() ?: return DeviceDiagnostics(0, generatedInsights, suppressedDuplicates, null, 0))
-            .count { it.severity == DeviceSeverity.CRITICAL }
-    )
+    fun diagnostics(): DeviceDiagnostics {
+        val latest = snapshots.lastOrNull()
+        val activeCriticalInsights = latest?.let { snapshot ->
+            planner.plan(snapshot).count { it.severity == DeviceSeverity.CRITICAL }
+        } ?: 0
+        return DeviceDiagnostics(
+            snapshots = snapshots.size,
+            generatedInsights = generatedInsights,
+            suppressedDuplicates = suppressedDuplicates,
+            lastCapturedAt = latest?.capturedAt,
+            activeCriticalInsights = activeCriticalInsights
+        )
+    }
 
     @Synchronized
     fun clear() {
