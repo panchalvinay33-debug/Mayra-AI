@@ -79,4 +79,15 @@ class RuntimeAttentionNotifierTest {
         assertEquals("1 blocked workflow · 2 steps waiting.", alert?.message)
         assertEquals("workflow:1:2", alert?.fingerprint)
     }
+
+    @Test
+    fun `attention schedule enforces WorkManager minimum interval`() {
+        assertEquals(15L, runtimeAttentionIntervalMinutes(1L))
+        assertEquals(15L, runtimeAttentionIntervalMinutes(14L))
+    }
+
+    @Test
+    fun `attention schedule preserves valid interval`() {
+        assertEquals(30L, runtimeAttentionIntervalMinutes(30L))
+    }
 }
