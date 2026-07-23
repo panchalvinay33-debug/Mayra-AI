@@ -2,8 +2,6 @@ package ai.mayra.app.device
 
 import android.app.ActivityManager
 import android.app.AlarmManager
-import android.app.KeyguardManager
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -84,10 +82,13 @@ class AndroidDeviceStateProvider(
     private fun readStorage(): StorageSnapshot {
         val root = Environment.getDataDirectory()
         val stats = StatFs(root.absolutePath)
+        val total = stats.totalBytes.coerceAtLeast(0)
         return StorageSnapshot(
-            totalBytes = stats.totalBytes.coerceAtLeast(0),
-            freeBytes = stats.availableBytes.coerceIn(0, stats.totalBytes.coerceAtLeast(0)),
-            cacheBytes = runCatching { appContext.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } }.getOrNull()
+            totalBytes = total,
+            freeBytes = stats.availableBytes.coerceIn(0, total),
+            cacheBytes = runCatching {
+                appContext.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            }.getOrNull()
         )
     }
 
@@ -95,9 +96,10 @@ class AndroidDeviceStateProvider(
         val manager = appContext.getSystemService(ActivityManager::class.java)
         val info = ActivityManager.MemoryInfo()
         manager.getMemoryInfo(info)
+        val total = info.totalMem.coerceAtLeast(0)
         return MemorySnapshot(
-            totalBytes = info.totalMem.coerceAtLeast(0),
-            availableBytes = info.availMem.coerceIn(0, info.totalMem.coerceAtLeast(0)),
+            totalBytes = total,
+            availableBytes = info.availMem.coerceIn(0, total),
             lowMemory = info.lowMemory
         )
     }
@@ -118,7 +120,8 @@ class AndroidDeviceStateProvider(
 
     private fun readNetwork(): NetworkSnapshot {
         val manager = appContext.getSystemService(ConnectivityManager::class.java)
-        val network = manager.activeNetwork ?: return NetworkSnapshot(false, false, NetworkTransport.NONE, manager.isActiveNetworkMetered)
+        val network = manager.activeNetwork
+            ?: return NetworkSnapshot(false, false, NetworkTransport.NONE, manager.isActiveNetworkMetered)
         val caps = manager.getNetworkCapabilities(network)
             ?: return NetworkSnapshot(true, false, NetworkTransport.OTHER, manager.isActiveNetworkMetered)
         val transport = when {
@@ -139,21 +142,20 @@ class AndroidDeviceStateProvider(
         )
     }
 
+    @Suppress("DEPRECATION")
     private fun readCapabilities(): DeviceCapabilities {
         val pm = appContext.packageManager
         val sensors = appContext.getSystemService(SensorManager::class.java)
-        val camera = pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
-        val flash = pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
         val notificationDeclared = runCatching {
             pm.getServiceInfo(
                 android.content.ComponentName(appContext, "ai.mayra.app.background.MayraNotificationListener"),
-                PackageManager.ComponentInfoFlags.of(0)
+                0
             )
             true
         }.getOrDefault(false)
         return DeviceCapabilities(
-            camera = camera,
-            cameraFlash = flash,
+            camera = pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY),
+            cameraFlash = pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH),
             bluetooth = pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH),
             telephony = pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY),
             microphone = pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE),
@@ -161,7 +163,8 @@ class AndroidDeviceStateProvider(
             gyroscope = sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null,
             stepCounter = sensors.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null,
             biometric = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appContext.getSystemService(BiometricManager::class.java)?.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS
+                appContext.getSystemService(BiometricManager::class.java)?.canAuthenticate() ==
+                    BiometricManager.BIOMETRIC_SUCCESS
             } else false,
             notificationListenerDeclared = notificationDeclared,
             exactAlarmDeclared = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
