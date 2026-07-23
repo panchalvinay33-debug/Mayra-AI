@@ -13,9 +13,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 enum class RuntimeHealth { HEALTHY, ATTENTION, DEGRADED }
 
@@ -31,7 +33,9 @@ data class RuntimeControlUiState(
     val pendingActions: List<RuntimePendingAction>,
     val capturedAt: Long,
     val notice: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val isBusy: Boolean = false,
+    val busyLabel: String? = null
 ) {
     companion object {
         val Loading = RuntimeControlUiState(
@@ -111,29 +115,39 @@ fun RuntimeControlDialog(
         onRefresh()
     }
 ) {
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(AUTO_REFRESH_MILLIS)
+            if (!state.isBusy) onRefresh()
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Runtime control") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(state.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                state.busyLabel?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 state.notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 state.metrics.forEach { RuntimeMetricCard(it) }
                 if (state.pendingActions.isNotEmpty()) {
                     Text("Waiting for approval", fontWeight = FontWeight.SemiBold)
-                    state.pendingActions.forEach { RuntimePendingActionCard(it, onApprove, onReject) }
+                    state.pendingActions.forEach { RuntimePendingActionCard(it, state.isBusy, onApprove, onReject) }
                 }
                 if (state.activePlans.isNotEmpty()) {
                     Text("Active workflows", fontWeight = FontWeight.SemiBold)
-                    state.activePlans.forEach { RuntimeActivePlanCard(it, onRunNext, onCancelPlan) }
+                    state.activePlans.forEach { RuntimeActivePlanCard(it, state.isBusy, onRunNext, onCancelPlan) }
                 }
                 if (state.metrics.isNotEmpty() && state.pendingActions.isEmpty() && state.activePlans.isEmpty()) {
                     Text("No active workflows or pending confirmations.", style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onRefresh) { Text("Refresh") } },
+        confirmButton = {
+            TextButton(onClick = onRefresh, enabled = !state.isBusy) { Text("Refresh") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 }
@@ -152,28 +166,40 @@ private fun RuntimeMetricCard(metric: RuntimeMetric) {
 }
 
 @Composable
-private fun RuntimePendingActionCard(action: RuntimePendingAction, onApprove: (String) -> Unit, onReject: (String) -> Unit) {
+private fun RuntimePendingActionCard(
+    action: RuntimePendingAction,
+    isBusy: Boolean,
+    onApprove: (String) -> Unit,
+    onReject: (String) -> Unit
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(action.title, fontWeight = FontWeight.SemiBold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onReject(action.id) }) { Text("Reject") }
-                OutlinedButton(onClick = { onApprove(action.id) }) { Text("Approve") }
+                OutlinedButton(onClick = { onReject(action.id) }, enabled = !isBusy) { Text("Reject") }
+                OutlinedButton(onClick = { onApprove(action.id) }, enabled = !isBusy) { Text("Approve") }
             }
         }
     }
 }
 
 @Composable
-private fun RuntimeActivePlanCard(plan: RuntimeActivePlan, onRunNext: (String) -> Unit, onCancelPlan: (String) -> Unit) {
+private fun RuntimeActivePlanCard(
+    plan: RuntimeActivePlan,
+    isBusy: Boolean,
+    onRunNext: (String) -> Unit,
+    onCancelPlan: (String) -> Unit
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(plan.title, fontWeight = FontWeight.SemiBold)
             Text(plan.state, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onCancelPlan(plan.id) }) { Text("Cancel") }
-                OutlinedButton(onClick = { onRunNext(plan.id) }) { Text("Run next") }
+                OutlinedButton(onClick = { onCancelPlan(plan.id) }, enabled = !isBusy) { Text("Cancel") }
+                OutlinedButton(onClick = { onRunNext(plan.id) }, enabled = !isBusy) { Text("Run next") }
             }
         }
     }
 }
+
+private const val AUTO_REFRESH_MILLIS = 5_000L
