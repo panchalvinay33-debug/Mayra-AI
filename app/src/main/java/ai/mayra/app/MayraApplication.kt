@@ -25,6 +25,10 @@ import ai.mayra.app.knowledge.MayraPersonalIntelligence
 import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import ai.mayra.app.runtime.MayraRuntimeControlCenter
+import ai.mayra.app.vision.MayraVisionCoordinator
+import ai.mayra.app.vision.MayraVisionMemory
+import ai.mayra.app.vision.MayraVisionRuntime
+import ai.mayra.app.vision.UnavailableVisionProvider
 import ai.mayra.app.voice.MayraVoiceCoordinator
 import android.app.Application
 import java.util.Calendar
@@ -35,15 +39,11 @@ class MayraApplication : Application() {
 
         val actionExecutor = AndroidActionExecutor(applicationContext)
         MayraRuntime.assistant = LocalMayraAssistant(
-            LocalCommandEngine(
-                actionDispatcher = ActionDispatcher(actionExecutor)
-            )
+            LocalCommandEngine(actionDispatcher = ActionDispatcher(actionExecutor))
         )
 
         val eventBus = BrainEventBus()
-        val skillRegistry = MayraSkillRegistry().apply {
-            registerBuiltInDeviceSkills(actionExecutor)
-        }
+        val skillRegistry = MayraSkillRegistry().apply { registerBuiltInDeviceSkills(actionExecutor) }
         val contextMemory = MayraContextMemory(applicationContext)
         val taskPlanner = MayraTaskPlanner()
         val planStore = MayraPlanStore(applicationContext)
@@ -51,11 +51,12 @@ class MayraApplication : Application() {
         val backgroundTasks = BackgroundTaskQueue(applicationContext)
         val knowledgeStore = MayraKnowledgeStore(applicationContext)
         val personalMemory = MayraPersonalMemory(applicationContext)
-        val personalIntelligence = MayraPersonalIntelligence(
-            knowledge = knowledgeStore,
-            memory = personalMemory
-        )
+        val personalIntelligence = MayraPersonalIntelligence(knowledgeStore, personalMemory)
         val voice = MayraVoiceCoordinator()
+        val vision = MayraVisionCoordinator(
+            runtime = MayraVisionRuntime(listOf(UnavailableVisionProvider())),
+            memory = MayraVisionMemory()
+        )
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -68,36 +69,15 @@ class MayraApplication : Application() {
                 userAvailable = true
             )
         }
-        val brain = MayraBrainCoordinator(
-            eventBus = eventBus,
-            contextProvider = contextProvider
-        )
-        val planRuntime = MayraPlanRuntime(
-            planner = taskPlanner,
-            store = planStore,
-            skills = skillRegistry,
-            contextProvider = contextProvider
-        )
+        val brain = MayraBrainCoordinator(eventBus, contextProvider)
+        val planRuntime = MayraPlanRuntime(taskPlanner, planStore, skillRegistry, contextProvider)
         val orchestrator = MayraRuntimeOrchestrator(
-            context = applicationContext,
-            brain = brain,
-            skills = skillRegistry,
-            planner = taskPlanner,
-            memory = contextMemory,
-            pendingActions = pendingActions
+            applicationContext, brain, skillRegistry, taskPlanner, contextMemory, pendingActions
         )
         val controlCenter = MayraRuntimeControlCenter(
-            context = applicationContext,
-            orchestrator = orchestrator,
-            planRuntime = planRuntime,
-            planStore = planStore,
-            pendingActions = pendingActions
+            applicationContext, orchestrator, planRuntime, planStore, pendingActions
         )
-        val autonomy = MayraAutonomyCoordinator(
-            context = applicationContext,
-            skills = skillRegistry,
-            contextProvider = contextProvider
-        )
+        val autonomy = MayraAutonomyCoordinator(applicationContext, skillRegistry, contextProvider)
 
         MayraRuntime.install(
             brain = brain,
@@ -110,7 +90,8 @@ class MayraApplication : Application() {
             controlCenter = controlCenter,
             autonomy = autonomy,
             personalIntelligence = personalIntelligence,
-            voice = voice
+            voice = voice,
+            vision = vision
         )
 
         contextMemory.prune()
@@ -126,8 +107,7 @@ class MayraApplication : Application() {
 
 /** Application-level service container shared by chat, background workers and future UI screens. */
 object MayraRuntime {
-    @Volatile
-    var assistant: MayraAssistant = LocalMayraAssistant()
+    @Volatile var assistant: MayraAssistant = LocalMayraAssistant()
 
     lateinit var brain: MayraBrainCoordinator
         private set
@@ -151,13 +131,13 @@ object MayraRuntime {
         private set
     lateinit var voice: MayraVoiceCoordinator
         private set
+    lateinit var vision: MayraVisionCoordinator
+        private set
 
     val installed: Boolean
-        get() = ::orchestrator.isInitialized &&
-            ::controlCenter.isInitialized &&
-            ::autonomy.isInitialized &&
-            ::personalIntelligence.isInitialized &&
-            ::voice.isInitialized
+        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized &&
+            ::autonomy.isInitialized && ::personalIntelligence.isInitialized &&
+            ::voice.isInitialized && ::vision.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -170,7 +150,8 @@ object MayraRuntime {
         controlCenter: MayraRuntimeControlCenter,
         autonomy: MayraAutonomyCoordinator,
         personalIntelligence: MayraPersonalIntelligence,
-        voice: MayraVoiceCoordinator
+        voice: MayraVoiceCoordinator,
+        vision: MayraVisionCoordinator
     ) {
         this.brain = brain
         this.skills = skills
@@ -183,5 +164,6 @@ object MayraRuntime {
         this.autonomy = autonomy
         this.personalIntelligence = personalIntelligence
         this.voice = voice
+        this.vision = vision
     }
 }
