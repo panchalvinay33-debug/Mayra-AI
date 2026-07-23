@@ -6,5 +6,6 @@ internal fun FunctionalAgentTool(
     executor: suspend (AgentToolCall, AgentExecutionContext) -> AgentToolResult
 ): FunctionalAgentTool = FunctionalAgentTool(
     descriptor = descriptor,
-    executor = executor
+    executor = executor,
+    compensator = { _, _, _ -> AgentToolResult.NotSupported("Compensation is not configured") }
 )
