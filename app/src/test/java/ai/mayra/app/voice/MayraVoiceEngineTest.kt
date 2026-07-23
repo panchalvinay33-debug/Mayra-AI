@@ -14,14 +14,14 @@ class MayraVoiceEngineTest {
         var clock = 1_000L
         val runtime = VoiceSessionRuntime { clock }
 
-        assertEquals(VoiceState.LISTENING, runtime.start().state)
+        assertEquals(VoiceSessionState.LISTENING, runtime.start().state)
         assertTrue(runtime.acceptUserTurn("WhatsApp kholo", 0.91))
-        assertEquals(VoiceState.PROCESSING, runtime.snapshot().state)
+        assertEquals(VoiceSessionState.PROCESSING, runtime.snapshot().state)
 
         runtime.enqueue(VoiceResponsePlan("WhatsApp khol rahi hoon."))
-        assertEquals(VoiceState.SPEAKING, runtime.snapshot().state)
+        assertEquals(VoiceSessionState.SPEAKING, runtime.snapshot().state)
         assertNotNull(runtime.nextResponse())
-        assertEquals(VoiceState.LISTENING, runtime.finishSpeaking().state)
+        assertEquals(VoiceSessionState.LISTENING, runtime.finishSpeaking().state)
     }
 
     @Test
