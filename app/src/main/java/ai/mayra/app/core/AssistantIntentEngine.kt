@@ -43,11 +43,8 @@ class AssistantIntentEngine(
         factory: (String) -> AssistantIntent
     ): AssistantIntent {
         val match = normalized.findCommand(commands) ?: return AssistantIntent.Invalid(emptyMessage)
-        val after = normalized.substring(match.index + match.keyword.length)
-            .cleanCommandSide()
-        val before = normalized.substring(0, match.index)
-            .cleanCommandSide()
-
+        val after = normalized.substring(match.index + match.keyword.length).cleanCommandSide()
+        val before = normalized.substring(0, match.index).cleanCommandSide()
         val target = when {
             after.isUsefulTarget() -> after
             before.isUsefulTarget() -> before
@@ -66,7 +63,6 @@ class AssistantIntentEngine(
         val afterOriginal = original.substringAfterKeyword(match.keyword)
             .trim().removeLeadingWordsIgnoreCase(MESSAGE_ACTION_WORDS)
 
-        // Natural Hindi order: "Mummy ko message likho main aa raha hu".
         if (before.isUsefulTarget()) {
             val body = afterOriginal.trim().trimStart(':').trim().ifBlank { null }
             return AssistantIntent.ComposeMessage(before, body)
@@ -119,7 +115,7 @@ class AssistantIntentEngine(
 
     private fun String.indexOfWord(word: String): Int {
         val result = Regex("(^|\\s)${Regex.escape(word)}(?=\\s|$)").find(this) ?: return -1
-        return result.range.first + if (result.value.startsWith(' ')) 1 else 0
+        return result.range.first + if (result.value.startsWith(" ")) 1 else 0
     }
 
     private fun String.cleanCommandSide(): String = trim()
