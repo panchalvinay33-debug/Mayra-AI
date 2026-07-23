@@ -38,36 +38,50 @@ class RuntimeControlViewModel(
     }
 
     fun refresh() {
+        if (_uiState.value.isBusy) return
         val notice = _uiState.value.notice
         _uiState.value = runCatching { snapshotProvider().toUiState().copy(notice = notice) }
             .getOrElse { RuntimeControlUiState.failure(it.message ?: "Runtime snapshot failed.") }
     }
 
-    fun approve(actionId: String) = performAction { approveAction(actionId) }
+    fun approve(actionId: String) = performAction("Approving action…") { approveAction(actionId) }
 
-    fun reject(actionId: String) = performAction { rejectAction(actionId) }
+    fun reject(actionId: String) = performAction("Rejecting action…") { rejectAction(actionId) }
 
-    fun cancelPlan(planId: String) = performAction { cancelPlanAction(planId) }
+    fun cancelPlan(planId: String) = performAction("Cancelling workflow…") { cancelPlanAction(planId) }
 
     fun runNext(planId: String) {
+        if (!beginAction("Running next workflow step…")) return
         viewModelScope.launch {
             val result = runCatching { runNextAction(planId) }.getOrElse {
-                updateFailure(it.message ?: "Workflow execution failed.")
+                finishFailure(it.message ?: "Workflow execution failed.")
                 return@launch
             }
-            applyResult(result)
+            finishResult(result)
         }
     }
 
-    private fun performAction(action: () -> RuntimeControlResult) {
+    private fun performAction(label: String, action: () -> RuntimeControlResult) {
+        if (!beginAction(label)) return
         val result = runCatching(action).getOrElse {
-            updateFailure(it.message ?: "Runtime action failed.")
+            finishFailure(it.message ?: "Runtime action failed.")
             return
         }
-        applyResult(result)
+        finishResult(result)
     }
 
-    private fun applyResult(result: RuntimeControlResult) {
+    private fun beginAction(label: String): Boolean {
+        if (_uiState.value.isBusy) return false
+        _uiState.value = _uiState.value.copy(
+            isBusy = true,
+            busyLabel = label,
+            notice = null,
+            error = null
+        )
+        return true
+    }
+
+    private fun finishResult(result: RuntimeControlResult) {
         val message = when (result) {
             is RuntimeControlResult.Success -> result.message
             is RuntimeControlResult.NotFound -> result.message
@@ -76,13 +90,20 @@ class RuntimeControlViewModel(
         }
         val succeeded = result is RuntimeControlResult.Success
         _uiState.value = _uiState.value.copy(
+            isBusy = false,
+            busyLabel = null,
             notice = message.takeIf { succeeded },
             error = message.takeUnless { succeeded }
         )
         if (succeeded) refresh()
     }
 
-    private fun updateFailure(message: String) {
-        _uiState.value = _uiState.value.copy(notice = null, error = message)
+    private fun finishFailure(message: String) {
+        _uiState.value = _uiState.value.copy(
+            isBusy = false,
+            busyLabel = null,
+            notice = null,
+            error = message
+        )
     }
 }
