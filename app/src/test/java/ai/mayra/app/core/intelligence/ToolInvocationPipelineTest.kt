@@ -22,7 +22,9 @@ class ToolInvocationPipelineTest {
 
         assertEquals(ToolExecutionStatus.SUCCESS, result.status)
         assertEquals("hello", result.output)
+        assertEquals("1", result.metadata["attempts"])
         assertEquals(1, pipeline.eventSnapshot().size)
+        assertEquals(1, pipeline.telemetrySnapshot("utility.echo").size)
     }
 
     @Test
@@ -57,7 +59,29 @@ class ToolInvocationPipelineTest {
 
         assertEquals(ToolExecutionStatus.FAILED, result.status)
         assertEquals("tool_execution_failed", result.errorCode)
+        assertEquals("3", result.metadata["attempts"])
         assertTrue(result.metadata.containsKey("exception"))
+    }
+
+    @Test
+    fun `transient failure is retried through resilient executor`() = runTest {
+        val tool = FlakyTool()
+        val registry = ToolRegistry().apply { register(tool) }
+        val executor = ResilientToolExecutor(
+            retryPolicy = ToolRetryPolicy(maxAttempts = 2, initialDelayMillis = 0, maxDelayMillis = 0)
+        )
+        val pipeline = ToolInvocationPipeline(registry, executor = executor)
+
+        val result = pipeline.invoke(
+            ToolInvocation("utility.flaky", context = ToolExecutionContext("s1"))
+        )
+
+        assertEquals(ToolExecutionStatus.SUCCESS, result.status)
+        assertEquals("recovered", result.output)
+        assertEquals("2", result.metadata["attempts"])
+        assertEquals(2, tool.calls)
+        assertEquals(2, pipeline.telemetrySnapshot("utility.flaky").size)
+        assertEquals(1, pipeline.eventSnapshot("utility.flaky").size)
     }
 
     private class EchoTool : MayraTool {
@@ -83,5 +107,19 @@ class ToolInvocationPipelineTest {
     private class FailingTool : MayraTool {
         override val manifest = ToolManifest("utility.fail", "Fail", "Always fails")
         override suspend fun execute(invocation: ToolInvocation): ToolResult = error("boom")
+    }
+
+    private class FlakyTool : MayraTool {
+        var calls = 0
+        override val manifest = ToolManifest("utility.flaky", "Flaky", "Fails once then succeeds")
+
+        override suspend fun execute(invocation: ToolInvocation): ToolResult {
+            calls += 1
+            return if (calls == 1) {
+                ToolResult(manifest.id, ToolExecutionStatus.FAILED, errorCode = "temporary_failure")
+            } else {
+                ToolResult(manifest.id, ToolExecutionStatus.SUCCESS, output = "recovered")
+            }
+        }
     }
 }
