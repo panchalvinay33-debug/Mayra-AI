@@ -51,7 +51,7 @@ internal fun buildRuntimeAttentionAlert(
 internal fun RuntimeControlSnapshot.toAttentionAlert(): RuntimeAttentionAlert? =
     buildRuntimeAttentionAlert(
         runtimeFailures = runtime.failedRequests,
-        planFailures = plans.failedPlans,
+        planFailures = plans.failedPlans.toLong(),
         pendingActions = pendingActions.map { it.id to it.title },
         blockedPlans = plans.blockedPlans,
         waitingConfirmationSteps = plans.waitingConfirmationSteps
