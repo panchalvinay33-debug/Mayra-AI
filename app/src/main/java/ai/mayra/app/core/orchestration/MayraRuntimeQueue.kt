@@ -26,17 +26,17 @@ class MayraRuntimeQueue(
         val normalized = normalize(input)
         require(normalized.isNotBlank()) { "Input cannot be blank." }
 
-        val task = RuntimeTask(
+        lateinit var task: RuntimeTask
+        task = RuntimeTask(
             name = TEXT_TASK_NAME,
             priority = priority,
             createdAt = clock()
         ) {
             storeResult(
-                taskId = currentTaskId.getValue(),
+                taskId = task.id,
                 result = QueuedOrchestrationResult.Text(orchestrator.processText(normalized))
             )
         }
-        currentTaskId.setValue(task.id)
         runtime.submit(task)
         storeResult(task.id, QueuedOrchestrationResult.Pending)
         return OrchestrationTicket(task.id, TEXT_TASK_NAME, priority, task.createdAt)
@@ -49,17 +49,17 @@ class MayraRuntimeQueue(
         val normalized = normalize(goal)
         require(normalized.isNotBlank()) { "Goal cannot be blank." }
 
-        val task = RuntimeTask(
+        lateinit var task: RuntimeTask
+        task = RuntimeTask(
             name = GOAL_TASK_NAME,
             priority = priority,
             createdAt = clock()
         ) {
             storeResult(
-                taskId = currentTaskId.getValue(),
+                taskId = task.id,
                 result = QueuedOrchestrationResult.Goal(orchestrator.processGoal(normalized))
             )
         }
-        currentTaskId.setValue(task.id)
         runtime.submit(task)
         storeResult(task.id, QueuedOrchestrationResult.Pending)
         return OrchestrationTicket(task.id, GOAL_TASK_NAME, priority, task.createdAt)
@@ -100,18 +100,6 @@ class MayraRuntimeQueue(
     }
 
     private fun normalize(value: String): String = value.trim().replace(WHITESPACE_REGEX, " ")
-
-    /**
-     * RuntimeKernel invokes one task at a time. This holder lets the task block reference its own
-     * immutable id without exposing mutable variables to callers.
-     */
-    private class TaskIdHolder {
-        private var value: String? = null
-        fun setValue(taskId: String) { value = taskId }
-        fun getValue(): String = requireNotNull(value)
-    }
-
-    private val currentTaskId = TaskIdHolder()
 
     private companion object {
         const val TEXT_TASK_NAME = "assistant-turn"
