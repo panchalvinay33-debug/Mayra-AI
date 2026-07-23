@@ -1,5 +1,6 @@
 package ai.mayra.app
 
+import ai.mayra.app.background.MayraBackgroundRuntime
 import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
@@ -17,6 +18,7 @@ class MayraApplication : Application() {
                 )
             )
         )
+        MayraBackgroundRuntime.initialize(applicationContext)
     }
 }
 
