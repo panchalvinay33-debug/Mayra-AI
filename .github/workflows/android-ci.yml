@@ -41,6 +41,9 @@ jobs:
       - name: Test Android action specifications
         run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --console=plain
 
+      - name: Test Android action runtime
+        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --console=plain
+
       - name: Run unit tests
         run: gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain
 
