@@ -30,6 +30,9 @@ import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.device.MayraDeviceRuntime
 import ai.mayra.app.device.androidDeviceRuntime
+import ai.mayra.app.execution.InMemoryExecutionCheckpointStore
+import ai.mayra.app.execution.MayraExecutionControlPlane
+import ai.mayra.app.execution.MayraExecutionCoordinator
 import ai.mayra.app.knowledge.MayraKnowledgeStore
 import ai.mayra.app.knowledge.MayraPersonalIntelligence
 import ai.mayra.app.knowledge.MayraPersonalMemory
@@ -73,6 +76,13 @@ class MayraApplication : Application() {
         val contextRuntime = MayraContextRuntime()
         MayraContextHolder.runtime = contextRuntime
         val deviceRuntime = androidDeviceRuntime(applicationContext)
+        val executionControlPlane = MayraExecutionControlPlane()
+        val executionCoordinator = MayraExecutionCoordinator(
+            controlPlane = executionControlPlane,
+            agentRuntime = agentRuntime,
+            deviceRuntime = deviceRuntime,
+            checkpointStore = InMemoryExecutionCheckpointStore()
+        )
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -112,7 +122,9 @@ class MayraApplication : Application() {
             agentPlanner = agentPlanner,
             agentRuntime = agentRuntime,
             contextRuntime = contextRuntime,
-            deviceRuntime = deviceRuntime
+            deviceRuntime = deviceRuntime,
+            executionControlPlane = executionControlPlane,
+            executionCoordinator = executionCoordinator
         )
 
         contextMemory.prune()
@@ -122,6 +134,7 @@ class MayraApplication : Application() {
         autonomy.maintenance()
         personalIntelligence.prune()
         deviceRuntime.capture(force = true)
+        executionCoordinator.restore()
         MayraBackgroundRuntime.initialize(applicationContext)
         MayraBriefingScheduler.sync(applicationContext)
     }
@@ -212,6 +225,10 @@ object MayraRuntime {
         private set
     lateinit var deviceRuntime: MayraDeviceRuntime
         private set
+    lateinit var executionControlPlane: MayraExecutionControlPlane
+        private set
+    lateinit var executionCoordinator: MayraExecutionCoordinator
+        private set
 
     val installed: Boolean
         get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized &&
@@ -219,7 +236,8 @@ object MayraRuntime {
             ::voice.isInitialized && ::vision.isInitialized &&
             ::agentTools.isInitialized && ::agentPlanner.isInitialized &&
             ::agentRuntime.isInitialized && ::contextRuntime.isInitialized &&
-            ::deviceRuntime.isInitialized
+            ::deviceRuntime.isInitialized && ::executionControlPlane.isInitialized &&
+            ::executionCoordinator.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -238,7 +256,9 @@ object MayraRuntime {
         agentPlanner: MayraAgentPlanner,
         agentRuntime: MayraAgentRuntime,
         contextRuntime: MayraContextRuntime,
-        deviceRuntime: MayraDeviceRuntime
+        deviceRuntime: MayraDeviceRuntime,
+        executionControlPlane: MayraExecutionControlPlane,
+        executionCoordinator: MayraExecutionCoordinator
     ) {
         this.brain = brain
         this.skills = skills
@@ -257,5 +277,7 @@ object MayraRuntime {
         this.agentRuntime = agentRuntime
         this.contextRuntime = contextRuntime
         this.deviceRuntime = deviceRuntime
+        this.executionControlPlane = executionControlPlane
+        this.executionCoordinator = executionCoordinator
     }
 }
