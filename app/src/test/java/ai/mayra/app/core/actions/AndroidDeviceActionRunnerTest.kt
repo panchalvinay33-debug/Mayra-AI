@@ -63,7 +63,10 @@ class AndroidDeviceActionRunnerTest {
         val intent = requireNotNull(captured)
 
         assertEquals("com.google.android.youtube", intent.`package`)
-        assertTrue(intent.categories.contains(AndroidDeviceActionSpecFactory.CATEGORY_LAUNCHER))
+        assertTrue(
+            intent.categories.orEmpty()
+                .contains(AndroidDeviceActionSpecFactory.CATEGORY_LAUNCHER)
+        )
     }
 
     @Test
