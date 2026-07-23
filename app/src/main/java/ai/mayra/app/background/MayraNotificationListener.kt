@@ -12,6 +12,9 @@ class MayraNotificationListener : NotificationListenerService() {
         val notification = sbn?.notification ?: return
         if (sbn.packageName == packageName) return
 
+        val preferences = AmbientPreferenceStore(applicationContext).read()
+        if (!preferences.notificationIntelligenceEnabled) return
+
         val extras = notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
@@ -23,9 +26,14 @@ class MayraNotificationListener : NotificationListenerService() {
             text = text.take(MAX_FIELD_LENGTH),
             timestamp = sbn.postTime
         )
-        AmbientEventStore(applicationContext).append(event)
+
+        if (preferences.retainLocalHistory) {
+            AmbientEventStore(applicationContext).append(event)
+        }
 
         val insight = intelligence.analyze(event)
+        if (!preferences.proactiveSuggestionsEnabled) return
+
         insight.suggestedAction?.let { action ->
             BackgroundTaskQueue(applicationContext).enqueue(
                 BackgroundTask(
