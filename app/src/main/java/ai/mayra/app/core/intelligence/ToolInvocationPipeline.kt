@@ -16,6 +16,7 @@ data class ToolInvocationEvent(
 class ToolInvocationPipeline(
     private val registry: ToolRegistry,
     private val permissionEngine: ToolPermissionPolicyEngine = ToolPermissionPolicyEngine(),
+    private val executor: ResilientToolExecutor = ResilientToolExecutor(),
     private val maxEvents: Int = 200,
     private val now: () -> Instant = Instant::now
 ) {
@@ -63,26 +64,19 @@ class ToolInvocationPipeline(
             )
         )
 
-        return try {
-            val result = tool.execute(executionInvocation)
-            finish(result.copy(toolId = tool.manifest.id), startedAt)
-        } catch (error: Throwable) {
-            finish(
-                ToolResult(
-                    toolId = tool.manifest.id,
-                    status = ToolExecutionStatus.FAILED,
-                    errorCode = "tool_execution_failed",
-                    metadata = mapOf("exception" to (error::class.simpleName ?: "Throwable"))
-                ),
-                startedAt,
-                error.message
-            )
-        }
+        val result = executor.execute(tool, executionInvocation)
+        return finish(result, startedAt)
     }
 
     @Synchronized
     fun eventSnapshot(toolId: String? = null): List<ToolInvocationEvent> = events
         .filter { toolId == null || it.toolId == toolId }
+
+    fun telemetrySnapshot(toolId: String? = null): List<ToolExecutionMetric> =
+        executor.telemetrySnapshot(toolId)
+
+    fun telemetrySummary(toolId: String): ToolExecutionSummary =
+        executor.telemetrySummary(toolId)
 
     private fun validateArguments(manifest: ToolManifest, arguments: Map<String, String>): String? {
         val known = manifest.parameters.mapTo(linkedSetOf()) { it.name }
