@@ -137,9 +137,21 @@ class ConversationContextEngine(
             .sortedWith(compareByDescending<Pair<ContextEntity, Double>> { it.second }.thenByDescending { it.first.updatedAt })
             .toList()
         val pronoun = containsPronoun(normalized)
-        val best = candidates.firstOrNull() ?: if (pronoun) mostRecentEntity(preferredType)?.let { it to 0.62 } else null
-        if (best == null) return ReferenceResolution(text, text, confidence = 0.0, clarificationNeeded = pronoun, explanation = if (pronoun) "Reference clear nahi hai" else null)
-        val ambiguous = candidates.size > 1 && best.second - candidates[1].second < 0.12
+        val lexicalBest = candidates.firstOrNull()
+        val resolvedByRecency = pronoun && (lexicalBest == null || lexicalBest.second < 0.55)
+        val best = if (resolvedByRecency) {
+            mostRecentEntity(preferredType)?.let { it to 0.62 } ?: lexicalBest
+        } else {
+            lexicalBest
+        }
+        if (best == null) return ReferenceResolution(
+            text,
+            text,
+            confidence = 0.0,
+            clarificationNeeded = pronoun,
+            explanation = if (pronoun) "Reference clear nahi hai" else null
+        )
+        val ambiguous = !resolvedByRecency && candidates.size > 1 && best.second - candidates[1].second < 0.12
         if (ambiguous) return ReferenceResolution(text, text, best.first, best.second, true, "Do possible references mile")
         val resolved = replacePronouns(text, best.first.canonicalName)
         return ReferenceResolution(text, resolved, best.first, best.second.coerceIn(0.0, 1.0), best.second < 0.55)
@@ -215,7 +227,10 @@ class ConversationContextEngine(
         return (lexical * 0.78 + recency * 0.14 + entity.confidence * 0.08).coerceIn(0.0, 1.0)
     }
 
-    private fun containsPronoun(value: String): Boolean = listOf("usko", "usse", "uska", "iski", "isko", "it", "that", "them", "him", "her", "वो", "उसको").any { value.contains(it) }
+    private fun containsPronoun(value: String): Boolean = listOf(
+        "usko", "usse", "uska", "iski", "isko", "it", "that", "them", "him", "her", "वो", "उसको"
+    ).any { value.contains(it) }
+
     private fun replacePronouns(text: String, name: String): String {
         var output = text
         listOf("usko", "usse", "uska", "iski", "isko", "that one", "them", "him", "her", "उसको", "उससे").forEach {
