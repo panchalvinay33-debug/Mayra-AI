@@ -4,7 +4,7 @@ import java.util.ArrayDeque
 import java.util.UUID
 import kotlin.math.max
 
-enum class VoiceState {
+enum class VoiceSessionState {
     IDLE,
     STANDBY,
     LISTENING,
@@ -67,7 +67,7 @@ data class VoiceResponsePlan(
 
 data class VoiceSessionSnapshot(
     val sessionId: String,
-    val state: VoiceState,
+    val state: VoiceSessionState,
     val activeTopic: String?,
     val turnCount: Int,
     val queuedResponses: Int,
@@ -93,7 +93,7 @@ class VoiceSessionRuntime(
     private val now: () -> Long = { System.currentTimeMillis() }
 ) {
     private var sessionId: String = UUID.randomUUID().toString()
-    private var state: VoiceState = VoiceState.IDLE
+    private var state: VoiceSessionState = VoiceSessionState.IDLE
     private var activeTopic: String? = null
     private var startedAt: Long = now()
     private var lastActivityAt: Long = startedAt
@@ -118,7 +118,7 @@ class VoiceSessionRuntime(
     @Synchronized
     fun start(topic: String? = null, standby: Boolean = false): VoiceSessionSnapshot {
         sessionId = UUID.randomUUID().toString()
-        state = if (standby) VoiceState.STANDBY else VoiceState.LISTENING
+        state = if (standby) VoiceSessionState.STANDBY else VoiceSessionState.LISTENING
         activeTopic = topic?.trim()?.takeIf { it.isNotEmpty() }
         startedAt = now()
         lastActivityAt = startedAt
@@ -133,25 +133,25 @@ class VoiceSessionRuntime(
 
     @Synchronized
     fun wake(): VoiceSessionSnapshot {
-        if (state == VoiceState.IDLE) return start()
-        state = VoiceState.LISTENING
+        if (state == VoiceSessionState.IDLE) return start()
+        state = VoiceSessionState.LISTENING
         touch()
         return snapshot()
     }
 
     @Synchronized
     fun standby(): VoiceSessionSnapshot {
-        require(state != VoiceState.PROCESSING) { "Cannot enter standby while processing" }
-        state = VoiceState.STANDBY
+        require(state != VoiceSessionState.PROCESSING) { "Cannot enter standby while processing" }
+        state = VoiceSessionState.STANDBY
         touch()
         return snapshot()
     }
 
     @Synchronized
     fun beginListening(): VoiceSessionSnapshot {
-        require(state !in setOf(VoiceState.IDLE, VoiceState.ERROR)) { "Session is not active" }
+        require(state !in setOf(VoiceSessionState.IDLE, VoiceSessionState.ERROR)) { "Session is not active" }
         expireConfirmationIfNeeded()
-        state = VoiceState.LISTENING
+        state = VoiceSessionState.LISTENING
         touch()
         return snapshot()
     }
@@ -159,7 +159,7 @@ class VoiceSessionRuntime(
     @Synchronized
     fun acceptUserTurn(text: String, confidence: Double, sensitive: Boolean = false): Boolean {
         require(confidence in 0.0..1.0)
-        require(state in setOf(VoiceState.LISTENING, VoiceState.WAITING_FOR_CONFIRMATION, VoiceState.INTERRUPTED)) {
+        require(state in setOf(VoiceSessionState.LISTENING, VoiceSessionState.WAITING_FOR_CONFIRMATION, VoiceSessionState.INTERRUPTED)) {
             "Voice runtime is not accepting user input in state $state"
         }
         val normalized = normalize(text)
@@ -177,7 +177,7 @@ class VoiceSessionRuntime(
         confidenceTotal += confidence
         confidenceSamples++
         if (confidence < LOW_CONFIDENCE_THRESHOLD) lowConfidenceTurns++
-        state = VoiceState.PROCESSING
+        state = VoiceSessionState.PROCESSING
         touch()
         return true
     }
@@ -196,8 +196,8 @@ class VoiceSessionRuntime(
             pendingConfirmation = it
             confirmationsRequested++
         }
-        if (state == VoiceState.PROCESSING || state == VoiceState.LISTENING) {
-            state = if (plan.confirmation != null) VoiceState.WAITING_FOR_CONFIRMATION else VoiceState.SPEAKING
+        if (state == VoiceSessionState.PROCESSING || state == VoiceSessionState.LISTENING) {
+            state = if (plan.confirmation != null) VoiceSessionState.WAITING_FOR_CONFIRMATION else VoiceSessionState.SPEAKING
         }
         touch()
         return snapshot()
@@ -215,9 +215,9 @@ class VoiceSessionRuntime(
             )
         )
         state = when {
-            plan.confirmation != null -> VoiceState.WAITING_FOR_CONFIRMATION
-            plan.shouldEndSession -> VoiceState.IDLE
-            else -> VoiceState.SPEAKING
+            plan.confirmation != null -> VoiceSessionState.WAITING_FOR_CONFIRMATION
+            plan.shouldEndSession -> VoiceSessionState.IDLE
+            else -> VoiceSessionState.SPEAKING
         }
         touch()
         return plan
@@ -225,11 +225,11 @@ class VoiceSessionRuntime(
 
     @Synchronized
     fun finishSpeaking(listenAgain: Boolean = true): VoiceSessionSnapshot {
-        if (state == VoiceState.IDLE) return snapshot()
+        if (state == VoiceSessionState.IDLE) return snapshot()
         state = when {
-            pendingConfirmation != null -> VoiceState.WAITING_FOR_CONFIRMATION
-            listenAgain -> VoiceState.LISTENING
-            else -> VoiceState.STANDBY
+            pendingConfirmation != null -> VoiceSessionState.WAITING_FOR_CONFIRMATION
+            listenAgain -> VoiceSessionState.LISTENING
+            else -> VoiceSessionState.STANDBY
         }
         touch()
         return snapshot()
@@ -237,11 +237,11 @@ class VoiceSessionRuntime(
 
     @Synchronized
     fun interrupt(): VoiceSessionSnapshot {
-        if (state == VoiceState.SPEAKING) {
+        if (state == VoiceSessionState.SPEAKING) {
             interruptedResponse = responseQueue.peekFirst()
             interruptions++
         }
-        state = VoiceState.INTERRUPTED
+        state = VoiceSessionState.INTERRUPTED
         touch()
         return snapshot()
     }
@@ -250,7 +250,7 @@ class VoiceSessionRuntime(
     fun resumeInterrupted(): VoiceResponsePlan? {
         val plan = interruptedResponse ?: return null
         interruptedResponse = null
-        state = VoiceState.SPEAKING
+        state = VoiceSessionState.SPEAKING
         touch()
         return plan
     }
@@ -261,7 +261,7 @@ class VoiceSessionRuntime(
         val confirmation = pendingConfirmation ?: return null
         pendingConfirmation = null
         if (accepted) confirmationsAccepted++ else confirmationsRejected++
-        state = VoiceState.PROCESSING
+        state = VoiceSessionState.PROCESSING
         touch()
         return confirmation
     }
@@ -269,7 +269,7 @@ class VoiceSessionRuntime(
     @Synchronized
     fun fail(message: String): VoiceSessionSnapshot {
         addTurn(VoiceTurn(role = VoiceTurnRole.SYSTEM, text = normalize(message)))
-        state = VoiceState.ERROR
+        state = VoiceSessionState.ERROR
         touch()
         return snapshot()
     }
@@ -279,7 +279,7 @@ class VoiceSessionRuntime(
         pendingConfirmation = null
         interruptedResponse = null
         responseQueue.clear()
-        state = VoiceState.IDLE
+        state = VoiceSessionState.IDLE
         touch()
         return snapshot()
     }
@@ -329,7 +329,7 @@ class VoiceSessionRuntime(
         val pending = pendingConfirmation ?: return
         if (pending.expired(now())) {
             pendingConfirmation = null
-            if (state == VoiceState.WAITING_FOR_CONFIRMATION) state = VoiceState.LISTENING
+            if (state == VoiceSessionState.WAITING_FOR_CONFIRMATION) state = VoiceSessionState.LISTENING
         }
     }
 
