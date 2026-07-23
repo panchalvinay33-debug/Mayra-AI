@@ -32,7 +32,7 @@ class AndroidDeviceActionRunner(
 
     fun buildIntent(spec: AndroidIntentSpec): Intent = Intent(spec.action).apply {
         spec.data?.let { data = Uri.parse(it) }
-        type = spec.mimeType
+        spec.mimeType?.let { type = it }
         spec.packageName?.let(::setPackage)
         spec.categories.forEach(::addCategory)
         spec.extras.forEach { (key, value) -> putExtra(key, value) }
