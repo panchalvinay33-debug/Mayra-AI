@@ -2,6 +2,7 @@ package ai.mayra.app.runtime
 
 import ai.mayra.app.MainActivity
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -66,6 +67,7 @@ object RuntimeAttentionNotifier {
     private const val PREFS = "runtime_attention_notifications"
     private const val LAST_FINGERPRINT = "last_fingerprint"
 
+    @SuppressLint("MissingPermission")
     fun scanAndNotify(context: Context, snapshot: RuntimeControlSnapshot): Boolean {
         val appContext = context.applicationContext
         RuntimeAttentionScheduler.sync(appContext)
