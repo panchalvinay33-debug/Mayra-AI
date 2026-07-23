@@ -85,8 +85,7 @@ class MayraExecutionCoordinator(
 
         val request = controlPlane.get(lease.requestId)
             ?: return ExecutionDispatchResult(request = null, run = null, leased = true, blockedReason = "Execution request disappeared")
-        val run = agentRuntime.get(lease.runId)
-        if (run == null) {
+        val run: AgentRun = agentRuntime.get(lease.runId) ?: run {
             agentErrors++
             val failed = controlPlane.fail(lease.requestId, ownerId, "Agent run was not found", retryable = false)
             persist()
@@ -104,7 +103,7 @@ class MayraExecutionCoordinator(
         }
 
         controlPlane.markRunning(lease.requestId, ownerId)
-        var current = run
+        var current: AgentRun = run
         return try {
             repeat(maxTicksPerDispatch) {
                 controlPlane.heartbeat(lease.requestId, ownerId)
