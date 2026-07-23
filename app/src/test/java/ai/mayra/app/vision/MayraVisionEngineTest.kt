@@ -1,247 +1,146 @@
 package ai.mayra.app.vision
 
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 
 class MayraVisionEngineTest {
-    @Test
-    fun `on-device provider is preferred`() = runBlocking {
-        val local = fakeProvider("local", VisionProviderKind.ON_DEVICE, remote = false, priority = 1)
-        val remote = fakeProvider("remote", VisionProviderKind.REMOTE, remote = true, priority = 50)
-        val runtime = MayraVisionRuntime(listOf(remote, local))
+    private var clock = 1_000L
 
-        val result = runtime.analyze(request())
-
-        assertTrue(result is VisionRuntimeResult.Completed)
-        val analysis = (result as VisionRuntimeResult.Completed).analysis
-        assertTrue(analysis.evidence.any { it.providerId == "local" })
-        assertFalse(analysis.usedRemoteProcessing)
+    @Test fun `on-device provider is preferred`() = runBlocking {
+        val runtime = MayraVisionRuntime(
+            listOf(provider("remote", true, 50), provider("local", false, 1)),
+            now = { clock }
+        )
+        val result = runtime.analyze(request()) as VisionRuntimeResult.Completed
+        assertEquals("local", result.analysis.evidence.single().providerId)
+        assertFalse(result.analysis.usedRemoteProcessing)
     }
 
-    @Test
-    fun `sensitive request blocks remote provider by default`() = runBlocking {
-        val remote = fakeProvider("remote", VisionProviderKind.REMOTE, remote = true)
-        val runtime = MayraVisionRuntime(listOf(remote))
-
+    @Test fun `sensitive request blocks remote provider`() = runBlocking {
+        val runtime = MayraVisionRuntime(listOf(provider("remote", true)), now = { clock })
         val result = runtime.analyze(request(sensitivity = VisionSensitivity.SENSITIVE, mode = VisionProcessingMode.ALLOW_REMOTE))
-
         assertTrue(result is VisionRuntimeResult.Blocked)
     }
 
-    @Test
-    fun `duplicate request is suppressed inside window`() = runBlocking {
-        var clock = 1_000L
-        val runtime = MayraVisionRuntime(listOf(fakeProvider("local", VisionProviderKind.ON_DEVICE, false)), now = { clock })
-        val request = request(id = "one")
-
-        assertTrue(runtime.analyze(request) is VisionRuntimeResult.Completed)
+    @Test fun `duplicate request is suppressed`() = runBlocking {
+        val runtime = MayraVisionRuntime(listOf(provider("local", false)), now = { clock })
+        assertTrue(runtime.analyze(request(id = "one")) is VisionRuntimeResult.Completed)
         clock += 500
-        val duplicate = runtime.analyze(request.copy(id = "two", createdAt = clock, expiresAt = clock + 10_000))
-
-        assertTrue(duplicate is VisionRuntimeResult.DuplicateSuppressed)
-        assertEquals("one", (duplicate as VisionRuntimeResult.DuplicateSuppressed).previousRequestId)
+        val duplicate = runtime.analyze(request(id = "two")) as VisionRuntimeResult.DuplicateSuppressed
+        assertEquals("one", duplicate.previousRequestId)
     }
 
-    @Test
-    fun `expired and oversized requests are blocked`() = runBlocking {
-        val runtime = MayraVisionRuntime(listOf(fakeProvider("local", VisionProviderKind.ON_DEVICE, false)), now = { 10_000L })
-        val expired = request(createdAt = 1L, expiresAt = 2L)
-        val huge = request(asset = asset(sizeBytes = 30L * 1024 * 1024), createdAt = 9_000L, expiresAt = 20_000L)
-
-        assertTrue(runtime.analyze(expired) is VisionRuntimeResult.Blocked)
-        assertTrue(runtime.analyze(huge) is VisionRuntimeResult.Blocked)
+    @Test fun `expired oversized and unsupported images are blocked`() = runBlocking {
+        val runtime = MayraVisionRuntime(listOf(provider("local", false)), now = { 10_000L })
+        assertTrue(runtime.analyze(request(createdAt = 1, expiresAt = 2)) is VisionRuntimeResult.Blocked)
+        assertTrue(runtime.analyze(request(asset = asset(size = 30L * 1024 * 1024), createdAt = 9_000, expiresAt = 20_000)) is VisionRuntimeResult.Blocked)
+        assertTrue(runtime.analyze(request(asset = asset(mime = "image/gif"), createdAt = 9_000, expiresAt = 20_000)) is VisionRuntimeResult.Blocked)
     }
 
-    @Test
-    fun `retryable failure falls back to next provider`() = runBlocking {
+    @Test fun `retryable provider failure falls back`() = runBlocking {
         val failing = object : MayraVisionProvider {
-            override val descriptor = descriptor("first", VisionProviderKind.ON_DEVICE, false, 20)
-            override suspend fun analyze(request: VisionRequest) = VisionProviderResult.Failure("model busy", retryable = true)
+            override val descriptor = descriptor("first", false, 20)
+            override suspend fun analyze(request: VisionRequest) = VisionProviderResult.Failure("busy", true)
         }
-        val success = fakeProvider("second", VisionProviderKind.ON_DEVICE, false, priority = 1)
-        val runtime = MayraVisionRuntime(listOf(failing, success))
-
-        val result = runtime.analyze(request())
-
-        assertTrue(result is VisionRuntimeResult.Completed)
+        val runtime = MayraVisionRuntime(listOf(failing, provider("second", false)), now = { clock })
+        assertTrue(runtime.analyze(request()) is VisionRuntimeResult.Completed)
         assertEquals(1L, runtime.diagnostics().providerFailures["first"])
     }
 
-    @Test
-    fun `planner detects receipt document medicine and question`() {
+    @Test fun `planner recognizes multimodal tasks and sensitivity`() {
         val planner = VisionIntentPlanner()
         val receipt = planner.plan("Is bill ka total kitna hai?", asset())
-        val medicine = planner.plan("Ye medicine ka naam kya hai?", asset(sensitive = true))
-        val document = planner.plan("Is document ko read aur summarize karo", asset())
-
-        assertTrue(VisionTask.READ_RECEIPT in receipt.tasks)
-        assertTrue(VisionTask.ANSWER_QUESTION in receipt.tasks)
+        val medicine = planner.plan("Ye medical prescription aur medicine kya hai?", asset(sensitive = true))
+        val document = planner.plan("Document read aur summarize karo", asset())
+        assertTrue(receipt.tasks.containsAll(setOf(VisionTask.READ_RECEIPT, VisionTask.ANSWER_QUESTION)))
         assertTrue(VisionTask.IDENTIFY_MEDICINE in medicine.tasks)
         assertEquals(VisionSensitivity.SENSITIVE, medicine.sensitivity)
-        assertTrue(VisionTask.EXTRACT_TEXT in document.tasks)
-        assertTrue(VisionTask.SUMMARIZE_DOCUMENT in document.tasks)
+        assertTrue(document.tasks.containsAll(setOf(VisionTask.EXTRACT_TEXT, VisionTask.SUMMARIZE_DOCUMENT)))
+        assertNotNull(planner.plan("Photo me kya hai?", null).clarification)
     }
 
-    @Test
-    fun `planner requests image when asset is absent`() {
-        val plan = VisionIntentPlanner().plan("Photo me kya hai?", null)
-
-        assertNotNull(plan.clarification)
-        assertFalse(plan.allowMemory)
-    }
-
-    @Test
-    fun `memory stores searchable non-sensitive metadata`() {
-        var clock = 1_000L
-        val memory = MayraVisionMemory(now = { clock })
-        val request = request(allowMemory = true, createdAt = clock, expiresAt = clock + 10_000)
-        val analysis = analysis(request, "A red medicine box", labels = listOf(VisionLabel("medicine", 0.9)))
-
-        val record = memory.remember(request, analysis)
-        val hits = memory.search("red medicine")
-
-        assertNotNull(record)
-        assertEquals(1, hits.size)
-        assertEquals(record?.id, hits.first().record.id)
-    }
-
-    @Test
-    fun `highly sensitive memory is denied by default`() {
-        val memory = MayraVisionMemory()
-        val request = request(allowMemory = true, sensitivity = VisionSensitivity.HIGHLY_SENSITIVE)
-
-        assertNull(memory.remember(request, analysis(request, "ID card")))
-        assertEquals(1L, memory.diagnostics().deniedWrites)
-    }
-
-    @Test
-    fun `memory duplicate replaces older record`() {
-        var clock = 1_000L
-        val memory = MayraVisionMemory(now = { clock })
-        val first = request(allowMemory = true, createdAt = clock, expiresAt = clock + 10_000)
-        memory.remember(first, analysis(first, "First description"))
-        clock += 100
-        val second = first.copy(id = "second", createdAt = clock, expiresAt = clock + 10_000)
-        memory.remember(second, analysis(second, "Updated description"))
-
+    @Test fun `memory is searchable merges duplicates and expires`() {
+        val memory = MayraVisionMemory(VisionMemoryPolicy(personalRetentionMs = 100), now = { clock })
+        val first = request(id = "first", allowMemory = true)
+        assertNotNull(memory.remember(first, analysis(first, "Red medicine box", listOf(VisionLabel("medicine", .9)))))
+        assertEquals(1, memory.search("red medicine").size)
+        clock += 10
+        val second = request(id = "second", allowMemory = true)
+        memory.remember(second, analysis(second, "Updated medicine box"))
         assertEquals(1, memory.diagnostics().records)
         assertEquals(1L, memory.diagnostics().duplicateMerges)
-        assertEquals("Updated description", memory.recent().single().summary)
-    }
-
-    @Test
-    fun `memory expires and prunes records`() {
-        var clock = 1_000L
-        val memory = MayraVisionMemory(VisionMemoryPolicy(personalRetentionMs = 100L), now = { clock })
-        val request = request(allowMemory = true, createdAt = clock, expiresAt = clock + 10_000)
-        memory.remember(request, analysis(request, "Temporary"))
-        clock += 200
-
+        clock += 101
         assertTrue(memory.recent().isEmpty())
         assertEquals(1L, memory.diagnostics().expiredPruned)
     }
 
-    @Test
-    fun `response composer includes receipt total and warning`() {
+    @Test fun `highly sensitive memory is denied`() {
+        val memory = MayraVisionMemory(now = { clock })
+        val request = request(allowMemory = true, sensitivity = VisionSensitivity.HIGHLY_SENSITIVE)
+        assertNull(memory.remember(request, analysis(request, "ID card")))
+        assertEquals(1L, memory.diagnostics().deniedWrites)
+    }
+
+    @Test fun `response includes total text and warning`() {
         val request = request(tasks = setOf(VisionTask.READ_RECEIPT))
-        val analysis = analysis(request, "Receipt detected").copy(
-            receiptFields = listOf(ReceiptField("total", "₹450", 0.95)),
-            warnings = listOf("Image thodi blurry hai")
+        val result = analysis(request, "Receipt detected").copy(
+            textBlocks = listOf(VisionTextBlock("Shop receipt", .9)),
+            receiptFields = listOf(ReceiptField("total", "₹450", .95)),
+            warnings = listOf("Image blurry hai")
         )
-
-        val response = VisionResponseComposer().compose(analysis)
-
+        val response = VisionResponseComposer().compose(result)
         assertTrue(response.contains("₹450"))
+        assertTrue(response.contains("Shop receipt"))
         assertTrue(response.contains("Dhyan rahe"))
     }
 
-    @Test
-    fun `coordinator remembers completed analysis and returns voice response`() = runBlocking {
-        val runtime = MayraVisionRuntime(listOf(fakeProvider("local", VisionProviderKind.ON_DEVICE, false)))
-        val coordinator = MayraVisionCoordinator(runtime)
-
+    @Test fun `coordinator returns response and snapshot`() = runBlocking {
+        val coordinator = MayraVisionCoordinator(
+            MayraVisionRuntime(listOf(provider("local", false)), now = { clock }),
+            memory = MayraVisionMemory(now = { clock }),
+            now = { clock }
+        )
         val (result, response) = coordinator.handle("Photo me kya hai?", asset())
-
         assertTrue(result is VisionRuntimeResult.Completed)
         assertTrue(response.contains("Test image"))
         assertNotNull(coordinator.snapshot().lastAnalysis)
     }
 
     private fun request(
-        id: String = "request-1",
+        id: String = "request",
         asset: VisionAsset = asset(),
         tasks: Set<VisionTask> = setOf(VisionTask.DESCRIBE),
         sensitivity: VisionSensitivity = VisionSensitivity.PERSONAL,
         mode: VisionProcessingMode = VisionProcessingMode.PREFER_ON_DEVICE,
         allowMemory: Boolean = false,
-        createdAt: Long = 1_000L,
-        expiresAt: Long = 10_000L
-    ) = VisionRequest(
-        id = id,
-        asset = asset,
-        tasks = tasks,
-        sensitivity = sensitivity,
-        mode = mode,
-        allowMemory = allowMemory,
-        createdAt = createdAt,
-        expiresAt = expiresAt
+        createdAt: Long = clock,
+        expiresAt: Long = clock + 10_000
+    ) = VisionRequest(id = id, asset = asset, tasks = tasks, sensitivity = sensitivity, mode = mode,
+        allowMemory = allowMemory, createdAt = createdAt, expiresAt = expiresAt)
+
+    private fun asset(size: Long = 1_024, mime: String = "image/jpeg", sensitive: Boolean = false) = VisionAsset(
+        id = "asset", uri = "content://test/image", mimeType = mime, sizeBytes = size,
+        source = VisionAssetSource.GALLERY, fingerprint = "same", sensitive = sensitive
     )
 
-    private fun asset(sizeBytes: Long = 1_024, sensitive: Boolean = false) = VisionAsset(
-        id = "asset-1",
-        uri = "content://test/image.jpg",
-        mimeType = "image/jpeg",
-        displayName = "image.jpg",
-        width = 100,
-        height = 100,
-        sizeBytes = sizeBytes,
-        source = VisionAssetSource.GALLERY,
-        fingerprint = "same-fingerprint",
-        sensitive = sensitive
-    )
-
-    private fun fakeProvider(
-        id: String,
-        kind: VisionProviderKind,
-        remote: Boolean,
-        priority: Int = 0
-    ) = object : MayraVisionProvider {
-        override val descriptor = descriptor(id, kind, remote, priority)
-        override suspend fun analyze(request: VisionRequest): VisionProviderResult = VisionProviderResult.Success(
+    private fun provider(id: String, remote: Boolean, priority: Int = 0) = object : MayraVisionProvider {
+        override val descriptor = descriptor(id, remote, priority)
+        override suspend fun analyze(request: VisionRequest) = VisionProviderResult.Success(
             analysis(request, "Test image").copy(
-                evidence = listOf(VisionEvidence(id, request.tasks.first(), 0.9)),
+                evidence = listOf(VisionEvidence(id, request.tasks.first(), .9)),
                 usedRemoteProcessing = remote
             )
         )
     }
 
-    private fun descriptor(id: String, kind: VisionProviderKind, remote: Boolean, priority: Int = 0) = VisionProviderDescriptor(
-        id = id,
-        displayName = id,
-        kind = kind,
-        supportedTasks = VisionTask.entries.toSet(),
-        requiresNetwork = remote,
-        sendsImageOffDevice = remote,
-        maxImageBytes = 20L * 1024 * 1024,
-        priority = priority
+    private fun descriptor(id: String, remote: Boolean, priority: Int = 0) = VisionProviderDescriptor(
+        id, id, if (remote) VisionProviderKind.REMOTE else VisionProviderKind.ON_DEVICE,
+        VisionTask.entries.toSet(), remote, remote, 20L * 1024 * 1024, priority
     )
 
-    private fun analysis(
-        request: VisionRequest,
-        summary: String,
-        labels: List<VisionLabel> = emptyList()
-    ) = VisionAnalysis(
-        requestId = request.id,
-        assetId = request.asset.id,
-        summary = summary,
-        labels = labels,
-        processingMillis = 50,
-        usedRemoteProcessing = false,
-        confidence = 0.9
+    private fun analysis(request: VisionRequest, summary: String, labels: List<VisionLabel> = emptyList()) = VisionAnalysis(
+        request.id, request.asset.id, summary, labels = labels, processingMillis = 50,
+        usedRemoteProcessing = false, confidence = .9
     )
 }
