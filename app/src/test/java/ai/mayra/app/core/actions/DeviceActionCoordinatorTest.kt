@@ -29,7 +29,10 @@ class DeviceActionCoordinatorTest {
     @Test
     fun `high risk action waits and executes only after confirmation`() = runTest {
         var executions = 0
-        val coordinator = coordinator { executions += 1; "called" }
+        val coordinator = coordinator {
+            executions += 1
+            "called"
+        }
         val request = request(DeviceActionType.CALL_CONTACT, "Amit")
 
         val waiting = coordinator.submit(
@@ -46,7 +49,10 @@ class DeviceActionCoordinatorTest {
     @Test
     fun `missing permission never invokes runner`() = runTest {
         var invoked = false
-        val coordinator = coordinator { invoked = true; null }
+        val coordinator = coordinator {
+            invoked = true
+            null
+        }
         val request = request(DeviceActionType.SEND_MESSAGE, "Mayra", "Hello")
 
         val result = coordinator.submit(request, PermissionSnapshot())
@@ -58,7 +64,10 @@ class DeviceActionCoordinatorTest {
     @Test
     fun `rejected confirmation never invokes runner`() = runTest {
         var invoked = false
-        val coordinator = coordinator { invoked = true; null }
+        val coordinator = coordinator {
+            invoked = true
+            null
+        }
         val request = request(DeviceActionType.CALL_CONTACT, "Amit")
         val waiting = coordinator.submit(
             request,
@@ -120,7 +129,7 @@ class DeviceActionCoordinatorTest {
             clock = { 100L },
             tokenFactory = { "token" }
         ),
-        runner = DeviceActionRunner(runner)
+        runner = DeviceActionRunner { request -> runner(request) }
     )
 
     private fun request(
