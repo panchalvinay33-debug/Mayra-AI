@@ -122,7 +122,9 @@ class MayraAgentRuntimeTest {
         val resumed = runtime.provideInput(run.id, "input", "Indore")
         assertNotNull(resumed)
         assertEquals("Indore", resumed?.workspace?.variables?.get("city"))
-        assertEquals(AgentRunState.COMPLETED, resumed?.state)
+
+        val settled = runtime.tick(run.id).run
+        assertEquals(AgentRunState.COMPLETED, settled.state)
     }
 
     @Test
