@@ -1,6 +1,5 @@
 package ai.mayra.app.runtime
 
-import ai.mayra.app.MayraRuntime
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,11 +29,17 @@ data class RuntimePendingAction(
     val title: String
 )
 
+data class RuntimeActivePlan(
+    val id: String,
+    val title: String,
+    val state: String
+)
+
 data class RuntimeControlUiState(
     val health: RuntimeHealth,
     val headline: String,
     val metrics: List<RuntimeMetric>,
-    val activePlanTitles: List<String>,
+    val activePlans: List<RuntimeActivePlan>,
     val pendingActions: List<RuntimePendingAction>,
     val capturedAt: Long,
     val notice: String? = null,
@@ -45,7 +50,7 @@ data class RuntimeControlUiState(
             health = RuntimeHealth.ATTENTION,
             headline = "Reading Mayra runtime…",
             metrics = emptyList(),
-            activePlanTitles = emptyList(),
+            activePlans = emptyList(),
             pendingActions = emptyList(),
             capturedAt = 0L
         )
@@ -54,7 +59,7 @@ data class RuntimeControlUiState(
             health = RuntimeHealth.DEGRADED,
             headline = "Runtime status unavailable",
             metrics = emptyList(),
-            activePlanTitles = emptyList(),
+            activePlans = emptyList(),
             pendingActions = emptyList(),
             capturedAt = System.currentTimeMillis(),
             error = message
@@ -62,15 +67,24 @@ data class RuntimeControlUiState(
     }
 }
 
+internal fun classifyRuntimeHealth(
+    failedCount: Long,
+    pendingActionCount: Int,
+    blockedPlanCount: Int,
+    waitingConfirmationSteps: Int
+): RuntimeHealth = when {
+    failedCount > 0 -> RuntimeHealth.DEGRADED
+    pendingActionCount > 0 || blockedPlanCount > 0 || waitingConfirmationSteps > 0 -> RuntimeHealth.ATTENTION
+    else -> RuntimeHealth.HEALTHY
+}
+
 fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
-    val failedCount = runtime.failedRequests + plans.failedPlans
-    val needsAttention = pendingActions.isNotEmpty() || plans.blockedPlans > 0 ||
-        plans.waitingConfirmationSteps > 0
-    val health = when {
-        failedCount > 0 -> RuntimeHealth.DEGRADED
-        needsAttention -> RuntimeHealth.ATTENTION
-        else -> RuntimeHealth.HEALTHY
-    }
+    val health = classifyRuntimeHealth(
+        failedCount = runtime.failedRequests + plans.failedPlans,
+        pendingActionCount = pendingActions.size,
+        blockedPlanCount = plans.blockedPlans,
+        waitingConfirmationSteps = plans.waitingConfirmationSteps
+    )
     val headline = when (health) {
         RuntimeHealth.HEALTHY -> "Mayra runtime is healthy"
         RuntimeHealth.ATTENTION -> "Mayra needs your attention"
@@ -101,8 +115,10 @@ fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
                 detail = "${runtime.recentReceiptCount} recent receipts"
             )
         ),
-        activePlanTitles = activePlans.map { it.title }.take(5),
-        pendingActions = pendingActions.map { RuntimePendingAction(it.id, it.title) }.take(5),
+        activePlans = activePlans.take(5).map {
+            RuntimeActivePlan(id = it.id, title = it.title, state = it.state.name)
+        },
+        pendingActions = pendingActions.take(5).map { RuntimePendingAction(it.id, it.title) },
         capturedAt = capturedAt
     )
 }
@@ -112,18 +128,10 @@ fun RuntimeControlDialog(
     state: RuntimeControlUiState,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit,
-    onApprove: (String) -> Unit = { actionId ->
-        if (MayraRuntime.installed) {
-            MayraRuntime.controlCenter.approvePendingAction(actionId)
-            onRefresh()
-        }
-    },
-    onReject: (String) -> Unit = { actionId ->
-        if (MayraRuntime.installed) {
-            MayraRuntime.controlCenter.rejectPendingAction(actionId)
-            onRefresh()
-        }
-    }
+    onApprove: (String) -> Unit,
+    onReject: (String) -> Unit,
+    onRunNext: (String) -> Unit,
+    onCancelPlan: (String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -135,12 +143,8 @@ fun RuntimeControlDialog(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                state.notice?.let {
-                    Text(it, color = MaterialTheme.colorScheme.primary)
-                }
-                state.error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                }
+                state.notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 state.metrics.forEach { metric -> RuntimeMetricCard(metric) }
                 if (state.pendingActions.isNotEmpty()) {
                     Text("Waiting for approval", fontWeight = FontWeight.SemiBold)
@@ -148,13 +152,13 @@ fun RuntimeControlDialog(
                         RuntimePendingActionCard(action, onApprove, onReject)
                     }
                 }
-                if (state.activePlanTitles.isNotEmpty()) {
-                    RuntimeSummaryGroup("Active workflows", state.activePlanTitles)
+                if (state.activePlans.isNotEmpty()) {
+                    Text("Active workflows", fontWeight = FontWeight.SemiBold)
+                    state.activePlans.forEach { plan ->
+                        RuntimeActivePlanCard(plan, onRunNext, onCancelPlan)
+                    }
                 }
-                if (state.metrics.isNotEmpty() &&
-                    state.pendingActions.isEmpty() &&
-                    state.activePlanTitles.isEmpty()
-                ) {
+                if (state.metrics.isNotEmpty() && state.pendingActions.isEmpty() && state.activePlans.isEmpty()) {
                     Text(
                         "No active workflows or pending confirmations.",
                         style = MaterialTheme.typography.bodySmall
@@ -208,9 +212,22 @@ private fun RuntimePendingActionCard(
 }
 
 @Composable
-private fun RuntimeSummaryGroup(title: String, items: List<String>) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, fontWeight = FontWeight.SemiBold)
-        items.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+private fun RuntimeActivePlanCard(
+    plan: RuntimeActivePlan,
+    onRunNext: (String) -> Unit,
+    onCancelPlan: (String) -> Unit
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(plan.title, fontWeight = FontWeight.SemiBold)
+            Text(plan.state, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onCancelPlan(plan.id) }) { Text("Cancel") }
+                OutlinedButton(onClick = { onRunNext(plan.id) }) { Text("Run next") }
+            }
+        }
     }
 }
