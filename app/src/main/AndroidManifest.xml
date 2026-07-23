@@ -35,6 +35,10 @@
         android:theme="@style/Theme.MayraAI">
 
         <activity
+            android:name=".runtime.RuntimeControlActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
