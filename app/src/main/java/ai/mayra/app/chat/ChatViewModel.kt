@@ -1,6 +1,6 @@
 package ai.mayra.app.chat
 
-import ai.mayra.app.core.LocalMayraAssistant
+import ai.mayra.app.MayraRuntime
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
 import androidx.lifecycle.ViewModel
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ChatViewModel(
-    private val assistant: MayraAssistant = LocalMayraAssistant()
+    private val assistant: MayraAssistant = MayraRuntime.assistant
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
