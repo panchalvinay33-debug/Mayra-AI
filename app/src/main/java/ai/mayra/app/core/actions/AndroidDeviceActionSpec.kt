@@ -2,13 +2,14 @@ package ai.mayra.app.core.actions
 
 /**
  * Android-facing, framework-neutral description of the intent that should be launched.
- * The actual Android adapter converts this value into android.content.Intent.
+ * The runtime adapter converts this value into android.content.Intent.
  */
 data class AndroidIntentSpec(
     val action: String,
     val data: String? = null,
     val mimeType: String? = null,
     val packageName: String? = null,
+    val categories: Set<String> = emptySet(),
     val extras: Map<String, String> = emptyMap(),
     val flags: Set<Int> = emptySet()
 )
@@ -26,7 +27,7 @@ object AndroidDeviceActionSpecFactory {
         DeviceActionType.OPEN_APP -> AndroidIntentSpec(
             action = ACTION_MAIN,
             packageName = request.metadata[PACKAGE_NAME_KEY] ?: request.target,
-            extras = mapOf(CATEGORY_KEY to CATEGORY_LAUNCHER)
+            categories = setOf(CATEGORY_LAUNCHER)
         )
 
         DeviceActionType.CALL_CONTACT -> AndroidIntentSpec(
@@ -64,6 +65,5 @@ object AndroidDeviceActionSpecFactory {
     }
 
     private const val PACKAGE_NAME_KEY = "packageName"
-    private const val CATEGORY_KEY = "category"
     private const val CALENDAR_EVENTS_URI = "content://com.android.calendar/events"
 }
