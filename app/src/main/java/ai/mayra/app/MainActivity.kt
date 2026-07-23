@@ -1,19 +1,59 @@
 package ai.mayra.app
 
+import ai.mayra.app.chat.ChatViewModel
+import ai.mayra.app.core.MayraMessage
+import ai.mayra.app.core.actions.DevicePermission
+import ai.mayra.app.platform.device.AndroidDevicePermissionStateReader
+import ai.mayra.app.platform.device.AndroidInstalledAppDataSource
+import ai.mayra.app.platform.device.DevicePermissionSnapshotProvider
+import ai.mayra.app.ui.theme.MayraAITheme
+import ai.mayra.app.voice.AndroidVoiceAssistant
+import ai.mayra.app.voice.MicrophonePermission
+import ai.mayra.app.voice.VoiceState
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,12 +62,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ai.mayra.app.chat.ChatViewModel
-import ai.mayra.app.core.MayraMessage
-import ai.mayra.app.ui.theme.MayraAITheme
-import ai.mayra.app.voice.AndroidVoiceAssistant
-import ai.mayra.app.voice.MicrophonePermission
-import ai.mayra.app.voice.VoiceState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,8 +77,20 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val listState = rememberLazyListState()
     var voiceState by remember { mutableStateOf(VoiceState()) }
     var lastSpokenMessageId by remember { mutableStateOf<Long?>(null) }
+    var showReadiness by remember { mutableStateOf(false) }
+    var readinessRefresh by remember { mutableIntStateOf(0) }
     val voiceAssistant = remember {
         AndroidVoiceAssistant(context) { newState -> voiceState = newState }
+    }
+
+    val permissionReader = remember(context, readinessRefresh) {
+        AndroidDevicePermissionStateReader(context)
+    }
+    val permissionSnapshot = remember(permissionReader, readinessRefresh) {
+        DevicePermissionSnapshotProvider(permissionReader).snapshot()
+    }
+    val installedAppsCount = remember(context, readinessRefresh) {
+        runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0)
     }
 
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
@@ -62,16 +108,27 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
 
     DisposableEffect(Unit) { onDispose { voiceAssistant.release() } }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val microphoneLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        readinessRefresh++
         if (granted) voiceAssistant.startListening()
         else voiceState = VoiceState(error = "Microphone permission is required for voice input")
     }
 
+    val devicePermissionsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        readinessRefresh++
+    }
+
     fun startVoice() {
         if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening()
-        else permissionLauncher.launch(MicrophonePermission.permission)
+        else microphoneLauncher.launch(MicrophonePermission.permission)
+    }
+
+    fun requestDevicePermissions() {
+        devicePermissionsLauncher.launch(runtimePermissionNames())
     }
 
     Scaffold { padding ->
@@ -93,6 +150,10 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                         }
                     )
                 }
+                AssistChip(
+                    onClick = { showReadiness = true },
+                    label = { Text("Device") }
+                )
                 if (state.messages.isNotEmpty()) {
                     TextButton(onClick = viewModel::clearConversation, enabled = !state.isThinking) {
                         Text("Clear")
@@ -153,4 +214,75 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             }
         }
     }
+
+    if (showReadiness) {
+        DeviceReadinessDialog(
+            grantedPermissions = permissionSnapshot.granted,
+            installedAppsCount = installedAppsCount,
+            onRequestPermissions = ::requestDevicePermissions,
+            onRefresh = { readinessRefresh++ },
+            onDismiss = { showReadiness = false }
+        )
+    }
 }
+
+@Composable
+private fun DeviceReadinessDialog(
+    grantedPermissions: Set<DevicePermission>,
+    installedAppsCount: Int,
+    onRequestPermissions: () -> Unit,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val rows = listOf(
+        DevicePermission.RECORD_AUDIO to "Voice input",
+        DevicePermission.READ_CONTACTS to "Find contacts",
+        DevicePermission.CALL_PHONE to "Start phone calls",
+        DevicePermission.SEND_SMS to "Prepare messages",
+        DevicePermission.POST_NOTIFICATIONS to "Assistant notifications",
+        DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders",
+        DevicePermission.QUERY_APPS to "Open installed apps"
+    )
+    val readyCount = rows.count { it.first in grantedPermissions }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Device readiness") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("$readyCount of ${rows.size} capabilities ready")
+                Text("$installedAppsCount launchable apps detected")
+                HorizontalDivider()
+                rows.forEach { (permission, label) ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(label, modifier = Modifier.weight(1f))
+                        Text(if (permission in grantedPermissions) "Ready ✓" else "Permission needed")
+                    }
+                }
+                Text(
+                    "Exact reminders may require enabling special access from Android settings.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onRequestPermissions) { Text("Allow permissions") }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onRefresh) { Text("Refresh") }
+                TextButton(onClick = onDismiss) { Text("Close") }
+            }
+        }
+    )
+}
+
+private fun runtimePermissionNames(): Array<String> = buildList {
+    add(Manifest.permission.RECORD_AUDIO)
+    add(Manifest.permission.READ_CONTACTS)
+    add(Manifest.permission.CALL_PHONE)
+    add(Manifest.permission.SEND_SMS)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}.toTypedArray()
