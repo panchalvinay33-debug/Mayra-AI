@@ -384,13 +384,13 @@ class AutonomousDecisionEngine {
             (1 - input.risk) to 0.30,
             input.contextRelevance to 0.20,
             input.urgency to 0.15
-        ) * if (input.permissionReady) 1.0 else 0.15
+        ) * (if (input.permissionReady) 1.0 else 0.15)
 
         val ask = weighted(
             input.risk to 0.45,
             (1 - input.confidence) to 0.25,
             input.contextRelevance to 0.10,
-            if (input.userAvailable) 1.0 else 0.2 to 0.20
+            (if (input.userAvailable) 1.0 else 0.2) to 0.20
         )
         val schedule = (if (scheduled) 0.85 else (1 - input.urgency) * 0.45) * input.contextRelevance
         val retry = if (input.retryable && input.retryCount < MAX_RETRIES) {
