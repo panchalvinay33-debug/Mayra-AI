@@ -192,11 +192,13 @@ class MayraRuntimeOrchestrator(
         return when (result) {
             is SkillResult.Success -> RuntimeOutcome.Completed(result.message, result.data)
             is SkillResult.NeedsConfirmation -> {
-                val pending = pendingActions.create(
-                    type = result.actionType.toPendingActionType(),
-                    title = result.prompt,
-                    payload = result.payload,
-                    createdAt = now()
+                val pending = pendingActions.add(
+                    PendingAction(
+                        type = result.actionType.toPendingActionType(),
+                        title = result.prompt,
+                        payload = result.payload,
+                        createdAt = now()
+                    )
                 )
                 RuntimeOutcome.ConfirmationRequired(pending.id, result.prompt)
             }
@@ -207,12 +209,15 @@ class MayraRuntimeOrchestrator(
     }
 
     private fun createPendingAction(request: RuntimeRequest, timestamp: Long): RuntimeOutcome {
-        val pending = pendingActions.create(
-            type = request.intent.toPendingActionType(),
-            title = "Confirm ${request.intent.ifBlank { "action" }}",
-            payload = request.command,
-            createdAt = timestamp,
-            expiresAt = request.parameters["expiresAt"]?.toLongOrNull()
+        val pending = pendingActions.add(
+            PendingAction(
+                type = request.intent.toPendingActionType(),
+                title = "Confirm ${request.intent.ifBlank { "action" }}",
+                payload = request.command,
+                createdAt = timestamp,
+                expiresAt = request.parameters["expiresAt"]?.toLongOrNull(),
+                source = request.source
+            )
         )
         return RuntimeOutcome.ConfirmationRequired(pending.id, pending.title)
     }
@@ -234,7 +239,7 @@ class MayraRuntimeOrchestrator(
 
     private fun currentContext(): BrainContextSnapshot = BrainContextSnapshot(
         hourOfDay = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY),
-        pendingActions = pendingActions.pending().size,
+        pendingActions = pendingActions.waiting().size,
         failedTasks = 0,
         notificationAccessGranted = true,
         recentCommandCount = memory.topHabits("command", 20).sumOf { it.count },
