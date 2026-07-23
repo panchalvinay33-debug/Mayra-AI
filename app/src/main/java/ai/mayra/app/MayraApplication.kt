@@ -25,6 +25,7 @@ import ai.mayra.app.knowledge.MayraPersonalIntelligence
 import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import ai.mayra.app.runtime.MayraRuntimeControlCenter
+import ai.mayra.app.voice.MayraVoiceCoordinator
 import android.app.Application
 import java.util.Calendar
 
@@ -54,6 +55,7 @@ class MayraApplication : Application() {
             knowledge = knowledgeStore,
             memory = personalMemory
         )
+        val voice = MayraVoiceCoordinator()
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -107,7 +109,8 @@ class MayraApplication : Application() {
             orchestrator = orchestrator,
             controlCenter = controlCenter,
             autonomy = autonomy,
-            personalIntelligence = personalIntelligence
+            personalIntelligence = personalIntelligence,
+            voice = voice
         )
 
         contextMemory.prune()
@@ -146,9 +149,15 @@ object MayraRuntime {
         private set
     lateinit var personalIntelligence: MayraPersonalIntelligence
         private set
+    lateinit var voice: MayraVoiceCoordinator
+        private set
 
     val installed: Boolean
-        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized && ::autonomy.isInitialized && ::personalIntelligence.isInitialized
+        get() = ::orchestrator.isInitialized &&
+            ::controlCenter.isInitialized &&
+            ::autonomy.isInitialized &&
+            ::personalIntelligence.isInitialized &&
+            ::voice.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -160,7 +169,8 @@ object MayraRuntime {
         orchestrator: MayraRuntimeOrchestrator,
         controlCenter: MayraRuntimeControlCenter,
         autonomy: MayraAutonomyCoordinator,
-        personalIntelligence: MayraPersonalIntelligence
+        personalIntelligence: MayraPersonalIntelligence,
+        voice: MayraVoiceCoordinator
     ) {
         this.brain = brain
         this.skills = skills
@@ -172,5 +182,6 @@ object MayraRuntime {
         this.controlCenter = controlCenter
         this.autonomy = autonomy
         this.personalIntelligence = personalIntelligence
+        this.voice = voice
     }
 }
