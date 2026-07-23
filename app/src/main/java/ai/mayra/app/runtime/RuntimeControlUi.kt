@@ -23,7 +23,13 @@ enum class RuntimeHealth { HEALTHY, ATTENTION, DEGRADED }
 
 data class RuntimeMetric(val label: String, val value: String, val detail: String)
 data class RuntimePendingAction(val id: String, val title: String)
-data class RuntimeActivePlan(val id: String, val title: String, val state: String)
+data class RuntimeActivePlan(
+    val id: String,
+    val title: String,
+    val state: String,
+    val progressPercent: Int,
+    val progressDetail: String
+)
 
 data class RuntimeControlUiState(
     val health: RuntimeHealth,
@@ -80,6 +86,17 @@ internal fun runtimeSnapshotFreshness(capturedAt: Long, now: Long): String {
     }
 }
 
+internal fun workflowProgress(
+    totalSteps: Int,
+    completedSteps: Int,
+    failedSteps: Int,
+    waitingSteps: Int
+): Pair<Int, String> {
+    val percent = if (totalSteps <= 0) 0 else (completedSteps * 100 / totalSteps).coerceIn(0, 100)
+    val detail = "$completedSteps/$totalSteps completed · $failedSteps failed · $waitingSteps waiting"
+    return percent to detail
+}
+
 fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
     val health = classifyRuntimeHealth(
         runtime.failedRequests + plans.failedPlans,
@@ -98,9 +115,16 @@ fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
             RuntimeMetric("Requests", runtime.processedRequests.toString(), "${runtime.completedRequests} completed · ${runtime.failedRequests} failed"),
             RuntimeMetric("Plans", plans.activePlans.toString(), "${plans.runningPlans} running · ${plans.blockedPlans} blocked"),
             RuntimeMetric("Confirmations", pendingActions.size.toString(), "${plans.waitingConfirmationSteps} plan steps waiting"),
-            RuntimeMetric("Average response", "${runtime.averageLatencyMillis} ms", "${runtime.recentReceiptCount} recent receipts")
+            RuntimeMetric("Average response", "${runtime.averageLatencyMillis} ms", "${runtime.recentReceiptCount} recent receipts"),
+            RuntimeMetric("Audit activity", recentAuditCount.toString(), "recent trusted runtime events")
         ),
-        activePlans = activePlans.take(5).map { RuntimeActivePlan(it.id, it.title, it.state.name) },
+        activePlans = activePlans.take(5).map { plan ->
+            val completed = plan.steps.count { it.state.name == "COMPLETED" }
+            val failed = plan.steps.count { it.state.name == "FAILED" }
+            val waiting = plan.steps.count { it.state.name in setOf("WAITING", "READY", "RUNNING") }
+            val (percent, detail) = workflowProgress(plan.steps.size, completed, failed, waiting)
+            RuntimeActivePlan(plan.id, plan.title, plan.state.name, percent, detail)
+        },
         pendingActions = pendingActions.take(5).map { RuntimePendingAction(it.id, it.title) },
         capturedAt = capturedAt
     )
@@ -199,7 +223,8 @@ private fun RuntimeActivePlanCard(
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(plan.title, fontWeight = FontWeight.SemiBold)
-            Text(plan.state, style = MaterialTheme.typography.bodySmall)
+            Text("${plan.state} · ${plan.progressPercent}%", style = MaterialTheme.typography.bodySmall)
+            Text(plan.progressDetail, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onCancelPlan(plan.id) }, enabled = !isBusy) { Text("Cancel") }
                 OutlinedButton(onClick = { onRunNext(plan.id) }, enabled = !isBusy) { Text("Run next") }
