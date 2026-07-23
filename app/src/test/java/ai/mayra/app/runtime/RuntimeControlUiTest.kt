@@ -55,4 +55,23 @@ class RuntimeControlUiTest {
             )
         )
     }
+
+    @Test
+    fun `freshness waits for first snapshot`() {
+        assertEquals("Waiting for first snapshot", runtimeSnapshotFreshness(capturedAt = 0L, now = 10_000L))
+    }
+
+    @Test
+    fun `freshness reports recent snapshot`() {
+        assertEquals("Updated just now", runtimeSnapshotFreshness(capturedAt = 9_000L, now = 10_000L))
+        assertEquals("Updated 12s ago", runtimeSnapshotFreshness(capturedAt = 8_000L, now = 20_000L))
+    }
+
+    @Test
+    fun `freshness warns when snapshot is old`() {
+        assertEquals(
+            "Snapshot may be stale · updated 2m ago",
+            runtimeSnapshotFreshness(capturedAt = 0L + 1_000L, now = 121_000L)
+        )
+    }
 }
