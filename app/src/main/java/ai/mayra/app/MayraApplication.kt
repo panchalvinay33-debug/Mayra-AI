@@ -22,6 +22,8 @@ import ai.mayra.app.brain.MayraRuntimeOrchestrator
 import ai.mayra.app.brain.MayraSkillRegistry
 import ai.mayra.app.brain.MayraTaskPlanner
 import ai.mayra.app.brain.registerBuiltInDeviceSkills
+import ai.mayra.app.context.MayraContextHolder
+import ai.mayra.app.context.MayraContextRuntime
 import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
@@ -66,6 +68,8 @@ class MayraApplication : Application() {
         val agentTools = MayraAgentToolRegistry(defaultAgentToolPlaceholders())
         val agentPlanner = MayraAgentPlanner(agentTools)
         val agentRuntime = MayraAgentRuntime(agentTools.snapshot())
+        val contextRuntime = MayraContextRuntime()
+        MayraContextHolder.runtime = contextRuntime
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -103,7 +107,8 @@ class MayraApplication : Application() {
             vision = vision,
             agentTools = agentTools,
             agentPlanner = agentPlanner,
-            agentRuntime = agentRuntime
+            agentRuntime = agentRuntime,
+            contextRuntime = contextRuntime
         )
 
         contextMemory.prune()
@@ -198,12 +203,15 @@ object MayraRuntime {
         private set
     lateinit var agentRuntime: MayraAgentRuntime
         private set
+    lateinit var contextRuntime: MayraContextRuntime
+        private set
 
     val installed: Boolean
         get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized &&
             ::autonomy.isInitialized && ::personalIntelligence.isInitialized &&
             ::voice.isInitialized && ::vision.isInitialized &&
-            ::agentTools.isInitialized && ::agentPlanner.isInitialized && ::agentRuntime.isInitialized
+            ::agentTools.isInitialized && ::agentPlanner.isInitialized &&
+            ::agentRuntime.isInitialized && ::contextRuntime.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -220,7 +228,8 @@ object MayraRuntime {
         vision: MayraVisionCoordinator,
         agentTools: MayraAgentToolRegistry,
         agentPlanner: MayraAgentPlanner,
-        agentRuntime: MayraAgentRuntime
+        agentRuntime: MayraAgentRuntime,
+        contextRuntime: MayraContextRuntime
     ) {
         this.brain = brain
         this.skills = skills
@@ -237,5 +246,6 @@ object MayraRuntime {
         this.agentTools = agentTools
         this.agentPlanner = agentPlanner
         this.agentRuntime = agentRuntime
+        this.contextRuntime = contextRuntime
     }
 }
