@@ -30,7 +30,11 @@ jobs:
           gradle-version: "8.9"
 
       - name: Compile debug sources
-        run: gradle --no-daemon :app:compileDebugKotlin --stacktrace --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/ci
+          gradle --no-daemon :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
 
       - name: Test device action safety
         run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --console=plain
@@ -56,6 +60,7 @@ jobs:
         with:
           name: android-reports
           path: |
+            build/ci/compile-debug.log
             app/build/reports/lint-results-debug.html
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
