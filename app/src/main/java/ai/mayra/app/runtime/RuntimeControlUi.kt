@@ -1,6 +1,5 @@
 package ai.mayra.app.runtime
 
-import ai.mayra.app.MayraRuntime
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 
 enum class RuntimeHealth { HEALTHY, ATTENTION, DEGRADED }
@@ -101,19 +101,11 @@ fun RuntimeControlDialog(
     state: RuntimeControlUiState,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit,
-    onApprove: (String) -> Unit = { id ->
-        if (MayraRuntime.installed) MayraRuntime.controlCenter.approvePendingAction(id)
-        onRefresh()
-    },
-    onReject: (String) -> Unit = { id ->
-        if (MayraRuntime.installed) MayraRuntime.controlCenter.rejectPendingAction(id)
-        onRefresh()
-    },
-    onRunNext: (String) -> Unit = {},
-    onCancelPlan: (String) -> Unit = { id ->
-        if (MayraRuntime.installed) MayraRuntime.controlCenter.cancelPlan(id)
-        onRefresh()
-    }
+    controller: RuntimeControlViewModel = viewModel(),
+    onApprove: (String) -> Unit = controller::approve,
+    onReject: (String) -> Unit = controller::reject,
+    onRunNext: (String) -> Unit = controller::runNext,
+    onCancelPlan: (String) -> Unit = controller::cancelPlan
 ) {
     LaunchedEffect(Unit) {
         while (true) {
