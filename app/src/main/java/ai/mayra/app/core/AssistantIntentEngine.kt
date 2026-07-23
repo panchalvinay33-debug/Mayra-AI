@@ -18,6 +18,7 @@ class AssistantIntentEngine(
                 AssistantIntent.DeviceInfo(DeviceInfoType.TIME)
             normalized.matchesAny("battery", "charge kitna", "battery kitni", "charge kitni") ->
                 AssistantIntent.DeviceInfo(DeviceInfoType.BATTERY)
+            REMINDER_COMMANDS.any(normalized::contains) -> parseReminderIntent(original, normalized)
             normalized.findCommand(MESSAGE_COMMANDS) != null -> parseMessageIntent(original, normalized)
             normalized.findCommand(CALL_COMMANDS) != null -> parseTargetIntent(
                 normalized,
@@ -31,7 +32,6 @@ class AssistantIntentEngine(
                 "Which app should I open?",
                 AssistantIntent::OpenApp
             )
-            REMINDER_COMMANDS.any(normalized::contains) -> parseReminderIntent(original, normalized)
             else -> AssistantIntent.Chat(original)
         }
     }
@@ -58,6 +58,11 @@ class AssistantIntentEngine(
             ?: return AssistantIntent.Invalid("Who should I message?")
 
         val before = normalized.substring(0, match.index).cleanCommandSide()
+        val beforeOriginal = original.substring(0, match.index)
+            .trim()
+            .removeLeadingWordsIgnoreCase(COMMAND_FILLER_WORDS)
+            .removeTrailingWordsIgnoreCase(COMMAND_TRAILING_WORDS)
+            .cleanTarget()
         val afterNormalized = normalized.substring(match.index + match.keyword.length)
             .trim().removeLeadingWords(MESSAGE_ACTION_WORDS)
         val afterOriginal = original.substringAfterKeyword(match.keyword)
@@ -65,7 +70,7 @@ class AssistantIntentEngine(
 
         if (before.isUsefulTarget()) {
             val body = afterOriginal.trim().trimStart(':').trim().ifBlank { null }
-            return AssistantIntent.ComposeMessage(before, body)
+            return AssistantIntent.ComposeMessage(beforeOriginal.ifBlank { before }, body)
         }
 
         if (afterNormalized.isBlank()) return AssistantIntent.Invalid("Who should I message?")
@@ -141,6 +146,12 @@ class AssistantIntentEngine(
     private fun String.removeLeadingWordsIgnoreCase(words: Set<String>): String {
         val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
         while (tokens.firstOrNull()?.lowercase(locale) in words) tokens.removeAt(0)
+        return tokens.joinToString(" ")
+    }
+
+    private fun String.removeTrailingWordsIgnoreCase(words: Set<String>): String {
+        val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
+        while (tokens.lastOrNull()?.lowercase(locale) in words) tokens.removeAt(tokens.lastIndex)
         return tokens.joinToString(" ")
     }
 
