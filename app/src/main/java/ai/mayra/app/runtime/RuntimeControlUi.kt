@@ -70,6 +70,16 @@ internal fun classifyRuntimeHealth(
     else -> RuntimeHealth.HEALTHY
 }
 
+internal fun runtimeSnapshotFreshness(capturedAt: Long, now: Long): String {
+    if (capturedAt <= 0L) return "Waiting for first snapshot"
+    val ageSeconds = ((now - capturedAt).coerceAtLeast(0L) / 1_000L)
+    return when {
+        ageSeconds < 2L -> "Updated just now"
+        ageSeconds < 60L -> "Updated ${ageSeconds}s ago"
+        else -> "Snapshot may be stale · updated ${ageSeconds / 60L}m ago"
+    }
+}
+
 fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
     val health = classifyRuntimeHealth(
         runtime.failedRequests + plans.failedPlans,
@@ -120,6 +130,10 @@ fun RuntimeControlDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(state.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    runtimeSnapshotFreshness(state.capturedAt, System.currentTimeMillis()),
+                    style = MaterialTheme.typography.bodySmall
+                )
                 state.busyLabel?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 state.notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
