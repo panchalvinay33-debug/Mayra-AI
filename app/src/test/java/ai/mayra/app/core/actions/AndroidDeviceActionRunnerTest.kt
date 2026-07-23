@@ -7,11 +7,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class AndroidDeviceActionRunnerTest {
     @Test
-    fun `call request builds and starts a new task tel intent`() = runTest {
+    fun callIntentIsBuiltAndStarted() = runTest {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -28,7 +30,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun `message request preserves recipient and trimmed body`() = runTest {
+    fun messageIntentPreservesRecipientAndBody() = runTest {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -46,7 +48,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun `open app request applies package and launcher category`() = runTest {
+    fun openAppIntentAppliesPackageAndLauncherCategory() = runTest {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -70,7 +72,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun `reminder request maps title and detail extras`() = runTest {
+    fun reminderIntentMapsTitleAndDetailExtras() = runTest {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
