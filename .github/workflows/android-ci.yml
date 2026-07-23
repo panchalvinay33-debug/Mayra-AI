@@ -32,6 +32,15 @@ jobs:
       - name: Compile debug sources
         run: gradle --no-daemon :app:compileDebugKotlin --stacktrace --console=plain
 
+      - name: Test device action safety
+        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --console=plain
+
+      - name: Test device action coordinator
+        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionCoordinatorTest' --console=plain
+
+      - name: Test Android action specifications
+        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --console=plain
+
       - name: Run unit tests
         run: gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain
 
@@ -46,5 +55,6 @@ jobs:
           path: |
             app/build/reports/lint-results-debug.html
             app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
             app/build/reports/problems/
           if-no-files-found: ignore
