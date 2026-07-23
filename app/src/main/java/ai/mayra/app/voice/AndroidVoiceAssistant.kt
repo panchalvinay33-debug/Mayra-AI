@@ -36,15 +36,17 @@ class AndroidVoiceAssistant(
     init {
         recognizer?.setRecognitionListener(this)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) = emitFromAnyThread(
-                state.copy(
-                    transportState = VoiceTransportState.SPEAKING,
-                    isListening = false,
-                    isSpeaking = true,
-                    lastUtteranceId = id,
-                    error = null
+            override fun onStart(id: String?) {
+                emitFromAnyThread(
+                    state.copy(
+                        transportState = VoiceTransportState.SPEAKING,
+                        isListening = false,
+                        isSpeaking = true,
+                        lastUtteranceId = id,
+                        error = null
+                    )
                 )
-            )
+            }
 
             override fun onDone(id: String?) {
                 handler.post {
@@ -68,13 +70,15 @@ class AndroidVoiceAssistant(
                 }
             }
 
-            override fun onStop(id: String?, interrupted: Boolean) = emitFromAnyThread(
-                state.copy(
-                    transportState = if (interrupted) VoiceTransportState.INTERRUPTED else VoiceTransportState.IDLE,
-                    isSpeaking = false,
-                    lastUtteranceId = id
+            override fun onStop(id: String?, interrupted: Boolean) {
+                emitFromAnyThread(
+                    state.copy(
+                        transportState = if (interrupted) VoiceTransportState.INTERRUPTED else VoiceTransportState.IDLE,
+                        isSpeaking = false,
+                        lastUtteranceId = id
+                    )
                 )
-            )
+            }
         })
         emit(state)
     }
@@ -118,7 +122,6 @@ class AndroidVoiceAssistant(
             }
     }
 
-    /** Pauses the current recognition turn but intentionally preserves continuous mode. */
     override fun stopListening() {
         recognitionActive = false
         runCatching { recognizer?.stopListening() }
@@ -268,7 +271,9 @@ class AndroidVoiceAssistant(
         state.copy(transportState = VoiceTransportState.ERROR, isListening = false, isSpeaking = false, error = message, recoverableError = recoverable)
     )
 
-    private fun emitFromAnyThread(next: VoiceState) = handler.post { emit(next) }
+    private fun emitFromAnyThread(next: VoiceState) {
+        handler.post { emit(next) }
+    }
 
     private fun emit(next: VoiceState) {
         state = next.copy(continuousMode = continuous, speechAvailable = recognitionAvailable, ttsReady = ttsReady)
