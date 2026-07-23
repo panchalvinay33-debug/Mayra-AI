@@ -124,8 +124,9 @@ class LongTermMemoryEngine(
         val keyWords = record.key.normalizedWords(locale)
         val valueWords = record.value.normalizedWords(locale)
         val sourceWords = record.source.orEmpty().normalizedWords(locale)
-        return terms.sumOf { term ->
-            when {
+
+        return terms.fold(0) { total, term ->
+            total + when {
                 term in keyWords -> 8
                 term in namespaceWords -> 6
                 term in valueWords -> 4
