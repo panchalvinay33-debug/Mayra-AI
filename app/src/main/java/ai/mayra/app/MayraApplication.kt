@@ -20,6 +20,9 @@ import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.knowledge.MayraKnowledgeStore
+import ai.mayra.app.knowledge.MayraPersonalIntelligence
+import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import ai.mayra.app.runtime.MayraRuntimeControlCenter
 import android.app.Application
@@ -45,6 +48,12 @@ class MayraApplication : Application() {
         val planStore = MayraPlanStore(applicationContext)
         val pendingActions = PendingActionStore(applicationContext)
         val backgroundTasks = BackgroundTaskQueue(applicationContext)
+        val knowledgeStore = MayraKnowledgeStore(applicationContext)
+        val personalMemory = MayraPersonalMemory(applicationContext)
+        val personalIntelligence = MayraPersonalIntelligence(
+            knowledge = knowledgeStore,
+            memory = personalMemory
+        )
 
         val contextProvider = {
             val ambientHealth = MayraAmbientControlCenter.health(applicationContext)
@@ -97,7 +106,8 @@ class MayraApplication : Application() {
             planRuntime = planRuntime,
             orchestrator = orchestrator,
             controlCenter = controlCenter,
-            autonomy = autonomy
+            autonomy = autonomy,
+            personalIntelligence = personalIntelligence
         )
 
         contextMemory.prune()
@@ -105,6 +115,7 @@ class MayraApplication : Application() {
         pendingActions.expireDue()
         pendingActions.prune()
         autonomy.maintenance()
+        personalIntelligence.prune()
         MayraBackgroundRuntime.initialize(applicationContext)
         MayraBriefingScheduler.sync(applicationContext)
     }
@@ -133,9 +144,11 @@ object MayraRuntime {
         private set
     lateinit var autonomy: MayraAutonomyCoordinator
         private set
+    lateinit var personalIntelligence: MayraPersonalIntelligence
+        private set
 
     val installed: Boolean
-        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized && ::autonomy.isInitialized
+        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized && ::autonomy.isInitialized && ::personalIntelligence.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -146,7 +159,8 @@ object MayraRuntime {
         planRuntime: MayraPlanRuntime,
         orchestrator: MayraRuntimeOrchestrator,
         controlCenter: MayraRuntimeControlCenter,
-        autonomy: MayraAutonomyCoordinator
+        autonomy: MayraAutonomyCoordinator,
+        personalIntelligence: MayraPersonalIntelligence
     ) {
         this.brain = brain
         this.skills = skills
@@ -157,5 +171,6 @@ object MayraRuntime {
         this.orchestrator = orchestrator
         this.controlCenter = controlCenter
         this.autonomy = autonomy
+        this.personalIntelligence = personalIntelligence
     }
 }
