@@ -4,11 +4,10 @@ import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
-/**
- * Receives notification events only after the user explicitly enables Notification Access.
- * Raw notification data stays on-device in the ambient inbox; no network transmission occurs here.
- */
+/** Receives notifications only after explicit Notification Access is enabled by the user. */
 class MayraNotificationListener : NotificationListenerService() {
+    private val intelligence by lazy { NotificationIntelligenceEngine() }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val notification = sbn?.notification ?: return
         if (sbn.packageName == packageName) return
@@ -18,14 +17,24 @@ class MayraNotificationListener : NotificationListenerService() {
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
         if (title.isBlank() && text.isBlank()) return
 
-        AmbientEventStore(applicationContext).append(
-            AmbientEvent(
-                sourcePackage = sbn.packageName.orEmpty(),
-                title = title.take(MAX_FIELD_LENGTH),
-                text = text.take(MAX_FIELD_LENGTH),
-                timestamp = sbn.postTime
-            )
+        val event = AmbientEvent(
+            sourcePackage = sbn.packageName.orEmpty(),
+            title = title.take(MAX_FIELD_LENGTH),
+            text = text.take(MAX_FIELD_LENGTH),
+            timestamp = sbn.postTime
         )
+        AmbientEventStore(applicationContext).append(event)
+
+        val insight = intelligence.analyze(event)
+        insight.suggestedAction?.let { action ->
+            BackgroundTaskQueue(applicationContext).enqueue(
+                BackgroundTask(
+                    type = action,
+                    payload = insight.summary,
+                    createdAt = event.timestamp
+                )
+            )
+        }
     }
 
     private companion object {
