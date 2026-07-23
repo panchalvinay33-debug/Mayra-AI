@@ -1,6 +1,5 @@
 package ai.mayra.app.runtime
 
-import ai.mayra.app.MainActivity
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
@@ -61,6 +60,10 @@ internal fun RuntimeControlSnapshot.toAttentionAlert(): RuntimeAttentionAlert? =
         waitingConfirmationSteps = plans.waitingConfirmationSteps
     )
 
+internal fun runtimeControlIntent(context: Context): Intent =
+    Intent(context.applicationContext, RuntimeControlActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
 object RuntimeAttentionNotifier {
     private const val CHANNEL_ID = "mayra_runtime_attention"
     private const val NOTIFICATION_ID = 4102
@@ -82,13 +85,10 @@ object RuntimeAttentionNotifier {
         if (preferences.getString(LAST_FINGERPRINT, null) == alert.fingerprint) return false
 
         ensureChannel(appContext)
-        val intent = Intent(appContext, MainActivity::class.java)
-            .putExtra(EXTRA_OPEN_RUNTIME_CONTROL, true)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pendingIntent = PendingIntent.getActivity(
             appContext,
             NOTIFICATION_ID,
-            intent,
+            runtimeControlIntent(appContext),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
@@ -124,6 +124,4 @@ object RuntimeAttentionNotifier {
             }
         )
     }
-
-    const val EXTRA_OPEN_RUNTIME_CONTROL = "open_runtime_control"
 }
