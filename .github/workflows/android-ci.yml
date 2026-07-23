@@ -37,22 +37,40 @@ jobs:
           gradle --no-daemon :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
 
       - name: Test device action safety
-        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-safety.log
 
       - name: Test device action coordinator
-        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionCoordinatorTest' --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionCoordinatorTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-coordinator.log
 
       - name: Test Android action specifications
-        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-specifications.log
 
       - name: Test Android action runtime
-        run: gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-runtime.log
 
       - name: Run unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee build/ci/unit-tests.log
 
       - name: Run Android lint
-        run: gradle --no-daemon :app:lintDebug --stacktrace --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:lintDebug --stacktrace --console=plain 2>&1 | tee build/ci/lint-debug.log
 
       - name: Upload reports
         if: always()
@@ -60,7 +78,7 @@ jobs:
         with:
           name: android-reports
           path: |
-            build/ci/compile-debug.log
+            build/ci/
             app/build/reports/lint-results-debug.html
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
