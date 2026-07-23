@@ -6,6 +6,8 @@ import ai.mayra.app.core.actions.DevicePermission
 import ai.mayra.app.platform.device.AndroidDevicePermissionStateReader
 import ai.mayra.app.platform.device.AndroidInstalledAppDataSource
 import ai.mayra.app.platform.device.DevicePermissionSnapshotProvider
+import ai.mayra.app.runtime.RuntimeControlDialog
+import ai.mayra.app.runtime.RuntimeControlViewModel
 import ai.mayra.app.ui.theme.MayraAITheme
 import ai.mayra.app.voice.AndroidVoiceAssistant
 import ai.mayra.app.voice.MicrophonePermission
@@ -73,12 +75,17 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+private fun MayraHome(
+    chatViewModel: ChatViewModel = viewModel(),
+    runtimeViewModel: RuntimeControlViewModel = viewModel()
+) {
+    val state by chatViewModel.uiState.collectAsStateWithLifecycle()
+    val runtimeState by runtimeViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val listState = rememberLazyListState()
     var voiceState by remember { mutableStateOf(VoiceState()) }
     var showReadiness by remember { mutableStateOf(false) }
+    var showRuntime by remember { mutableStateOf(false) }
     var readinessRefresh by remember { mutableIntStateOf(0) }
     val voiceLoopPolicy = remember { RealtimeVoiceLoopPolicy() }
     val voiceAssistant = remember {
@@ -100,7 +107,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
 
     LaunchedEffect(voiceState.partialTranscript, voiceState.isFinalTranscript) {
         if (!voiceState.isFinalTranscript && voiceState.partialTranscript.isNotBlank()) {
-            viewModel.updateInput(voiceState.partialTranscript)
+            chatViewModel.updateInput(voiceState.partialTranscript)
         }
     }
 
@@ -113,8 +120,8 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         val decision = voiceLoopPolicy.onVoiceState(voiceState, assistantBusy = state.isThinking)
         decision.submitTranscript?.let { transcript ->
             voiceAssistant.stopListening()
-            viewModel.updateInput(transcript)
-            viewModel.sendMessage()
+            chatViewModel.updateInput(transcript)
+            chatViewModel.sendMessage()
         }
     }
 
@@ -199,15 +206,30 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     Text("Mayra AI", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(voiceStatusText(state.isThinking, voiceState))
                 }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 AssistChip(
                     onClick = { showReadiness = true },
                     label = { Text("Device") }
                 )
+                AssistChip(
+                    onClick = {
+                        runtimeViewModel.refresh()
+                        showRuntime = true
+                    },
+                    label = { Text("Runtime") }
+                )
+                Spacer(Modifier.weight(1f))
                 if (state.messages.isNotEmpty()) {
                     TextButton(
                         onClick = {
                             voiceLoopPolicy.reset()
-                            viewModel.clearConversation()
+                            chatViewModel.clearConversation()
                         },
                         enabled = !state.isThinking
                     ) {
@@ -216,7 +238,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -247,13 +269,13 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = state.input,
-                onValueChange = viewModel::updateInput,
+                onValueChange = chatViewModel::updateInput,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Ask Mayra anything…") },
                 enabled = !state.isThinking,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() })
+                keyboardActions = KeyboardActions(onSend = { chatViewModel.sendMessage() })
             )
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -276,7 +298,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     )
                 }
                 Button(
-                    onClick = viewModel::sendMessage,
+                    onClick = chatViewModel::sendMessage,
                     enabled = state.input.isNotBlank() && !state.isThinking,
                     modifier = Modifier.weight(2f).height(52.dp)
                 ) {
@@ -296,6 +318,14 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             onRequestPermissions = ::requestDevicePermissions,
             onRefresh = { readinessRefresh++ },
             onDismiss = { showReadiness = false }
+        )
+    }
+
+    if (showRuntime) {
+        RuntimeControlDialog(
+            state = runtimeState,
+            onRefresh = runtimeViewModel::refresh,
+            onDismiss = { showRuntime = false }
         )
     }
 }
