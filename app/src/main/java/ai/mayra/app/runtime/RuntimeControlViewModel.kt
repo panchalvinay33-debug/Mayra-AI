@@ -2,9 +2,11 @@ package ai.mayra.app.runtime
 
 import ai.mayra.app.MayraRuntime
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class RuntimeControlViewModel(
     private val snapshotProvider: () -> RuntimeControlSnapshot = {
@@ -18,6 +20,14 @@ class RuntimeControlViewModel(
     private val rejectAction: (String) -> RuntimeControlResult = { actionId ->
         check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
         MayraRuntime.controlCenter.rejectPendingAction(actionId)
+    },
+    private val cancelPlanAction: (String) -> RuntimeControlResult = { planId ->
+        check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
+        MayraRuntime.controlCenter.cancelPlan(planId)
+    },
+    private val runNextAction: suspend (String) -> RuntimeControlResult = { planId ->
+        check(MayraRuntime.installed) { "Mayra runtime is not installed yet." }
+        MayraRuntime.controlCenter.executeNextPlanStep(planId)
     }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RuntimeControlUiState.Loading)
@@ -37,14 +47,27 @@ class RuntimeControlViewModel(
 
     fun reject(actionId: String) = performAction { rejectAction(actionId) }
 
+    fun cancelPlan(planId: String) = performAction { cancelPlanAction(planId) }
+
+    fun runNext(planId: String) {
+        viewModelScope.launch {
+            val result = runCatching { runNextAction(planId) }.getOrElse {
+                updateFailure(it.message ?: "Workflow execution failed.")
+                return@launch
+            }
+            applyResult(result)
+        }
+    }
+
     private fun performAction(action: () -> RuntimeControlResult) {
         val result = runCatching(action).getOrElse {
-            _uiState.value = _uiState.value.copy(
-                notice = null,
-                error = it.message ?: "Runtime action failed."
-            )
+            updateFailure(it.message ?: "Runtime action failed.")
             return
         }
+        applyResult(result)
+    }
+
+    private fun applyResult(result: RuntimeControlResult) {
         val message = when (result) {
             is RuntimeControlResult.Success -> result.message
             is RuntimeControlResult.NotFound -> result.message
@@ -57,5 +80,9 @@ class RuntimeControlViewModel(
             error = message.takeUnless { succeeded }
         )
         if (succeeded) refresh()
+    }
+
+    private fun updateFailure(message: String) {
+        _uiState.value = _uiState.value.copy(notice = null, error = message)
     }
 }
