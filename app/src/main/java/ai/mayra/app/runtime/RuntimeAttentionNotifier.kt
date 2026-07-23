@@ -16,31 +16,46 @@ data class RuntimeAttentionAlert(
     val fingerprint: String
 )
 
-internal fun RuntimeControlSnapshot.toAttentionAlert(): RuntimeAttentionAlert? {
-    val failedCount = runtime.failedRequests + plans.failedPlans
+internal fun buildRuntimeAttentionAlert(
+    runtimeFailures: Long,
+    planFailures: Long,
+    pendingActions: List<Pair<String, String>>,
+    blockedPlans: Int,
+    waitingConfirmationSteps: Int
+): RuntimeAttentionAlert? {
+    val failedCount = runtimeFailures + planFailures
     return when {
         failedCount > 0 -> RuntimeAttentionAlert(
             title = "Mayra runtime needs attention",
             message = "$failedCount runtime failure${if (failedCount == 1L) "" else "s"} detected.",
-            fingerprint = "failure:$failedCount:${runtime.failedRequests}:${plans.failedPlans}"
+            fingerprint = "failure:$failedCount:$runtimeFailures:$planFailures"
         )
         pendingActions.isNotEmpty() -> RuntimeAttentionAlert(
             title = "Mayra is waiting for approval",
             message = if (pendingActions.size == 1) {
-                pendingActions.first().title
+                pendingActions.first().second
             } else {
                 "${pendingActions.size} actions are waiting for your approval."
             },
-            fingerprint = "approval:${pendingActions.map { it.id }.sorted().joinToString(",")}"
+            fingerprint = "approval:${pendingActions.map { it.first }.sorted().joinToString(",")}"
         )
-        plans.blockedPlans > 0 || plans.waitingConfirmationSteps > 0 -> RuntimeAttentionAlert(
+        blockedPlans > 0 || waitingConfirmationSteps > 0 -> RuntimeAttentionAlert(
             title = "A Mayra workflow is paused",
-            message = "${plans.blockedPlans} blocked workflow${if (plans.blockedPlans == 1) "" else "s"} · ${plans.waitingConfirmationSteps} step${if (plans.waitingConfirmationSteps == 1) "" else "s"} waiting.",
-            fingerprint = "workflow:${plans.blockedPlans}:${plans.waitingConfirmationSteps}"
+            message = "$blockedPlans blocked workflow${if (blockedPlans == 1) "" else "s"} · $waitingConfirmationSteps step${if (waitingConfirmationSteps == 1) "" else "s"} waiting.",
+            fingerprint = "workflow:$blockedPlans:$waitingConfirmationSteps"
         )
         else -> null
     }
 }
+
+internal fun RuntimeControlSnapshot.toAttentionAlert(): RuntimeAttentionAlert? =
+    buildRuntimeAttentionAlert(
+        runtimeFailures = runtime.failedRequests,
+        planFailures = plans.failedPlans,
+        pendingActions = pendingActions.map { it.id to it.title },
+        blockedPlans = plans.blockedPlans,
+        waitingConfirmationSteps = plans.waitingConfirmationSteps
+    )
 
 object RuntimeAttentionNotifier {
     private const val CHANNEL_ID = "mayra_runtime_attention"
