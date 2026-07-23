@@ -20,6 +20,7 @@ import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
+import ai.mayra.app.runtime.MayraRuntimeControlCenter
 import android.app.Application
 import java.util.Calendar
 
@@ -73,6 +74,13 @@ class MayraApplication : Application() {
             memory = contextMemory,
             pendingActions = pendingActions
         )
+        val controlCenter = MayraRuntimeControlCenter(
+            context = applicationContext,
+            orchestrator = orchestrator,
+            planRuntime = planRuntime,
+            planStore = planStore,
+            pendingActions = pendingActions
+        )
 
         MayraRuntime.install(
             brain = brain,
@@ -81,7 +89,8 @@ class MayraApplication : Application() {
             planner = taskPlanner,
             planStore = planStore,
             planRuntime = planRuntime,
-            orchestrator = orchestrator
+            orchestrator = orchestrator,
+            controlCenter = controlCenter
         )
 
         contextMemory.prune()
@@ -112,9 +121,11 @@ object MayraRuntime {
         private set
     lateinit var orchestrator: MayraRuntimeOrchestrator
         private set
+    lateinit var controlCenter: MayraRuntimeControlCenter
+        private set
 
     val installed: Boolean
-        get() = ::orchestrator.isInitialized
+        get() = ::orchestrator.isInitialized && ::controlCenter.isInitialized
 
     fun install(
         brain: MayraBrainCoordinator,
@@ -123,7 +134,8 @@ object MayraRuntime {
         planner: MayraTaskPlanner,
         planStore: MayraPlanStore,
         planRuntime: MayraPlanRuntime,
-        orchestrator: MayraRuntimeOrchestrator
+        orchestrator: MayraRuntimeOrchestrator,
+        controlCenter: MayraRuntimeControlCenter
     ) {
         this.brain = brain
         this.skills = skills
@@ -132,5 +144,6 @@ object MayraRuntime {
         this.planStore = planStore
         this.planRuntime = planRuntime
         this.orchestrator = orchestrator
+        this.controlCenter = controlCenter
     }
 }
