@@ -10,24 +10,18 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
-/**
- * Schedules Mayra's durable background maintenance.
- *
- * This is intentionally event-driven rather than a permanently spinning process. Android may kill
- * ordinary background processes, while WorkManager restores persistent work when constraints allow.
- */
 object MayraBackgroundRuntime {
     private const val PERIODIC_WORK_NAME = "mayra-ambient-maintenance"
 
     fun initialize(context: Context) {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-            .setRequiresBatteryNotLow(true)
+        val request = PeriodicWorkRequestBuilder<MayraMaintenanceWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                    .setRequiresBatteryNotLow(true)
+                    .build()
+            )
             .build()
-        val request = PeriodicWorkRequestBuilder<MayraMaintenanceWorker>(
-            15,
-            TimeUnit.MINUTES
-        ).setConstraints(constraints).build()
 
         WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
             PERIODIC_WORK_NAME,
@@ -42,14 +36,87 @@ class MayraMaintenanceWorker(
     params: WorkerParameters
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result = runCatching {
-        val store = AmbientEventStore(applicationContext)
-        store.recordSystemHeartbeat(System.currentTimeMillis())
-        store.prune(maxEntries = 200)
+        val now = System.currentTimeMillis()
+        val eventStore = AmbientEventStore(applicationContext)
+        val taskQueue = BackgroundTaskQueue(applicationContext)
+        val processor = AmbientTaskProcessor()
+
+        eventStore.recordSystemHeartbeat(now)
+        taskQueue.due(now).forEach { task ->
+            taskQueue.markRunning(task.id)
+            when (val outcome = processor.process(task)) {
+                TaskOutcome.Completed -> taskQueue.markCompleted(task.id)
+                is TaskOutcome.Retry -> taskQueue.markFailed(
+                    id = task.id,
+                    error = outcome.reason,
+                    retryAt = now + retryDelayMillis(task.attempt)
+                )
+            }
+        }
+
+        val briefing = DailyBriefingEngine().build(
+            events = eventStore.snapshot(),
+            since = now - TimeUnit.HOURS.toMillis(24)
+        )
+        AmbientBriefingStore(applicationContext).save(briefing, now)
+        eventStore.prune(maxEntries = 300)
+        taskQueue.prune(maxEntries = 250)
         Result.success()
     }.getOrElse { Result.retry() }
+
+    private fun retryDelayMillis(attempt: Int): Long {
+        val minutes = when (attempt) {
+            0 -> 5L
+            1 -> 15L
+            else -> 60L
+        }
+        return TimeUnit.MINUTES.toMillis(minutes)
+    }
 }
 
-/** Small durable event inbox used by notification, boot and scheduled background components. */
+sealed interface TaskOutcome {
+    data object Completed : TaskOutcome
+    data class Retry(val reason: String) : TaskOutcome
+}
+
+/**
+ * Background processor intentionally handles only work that does not need a visible activity.
+ * UI-bound and sensitive actions remain queued for a user-visible confirmation flow.
+ */
+class AmbientTaskProcessor {
+    fun process(task: BackgroundTask): TaskOutcome = when (task.type) {
+        "track_delivery", "review_schedule" -> TaskOutcome.Completed
+        "reply", "review_security" -> TaskOutcome.Retry("User confirmation is required.")
+        else -> TaskOutcome.Retry("No background handler is registered for ${task.type}.")
+    }
+}
+
+class AmbientBriefingStore(context: Context) {
+    private val preferences = context.applicationContext.getSharedPreferences(
+        "mayra_ambient_briefing",
+        Context.MODE_PRIVATE
+    )
+
+    fun save(text: String, generatedAt: Long) {
+        preferences.edit()
+            .putString(KEY_TEXT, text)
+            .putLong(KEY_GENERATED_AT, generatedAt)
+            .apply()
+    }
+
+    fun latest(): AmbientBriefing = AmbientBriefing(
+        text = preferences.getString(KEY_TEXT, null),
+        generatedAt = preferences.getLong(KEY_GENERATED_AT, 0L)
+    )
+
+    private companion object {
+        const val KEY_TEXT = "text"
+        const val KEY_GENERATED_AT = "generated_at"
+    }
+}
+
+data class AmbientBriefing(val text: String?, val generatedAt: Long)
+
 class AmbientEventStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(
         "mayra_ambient_events",
