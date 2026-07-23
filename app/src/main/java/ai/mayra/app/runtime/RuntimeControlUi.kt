@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,13 +24,19 @@ data class RuntimeMetric(
     val detail: String
 )
 
+data class RuntimePendingAction(
+    val id: String,
+    val title: String
+)
+
 data class RuntimeControlUiState(
     val health: RuntimeHealth,
     val headline: String,
     val metrics: List<RuntimeMetric>,
     val activePlanTitles: List<String>,
-    val pendingActionTitles: List<String>,
+    val pendingActions: List<RuntimePendingAction>,
     val capturedAt: Long,
+    val notice: String? = null,
     val error: String? = null
 ) {
     companion object {
@@ -38,7 +45,7 @@ data class RuntimeControlUiState(
             headline = "Reading Mayra runtime…",
             metrics = emptyList(),
             activePlanTitles = emptyList(),
-            pendingActionTitles = emptyList(),
+            pendingActions = emptyList(),
             capturedAt = 0L
         )
 
@@ -47,7 +54,7 @@ data class RuntimeControlUiState(
             headline = "Runtime status unavailable",
             metrics = emptyList(),
             activePlanTitles = emptyList(),
-            pendingActionTitles = emptyList(),
+            pendingActions = emptyList(),
             capturedAt = System.currentTimeMillis(),
             error = message
         )
@@ -94,7 +101,7 @@ fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
             )
         ),
         activePlanTitles = activePlans.map { it.title }.take(5),
-        pendingActionTitles = pendingActions.map { it.title }.take(5),
+        pendingActions = pendingActions.map { RuntimePendingAction(it.id, it.title) }.take(5),
         capturedAt = capturedAt
     )
 }
@@ -102,6 +109,8 @@ fun RuntimeControlSnapshot.toUiState(): RuntimeControlUiState {
 @Composable
 fun RuntimeControlDialog(
     state: RuntimeControlUiState,
+    onApprove: (String) -> Unit,
+    onReject: (String) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -115,18 +124,24 @@ fun RuntimeControlDialog(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                state.notice?.let {
+                    Text(it, color = MaterialTheme.colorScheme.primary)
+                }
                 state.error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                 }
                 state.metrics.forEach { metric -> RuntimeMetricCard(metric) }
-                if (state.pendingActionTitles.isNotEmpty()) {
-                    RuntimeSummaryGroup("Waiting for approval", state.pendingActionTitles)
+                if (state.pendingActions.isNotEmpty()) {
+                    Text("Waiting for approval", fontWeight = FontWeight.SemiBold)
+                    state.pendingActions.forEach { action ->
+                        RuntimePendingActionCard(action, onApprove, onReject)
+                    }
                 }
                 if (state.activePlanTitles.isNotEmpty()) {
                     RuntimeSummaryGroup("Active workflows", state.activePlanTitles)
                 }
                 if (state.metrics.isNotEmpty() &&
-                    state.pendingActionTitles.isEmpty() &&
+                    state.pendingActions.isEmpty() &&
                     state.activePlanTitles.isEmpty()
                 ) {
                     Text(
@@ -157,6 +172,26 @@ private fun RuntimeMetricCard(metric: RuntimeMetric) {
                 Text(metric.detail, style = MaterialTheme.typography.bodySmall)
             }
             Text(metric.value, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun RuntimePendingActionCard(
+    action: RuntimePendingAction,
+    onApprove: (String) -> Unit,
+    onReject: (String) -> Unit
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(action.title, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onReject(action.id) }) { Text("Reject") }
+                OutlinedButton(onClick = { onApprove(action.id) }) { Text("Approve") }
+            }
         }
     }
 }
