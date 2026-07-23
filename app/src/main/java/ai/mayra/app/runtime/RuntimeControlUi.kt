@@ -139,7 +139,8 @@ fun RuntimeControlDialog(
     onApprove: (String) -> Unit = controller::approve,
     onReject: (String) -> Unit = controller::reject,
     onRunNext: (String) -> Unit = controller::runNext,
-    onCancelPlan: (String) -> Unit = controller::cancelPlan
+    onCancelPlan: (String) -> Unit = controller::cancelPlan,
+    onClearHistory: () -> Unit = controller::clearCompletedHistory
 ) {
     LaunchedEffect(Unit) {
         while (true) {
@@ -172,6 +173,13 @@ fun RuntimeControlDialog(
                 }
                 if (state.metrics.isNotEmpty() && state.pendingActions.isEmpty() && state.activePlans.isEmpty()) {
                     Text("No active workflows or pending confirmations.", style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(
+                    onClick = onClearHistory,
+                    enabled = !state.isBusy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Clear completed workflow history")
                 }
             }
         },
