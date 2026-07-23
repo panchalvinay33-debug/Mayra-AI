@@ -2,137 +2,108 @@ package ai.mayra.app.core
 
 import java.util.Locale
 
-/**
- * Deterministic offline intent parser used before a remote AI provider is configured.
- *
- * The parser intentionally accepts natural Hindi/Hinglish sentences instead of requiring every
- * device command to begin with one exact English keyword.
- */
+/** Offline deterministic parser for common English, Hindi and Hinglish assistant commands. */
 class AssistantIntentEngine(
     private val locale: Locale = Locale.getDefault()
 ) {
-
     fun parse(rawInput: String): AssistantIntent {
         val original = rawInput.trim()
         if (original.isEmpty()) return AssistantIntent.Invalid("Please say or type a command.")
-
         val normalized = normalize(original)
 
         return when {
             normalized.matchesAny("clear chat", "clear conversation", "delete chat", "chat clear") ->
                 AssistantIntent.ClearConversation
-
             normalized.matchesAny("what time", "current time", "time kya", "samay kya", "kitne baje") ->
                 AssistantIntent.DeviceInfo(DeviceInfoType.TIME)
-
             normalized.matchesAny("battery", "charge kitna", "battery kitni", "charge kitni") ->
                 AssistantIntent.DeviceInfo(DeviceInfoType.BATTERY)
-
-            normalized.hasMessageCommand() -> parseMessageIntent(original, normalized)
-            normalized.hasCallCommand() -> parseCallIntent(normalized)
-            normalized.hasOpenCommand() -> parseOpenIntent(normalized)
-            normalized.hasReminderCommand() -> parseReminderIntent(original, normalized)
+            normalized.findCommand(MESSAGE_COMMANDS) != null -> parseMessageIntent(original, normalized)
+            normalized.findCommand(CALL_COMMANDS) != null -> parseTargetIntent(
+                normalized,
+                CALL_COMMANDS,
+                "Who should I call?",
+                AssistantIntent::CallContact
+            )
+            normalized.findCommand(OPEN_COMMANDS) != null -> parseTargetIntent(
+                normalized,
+                OPEN_COMMANDS,
+                "Which app should I open?",
+                AssistantIntent::OpenApp
+            )
+            REMINDER_COMMANDS.any(normalized::contains) -> parseReminderIntent(original, normalized)
             else -> AssistantIntent.Chat(original)
         }
     }
 
-    private fun parseOpenIntent(normalized: String): AssistantIntent {
-        val appName = extractTargetAfterKeyword(
-            normalized,
-            keywords = listOf("open", "launch", "khol", "kholo", "chalao", "start"),
-            removableWords = OPEN_FILLER_WORDS
-        )
-        return if (appName.isBlank()) {
-            AssistantIntent.Invalid("Which app should I open?")
-        } else {
-            AssistantIntent.OpenApp(appName)
-        }
-    }
+    private fun parseTargetIntent(
+        normalized: String,
+        commands: List<String>,
+        emptyMessage: String,
+        factory: (String) -> AssistantIntent
+    ): AssistantIntent {
+        val match = normalized.findCommand(commands) ?: return AssistantIntent.Invalid(emptyMessage)
+        val after = normalized.substring(match.index + match.keyword.length)
+            .cleanCommandSide()
+        val before = normalized.substring(0, match.index)
+            .cleanCommandSide()
 
-    private fun parseCallIntent(normalized: String): AssistantIntent {
-        val contact = extractTargetAfterKeyword(
-            normalized,
-            keywords = listOf("call", "phone", "dial", "lagao", "milao"),
-            removableWords = CALL_FILLER_WORDS
-        )
-        return if (contact.isBlank()) {
-            AssistantIntent.Invalid("Who should I call?")
-        } else {
-            AssistantIntent.CallContact(contact)
+        val target = when {
+            after.isUsefulTarget() -> after
+            before.isUsefulTarget() -> before
+            else -> ""
         }
+        return if (target.isBlank()) AssistantIntent.Invalid(emptyMessage) else factory(target)
     }
 
     private fun parseMessageIntent(original: String, normalized: String): AssistantIntent {
-        val command = MESSAGE_COMMANDS
-            .mapNotNull { keyword -> normalized.indexOfWord(keyword).takeIf { it >= 0 }?.let { keyword to it } }
-            .minByOrNull { it.second }
+        val match = normalized.findCommand(MESSAGE_COMMANDS)
             ?: return AssistantIntent.Invalid("Who should I message?")
 
-        val normalizedPayload = normalized.substring(command.second + command.first.length).trim()
-            .removeLeadingWords(MESSAGE_FILLER_WORDS)
-        if (normalizedPayload.isBlank()) return AssistantIntent.Invalid("Who should I message?")
+        val before = normalized.substring(0, match.index).cleanCommandSide()
+        val afterNormalized = normalized.substring(match.index + match.keyword.length)
+            .trim().removeLeadingWords(MESSAGE_ACTION_WORDS)
+        val afterOriginal = original.substringAfterKeyword(match.keyword)
+            .trim().removeLeadingWordsIgnoreCase(MESSAGE_ACTION_WORDS)
 
-        val originalStart = findOriginalPayloadStart(original, command.first)
-        val originalPayload = original.substring(originalStart).trim()
-            .removeLeadingWordsIgnoreCase(MESSAGE_FILLER_WORDS)
+        // Natural Hindi order: "Mummy ko message likho main aa raha hu".
+        if (before.isUsefulTarget()) {
+            val body = afterOriginal.trim().trimStart(':').trim().ifBlank { null }
+            return AssistantIntent.ComposeMessage(before, body)
+        }
 
+        if (afterNormalized.isBlank()) return AssistantIntent.Invalid("Who should I message?")
         val separator = MESSAGE_SEPARATORS
-            .mapNotNull { value -> normalizedPayload.indexOf(value).takeIf { it > 0 }?.let { value to it } }
+            .mapNotNull { token -> afterNormalized.indexOf(token).takeIf { it > 0 }?.let { token to it } }
             .minByOrNull { it.second }
 
         if (separator == null) {
-            return AssistantIntent.ComposeMessage(recipient = cleanTarget(originalPayload), message = null)
+            return AssistantIntent.ComposeMessage(afterOriginal.cleanTarget(), null)
         }
 
-        val recipient = cleanTarget(originalPayload.substring(0, separator.second))
+        val recipient = afterOriginal.substring(0, separator.second).cleanTarget()
         val bodyStart = separator.second + separator.first.length
-        val message = originalPayload.substring(bodyStart.coerceAtMost(originalPayload.length))
-            .trim().trimStart(':').trim()
-
+        val body = afterOriginal.substring(bodyStart.coerceAtMost(afterOriginal.length))
+            .trim().trimStart(':').trim().ifBlank { null }
         return if (recipient.isBlank()) {
             AssistantIntent.Invalid("Who should I message?")
         } else {
-            AssistantIntent.ComposeMessage(recipient, message.ifBlank { null })
+            AssistantIntent.ComposeMessage(recipient, body)
         }
     }
 
     private fun parseReminderIntent(original: String, normalized: String): AssistantIntent {
-        val keyword = REMINDER_COMMANDS
-            .mapNotNull { value -> normalized.indexOf(value).takeIf { it >= 0 }?.let { value to it } }
-            .minByOrNull { it.second }
+        val match = REMINDER_COMMANDS
+            .mapNotNull { keyword -> normalized.indexOf(keyword).takeIf { it >= 0 }?.let { CommandMatch(keyword, it) } }
+            .minByOrNull(CommandMatch::index)
             ?: return AssistantIntent.Invalid("What should I remind you about?")
-
-        val start = findOriginalPayloadStart(original, keyword.first)
-        val request = original.substring(start).trim()
-            .removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
-
+        val request = original.substringAfterKeyword(match.keyword)
+            .trim().removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
         return if (request.isBlank()) {
             AssistantIntent.Invalid("What should I remind you about?")
         } else {
             AssistantIntent.CreateReminder(request)
         }
-    }
-
-    private fun extractTargetAfterKeyword(
-        normalized: String,
-        keywords: List<String>,
-        removableWords: Set<String>
-    ): String {
-        val match = keywords
-            .mapNotNull { keyword -> normalized.indexOfWord(keyword).takeIf { it >= 0 }?.let { keyword to it } }
-            .minByOrNull { it.second }
-            ?: return ""
-
-        return normalized.substring(match.second + match.first.length)
-            .trim()
-            .removeLeadingWords(removableWords)
-            .removeTrailingWords(COMMON_TRAILING_WORDS)
-            .let(::cleanTarget)
-    }
-
-    private fun findOriginalPayloadStart(original: String, keyword: String): Int {
-        val index = original.lowercase(locale).indexOf(keyword)
-        return if (index < 0) 0 else index + keyword.length
     }
 
     private fun normalize(value: String): String = value
@@ -141,37 +112,49 @@ class AssistantIntentEngine(
         .replace(Regex("\\s+"), " ")
         .trim()
 
-    private fun String.hasOpenCommand(): Boolean = OPEN_COMMANDS.any { indexOfWord(it) >= 0 }
-    private fun String.hasCallCommand(): Boolean = CALL_COMMANDS.any { indexOfWord(it) >= 0 }
-    private fun String.hasMessageCommand(): Boolean = MESSAGE_COMMANDS.any { indexOfWord(it) >= 0 }
-    private fun String.hasReminderCommand(): Boolean = REMINDER_COMMANDS.any { contains(it) }
+    private fun String.findCommand(commands: List<String>): CommandMatch? = commands
+        .mapNotNull { keyword -> indexOfWord(keyword).takeIf { it >= 0 }?.let { CommandMatch(keyword, it) } }
+        .sortedWith(compareBy<CommandMatch> { it.index }.thenByDescending { it.keyword.length })
+        .firstOrNull()
 
     private fun String.indexOfWord(word: String): Int {
-        val pattern = Regex("(^|\\s)${Regex.escape(word)}(?=\\s|$)")
-        val result = pattern.find(this) ?: return -1
-        return result.range.first + if (result.value.startsWith(" ")) 1 else 0
+        val result = Regex("(^|\\s)${Regex.escape(word)}(?=\\s|$)").find(this) ?: return -1
+        return result.range.first + if (result.value.startsWith(' ')) 1 else 0
     }
 
+    private fun String.cleanCommandSide(): String = trim()
+        .removeLeadingWords(COMMAND_FILLER_WORDS)
+        .removeTrailingWords(COMMAND_TRAILING_WORDS)
+        .cleanTarget()
+
+    private fun String.isUsefulTarget(): Boolean =
+        isNotBlank() && split(' ').any { it !in COMMAND_FILLER_WORDS && it !in COMMAND_TRAILING_WORDS }
+
     private fun String.removeLeadingWords(words: Set<String>): String {
-        val tokens = split(' ').filter(String::isNotBlank).toMutableList()
+        val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
         while (tokens.firstOrNull() in words) tokens.removeAt(0)
         return tokens.joinToString(" ")
     }
 
     private fun String.removeTrailingWords(words: Set<String>): String {
-        val tokens = split(' ').filter(String::isNotBlank).toMutableList()
+        val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
         while (tokens.lastOrNull() in words) tokens.removeAt(tokens.lastIndex)
         return tokens.joinToString(" ")
     }
 
     private fun String.removeLeadingWordsIgnoreCase(words: Set<String>): String {
-        val tokens = trim().split(Regex("\\s+")).toMutableList()
+        val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
         while (tokens.firstOrNull()?.lowercase(locale) in words) tokens.removeAt(0)
         return tokens.joinToString(" ")
     }
 
-    private fun cleanTarget(value: String): String = value
-        .trim().trim(':', ',', '.', '?', '!')
+    private fun String.substringAfterKeyword(keyword: String): String {
+        val index = lowercase(locale).indexOf(keyword)
+        return if (index < 0) this else substring(index + keyword.length)
+    }
+
+    private fun String.cleanTarget(): String = trim()
+        .trim(':', ',', '.', '?', '!')
         .replace(Regex("\\s+"), " ")
 }
 
@@ -186,29 +169,24 @@ sealed interface AssistantIntent {
     data object ClearConversation : AssistantIntent
 }
 
-enum class DeviceInfoType {
-    TIME,
-    BATTERY
-}
+enum class DeviceInfoType { TIME, BATTERY }
 
+private data class CommandMatch(val keyword: String, val index: Int)
 private fun String.matchesAny(vararg values: String): Boolean = values.any(::contains)
 
 private val OPEN_COMMANDS = listOf("open", "launch", "khol", "kholo", "chalao", "start")
 private val CALL_COMMANDS = listOf("call", "phone", "dial", "lagao", "milao")
-private val MESSAGE_COMMANDS = listOf("send message to", "message", "text", "sms", "msg")
+private val MESSAGE_COMMANDS = listOf("send message to", "send sms to", "message", "text", "sms", "msg")
 private val REMINDER_COMMANDS = listOf("remind me", "set reminder", "yaad dilana", "reminder laga")
 
-private val OPEN_FILLER_WORDS = setOf(
-    "app", "application", "ko", "please", "jara", "zara", "mera", "meri", "the"
+private val COMMAND_FILLER_WORDS = setOf(
+    "mayra", "mira", "please", "jara", "zara", "mera", "meri", "mere", "the",
+    "app", "application", "contact", "number", "to"
 )
-private val CALL_FILLER_WORDS = setOf(
-    "to", "ko", "contact", "number", "please", "jara", "zara", "mera", "meri"
+private val COMMAND_TRAILING_WORDS = setOf(
+    "ko", "please", "karo", "kar", "karna", "do", "de", "abhi", "jara", "zara",
+    "open", "call", "phone", "dial", "launch", "start", "khol", "kholo", "chalao"
 )
-private val MESSAGE_FILLER_WORDS = setOf(
-    "to", "ko", "contact", "number", "please", "jara", "zara"
-)
+private val MESSAGE_ACTION_WORDS = setOf("to", "ko", "likho", "bolo", "saying", "that")
 private val REMINDER_FILLER_WORDS = setOf("to", "ki", "please", "mujhe")
-private val COMMON_TRAILING_WORDS = setOf(
-    "please", "karo", "kar", "karna", "do", "de", "abhi", "jara", "zara"
-)
-private val MESSAGE_SEPARATORS = listOf(":", " saying ", " that ", " bolo ", " likho ", " message ")
+private val MESSAGE_SEPARATORS = listOf(":", " saying ", " that ", " bolo ", " likho ")
