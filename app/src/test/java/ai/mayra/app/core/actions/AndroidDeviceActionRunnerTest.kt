@@ -1,7 +1,7 @@
 package ai.mayra.app.core.actions
 
 import android.content.Intent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,7 +13,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class AndroidDeviceActionRunnerTest {
     @Test
-    fun callIntentIsBuiltAndStarted() = runTest {
+    fun callIntentIsBuiltAndStarted() = runBlocking {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -30,7 +30,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun messageIntentPreservesRecipientAndBody() = runTest {
+    fun messageIntentPreservesRecipientAndBody() = runBlocking {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -48,7 +48,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun openAppIntentAppliesPackageAndLauncherCategory() = runTest {
+    fun openAppIntentAppliesPackageAndLauncherCategory() = runBlocking {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -72,7 +72,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun reminderIntentMapsTitleAndDetailExtras() = runTest {
+    fun reminderIntentMapsTitleAndDetailExtras() = runBlocking {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
