@@ -33,6 +33,7 @@
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
 
+        <activity android:name=".identity.MayraIdentityActivity" android:exported="false" />
         <activity android:name=".owner.MayraOwnerSetupActivity" android:exported="false" />
         <activity android:name=".background.MayraNotificationCenterActivity" android:exported="false" />
         <activity android:name=".action.MayraActionControlActivity" android:exported="false" />
