@@ -111,4 +111,72 @@ class RuntimeAttentionNotifierTest {
     fun `queued background scan has clear feedback`() {
         assertEquals("Background runtime scan queued.", backgroundScanQueuedMessage())
     }
+
+    @Test
+    fun `disabled schedule has no next scan`() {
+        assertEquals(
+            "Next background scan: off",
+            nextBackgroundScanEstimate(
+                RuntimeAttentionScheduleState(enabled = false, intervalMinutes = 15L),
+                lastCompletedAt = 1_000L,
+                now = 2_000L
+            )
+        )
+    }
+
+    @Test
+    fun `new schedule reports first scan window`() {
+        assertEquals(
+            "First background scan expected within about 15 min",
+            nextBackgroundScanEstimate(
+                RuntimeAttentionScheduleState(enabled = true, intervalMinutes = 15L),
+                lastCompletedAt = null,
+                now = 2_000L
+            )
+        )
+    }
+
+    @Test
+    fun `next scan estimate rounds remaining minutes up`() {
+        assertEquals(
+            "Next background scan in about 2 min",
+            nextBackgroundScanEstimate(
+                RuntimeAttentionScheduleState(enabled = true, intervalMinutes = 15L),
+                lastCompletedAt = 1_000L,
+                now = 781_001L
+            )
+        )
+    }
+
+    @Test
+    fun `overdue scan reports Android delay`() {
+        assertEquals(
+            "Background scan is due; Android may delay it",
+            nextBackgroundScanEstimate(
+                RuntimeAttentionScheduleState(enabled = true, intervalMinutes = 15L),
+                lastCompletedAt = 1_000L,
+                now = 901_001L
+            )
+        )
+    }
+
+    @Test
+    fun `immediate scan lifecycle status is readable`() {
+        assertEquals(
+            "Manual background scan: queued · just now",
+            RuntimeAttentionImmediateState(RuntimeAttentionImmediatePhase.QUEUED, 1_000L).status(1_000L)
+        )
+        assertEquals(
+            "Manual background scan: running · 1 min ago",
+            RuntimeAttentionImmediateState(RuntimeAttentionImmediatePhase.RUNNING, 1_000L).status(61_000L)
+        )
+        assertEquals(
+            "Manual background scan: completed · 2 min ago",
+            RuntimeAttentionImmediateState(RuntimeAttentionImmediatePhase.COMPLETED, 1_000L).status(121_000L)
+        )
+        assertEquals(
+            "Manual background scan: retry scheduled · just now",
+            RuntimeAttentionImmediateState(RuntimeAttentionImmediatePhase.RETRYING, 1_000L).status(1_000L)
+        )
+    }
 }
