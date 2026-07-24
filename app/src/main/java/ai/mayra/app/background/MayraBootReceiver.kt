@@ -1,5 +1,6 @@
 package ai.mayra.app.background
 
+import ai.mayra.app.reminder.MayraReminderRuntime
 import ai.mayra.app.runtime.RuntimeAttentionScheduler
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -13,6 +14,7 @@ class MayraBootReceiver : BroadcastReceiver() {
             val appContext = context.applicationContext
             MayraBackgroundRuntime.initialize(appContext)
             RuntimeAttentionScheduler.sync(appContext)
+            MayraReminderRuntime.rescheduleAll(appContext)
         }
     }
 }
