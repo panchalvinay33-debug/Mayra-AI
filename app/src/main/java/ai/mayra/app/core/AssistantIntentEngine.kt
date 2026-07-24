@@ -23,7 +23,7 @@ class AssistantIntentEngine(
                 AssistantIntent.DeviceInfo(DeviceInfoType.TIME)
             normalized.matchesAny("battery", "charge kitna", "battery kitni", "charge kitni") ->
                 AssistantIntent.DeviceInfo(DeviceInfoType.BATTERY)
-            REMINDER_COMMANDS.any(normalized::contains) -> parseReminderIntent(original, normalized)
+            normalized.isReminderCommand() -> parseReminderIntent(original, normalized)
             normalized.findCommand(MESSAGE_COMMANDS) != null -> parseMessageIntent(original, normalized)
             normalized.findCommand(CALL_COMMANDS) != null -> parseTargetIntent(
                 normalized,
@@ -99,15 +99,26 @@ class AssistantIntentEngine(
     }
 
     private fun parseReminderIntent(original: String, normalized: String): AssistantIntent {
-        val match = REMINDER_COMMANDS
+        val flexibleMatch = FLEXIBLE_SET_TIME_REMINDER.find(normalized)
+        val exactMatch = REMINDER_COMMANDS
             .mapNotNull { keyword -> normalized.indexOf(keyword).takeIf { it >= 0 }?.let { CommandMatch(keyword, it) } }
             .sortedWith(compareBy<CommandMatch> { it.index }.thenByDescending { it.keyword.length })
             .firstOrNull()
-            ?: return AssistantIntent.Invalid("What should I remind you about?")
 
-        val commandPattern = Regex("(?i)(^|\\s)${Regex.escape(match.keyword)}(?=\\s|$)")
-        val request = original
-            .replaceFirst(commandPattern, " ")
+        val request = when {
+            flexibleMatch != null -> {
+                val middleStart = flexibleMatch.groups[1]?.range?.first ?: 0
+                val middleEnd = flexibleMatch.groups[1]?.range?.last?.plus(1) ?: middleStart
+                val middle = original.substring(middleStart.coerceAtMost(original.length), middleEnd.coerceAtMost(original.length))
+                val after = original.substring(flexibleMatch.range.last.plus(1).coerceAtMost(original.length))
+                "$middle $after"
+            }
+            exactMatch != null -> {
+                val commandPattern = Regex("(?i)(^|\\s)${Regex.escape(exactMatch.keyword)}(?=\\s|$)")
+                original.replaceFirst(commandPattern, " ")
+            }
+            else -> original
+        }
             .trim()
             .removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
             .removeTrailingWordsIgnoreCase(REMINDER_TRAILING_WORDS)
@@ -136,6 +147,9 @@ class AssistantIntentEngine(
         val result = Regex("(^|\\s)${Regex.escape(word)}(?=\\s|$)").find(this) ?: return -1
         return result.range.first + if (result.value.startsWith(" ")) 1 else 0
     }
+
+    private fun String.isReminderCommand(): Boolean =
+        REMINDER_COMMANDS.any(::contains) || FLEXIBLE_SET_TIME_REMINDER.containsMatchIn(this)
 
     private fun String.cleanCommandSide(): String = trim()
         .removeLeadingWords(COMMAND_FILLER_WORDS)
@@ -203,6 +217,9 @@ private val REMINDER_COMMANDS = listOf(
     "reminder daal do", "reminder dalo", "reminder daalo", "reminder lagao",
     "remind me", "set reminder", "yaad dila do", "yaad dilao", "yaad dilana", "reminder laga"
 )
+private val FLEXIBLE_SET_TIME_REMINDER = Regex(
+    "(?i)\\bset\\s+(.{1,80}?)\\s+reminder\\b"
+)
 
 private val COMMAND_FILLER_WORDS = setOf(
     "mayra", "mira", "please", "jara", "zara", "mera", "meri", "mere", "the",
@@ -213,7 +230,7 @@ private val COMMAND_TRAILING_WORDS = setOf(
     "open", "call", "phone", "dial", "launch", "start", "khol", "kholo", "chalao"
 )
 private val MESSAGE_ACTION_WORDS = setOf("to", "ko", "likho", "bolo", "saying", "that")
-private val REMINDER_FILLER_WORDS = setOf("to", "ki", "please", "mujhe", "mayra", "mira")
+private val REMINDER_FILLER_WORDS = setOf("to", "for", "ki", "please", "mujhe", "mayra", "mira")
 private val REMINDER_TRAILING_WORDS = setOf(
     "ka", "ki", "ke", "please", "karo", "kar", "do", "de", "dalo", "daalo", "lagao", "laga"
 )
