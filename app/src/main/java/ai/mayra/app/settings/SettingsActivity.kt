@@ -1,0 +1,253 @@
+package ai.mayra.app.settings
+
+import ai.mayra.app.ui.theme.MayraAITheme
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+class SettingsActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val onboarding = intent.getBooleanExtra(EXTRA_ONBOARDING, false)
+        setContent {
+            MayraAITheme {
+                MayraSettingsScreen(
+                    onboarding = onboarding,
+                    store = remember { MayraSettingsStore(applicationContext) },
+                    onClose = ::finish
+                )
+            }
+        }
+    }
+
+    companion object {
+        const val EXTRA_ONBOARDING = "mayra.extra.ONBOARDING"
+    }
+}
+
+@Composable
+private fun MayraSettingsScreen(
+    onboarding: Boolean,
+    store: MayraSettingsStore,
+    onClose: () -> Unit
+) {
+    var settings by remember { mutableStateOf(store.read()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var showResetConfirmation by remember { mutableStateOf(false) }
+
+    Scaffold { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                if (onboarding) "Welcome to Mayra AI" else "Mayra settings",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                if (onboarding) {
+                    "Set up how Mayra should speak, remember and personalize your experience."
+                } else {
+                    settings.summary()
+                }
+            )
+
+            SettingsSection("Your profile") {
+                OutlinedTextField(
+                    value = settings.userName,
+                    onValueChange = { value ->
+                        settings = settings.copy(userName = value.take(MayraSettings.MAX_NAME_LENGTH))
+                        error = null
+                    },
+                    label = { Text("What should Mayra call you?") },
+                    supportingText = { Text("Stored only in this app on your device.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            SettingsSection("Language") {
+                MayraLanguage.entries.forEach { language ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = settings.language == language,
+                            onClick = { settings = settings.copy(language = language) }
+                        )
+                        Text(language.label)
+                    }
+                }
+            }
+
+            SettingsSection("Voice") {
+                SettingsToggle(
+                    title = "Speak Mayra's responses",
+                    description = "Read assistant replies aloud when voice mode is active.",
+                    checked = settings.speakResponses,
+                    onCheckedChange = { settings = settings.copy(speakResponses = it) }
+                )
+                SettingsToggle(
+                    title = "Start continuous voice by default",
+                    description = "Keep listening after Mayra finishes speaking.",
+                    checked = settings.continuousVoiceByDefault,
+                    onCheckedChange = { settings = settings.copy(continuousVoiceByDefault = it) }
+                )
+            }
+
+            SettingsSection("Memory and personalization") {
+                SettingsToggle(
+                    title = "Memory",
+                    description = "Allow Mayra to remember useful preferences and context.",
+                    checked = settings.memoryEnabled,
+                    onCheckedChange = {
+                        settings = settings.copy(
+                            memoryEnabled = it,
+                            personalizationEnabled = settings.personalizationEnabled && it
+                        )
+                    }
+                )
+                SettingsToggle(
+                    title = "Personalization",
+                    description = "Use saved preferences to tailor answers and actions.",
+                    checked = settings.personalizationEnabled,
+                    enabled = settings.memoryEnabled,
+                    onCheckedChange = { settings = settings.copy(personalizationEnabled = it) }
+                )
+            }
+
+            SettingsSection("Privacy") {
+                SettingsToggle(
+                    title = "Share anonymous diagnostics",
+                    description = "Off by default. No conversations are included by this setting.",
+                    checked = settings.diagnosticsSharingEnabled,
+                    onCheckedChange = { settings = settings.copy(diagnosticsSharingEnabled = it) }
+                )
+                Text(
+                    "Mayra's profile and preferences stay in local app storage. You can reset them anytime.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+            Button(
+                onClick = {
+                    val validation = settings.validationMessage()
+                    if (validation != null) {
+                        error = validation
+                    } else {
+                        if (onboarding) store.completeOnboarding(settings) else store.save(settings)
+                        onClose()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (onboarding) "Finish setup" else "Save settings")
+            }
+
+            if (!onboarding) {
+                OutlinedButton(
+                    onClick = { showResetConfirmation = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Reset Mayra settings") }
+                TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+            }
+        }
+    }
+
+    if (showResetConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmation = false },
+            title = { Text("Reset settings?") },
+            text = { Text("This clears your profile, language, voice and memory preferences. Onboarding will appear again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.reset()
+                    settings = store.read()
+                    showResetConfirmation = false
+                    onClose()
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirmation = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            HorizontalDivider()
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggle(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Text(description, style = MaterialTheme.typography.bodySmall)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
