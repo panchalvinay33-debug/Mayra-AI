@@ -8,6 +8,8 @@ import ai.mayra.app.platform.device.AndroidInstalledAppDataSource
 import ai.mayra.app.platform.device.DevicePermissionSnapshotProvider
 import ai.mayra.app.runtime.RuntimeControlDialog
 import ai.mayra.app.runtime.RuntimeControlViewModel
+import ai.mayra.app.settings.MayraSettingsStore
+import ai.mayra.app.settings.SettingsActivity
 import ai.mayra.app.ui.theme.MayraAITheme
 import ai.mayra.app.voice.AndroidVoiceAssistant
 import ai.mayra.app.voice.MicrophonePermission
@@ -15,6 +17,7 @@ import ai.mayra.app.voice.RealtimeVoiceLoopPolicy
 import ai.mayra.app.voice.VoiceState
 import ai.mayra.app.voice.VoiceTransportState
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -61,15 +64,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!MayraSettingsStore(this).read().onboardingCompleted) {
+            startActivity(
+                Intent(this, SettingsActivity::class.java)
+                    .putExtra(SettingsActivity.EXTRA_ONBOARDING, true)
+            )
+        }
         setContent { MayraAITheme { MayraHome() } }
     }
 }
@@ -82,6 +94,9 @@ private fun MayraHome(
     val state by chatViewModel.uiState.collectAsStateWithLifecycle()
     val runtimeState by runtimeViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val settingsStore = remember(context) { MayraSettingsStore(context) }
+    var settings by remember { mutableStateOf(settingsStore.read()) }
     val listState = rememberLazyListState()
     var voiceState by remember { mutableStateOf(VoiceState()) }
     var showReadiness by remember { mutableStateOf(false) }
@@ -90,6 +105,20 @@ private fun MayraHome(
     val voiceLoopPolicy = remember { RealtimeVoiceLoopPolicy() }
     val voiceAssistant = remember {
         AndroidVoiceAssistant(context) { newState -> voiceState = newState }
+    }
+
+    val settingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        settings = settingsStore.read()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) settings = settingsStore.read()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val permissionReader = remember(context, readinessRefresh) {
@@ -125,10 +154,10 @@ private fun MayraHome(
         }
     }
 
-    LaunchedEffect(state.messages.size) {
+    LaunchedEffect(state.messages.size, settings.speakResponses) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
         val latest = state.messages.lastOrNull()
-        if (latest?.sender == MayraMessage.Sender.MAYRA) {
+        if (settings.speakResponses && latest?.sender == MayraMessage.Sender.MAYRA) {
             val decision = voiceLoopPolicy.onAssistantResponse(
                 responseText = latest.text,
                 responseKey = latest.timestamp.toString(),
@@ -159,7 +188,7 @@ private fun MayraHome(
     ) { granted ->
         readinessRefresh++
         if (granted) {
-            voiceAssistant.setContinuousMode(true)
+            voiceAssistant.setContinuousMode(settings.continuousVoiceByDefault)
             voiceAssistant.startListening()
         } else {
             voiceState = VoiceState(
@@ -177,7 +206,7 @@ private fun MayraHome(
 
     fun startVoiceConversation() {
         if (MicrophonePermission.isGranted(context)) {
-            voiceAssistant.setContinuousMode(true)
+            voiceAssistant.setContinuousMode(settings.continuousVoiceByDefault)
             voiceAssistant.startListening()
         } else {
             microphoneLauncher.launch(MicrophonePermission.permission)
@@ -224,6 +253,12 @@ private fun MayraHome(
                     },
                     label = { Text("Runtime") }
                 )
+                AssistChip(
+                    onClick = {
+                        settingsLauncher.launch(Intent(context, SettingsActivity::class.java))
+                    },
+                    label = { Text("Settings") }
+                )
                 Spacer(Modifier.weight(1f))
                 if (state.messages.isNotEmpty()) {
                     TextButton(
@@ -245,7 +280,10 @@ private fun MayraHome(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (state.messages.isEmpty()) item {
-                    Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        welcomeMessage(settings.normalizedName),
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
                 items(state.messages, key = { it.timestamp }) { message ->
                     val label = if (message.sender == MayraMessage.Sender.USER) "You" else "Mayra"
@@ -328,6 +366,12 @@ private fun MayraHome(
             onDismiss = { showRuntime = false }
         )
     }
+}
+
+internal fun welcomeMessage(userName: String): String = if (userName.isBlank()) {
+    "Namaste. I’m Mayra. What can I help you with today?"
+} else {
+    "Namaste, $userName. I’m Mayra. What can I help you with today?"
 }
 
 private fun voiceStatusText(isThinking: Boolean, voiceState: VoiceState): String = when {
