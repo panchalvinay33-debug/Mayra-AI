@@ -57,6 +57,17 @@ class MayraNotificationIntelligenceTest {
     }
 
     @Test
+    fun `sensitive reply preview hides draft content`() {
+        val preview = NotificationContentGuard.safeReplyPreview(
+            "My account number is 12345678",
+            NotificationSensitivity.SENSITIVE
+        )
+
+        assertEquals("Sensitive reply content hidden.", preview)
+        assertFalse(preview.contains("12345678"))
+    }
+
+    @Test
     fun `conversation notifications are grouped in brief`() {
         val store = MayraNotificationStore()
         store.upsert(record("one", "WhatsApp", "Family", "First", 100L, reply = true))
@@ -84,9 +95,7 @@ class MayraNotificationIntelligenceTest {
     @Test
     fun `store remains bounded`() {
         val store = MayraNotificationStore(maxEntries = 20)
-        repeat(25) { index ->
-            store.upsert(record("id-$index", "App", null, "Text $index", index.toLong()))
-        }
+        repeat(25) { index -> store.upsert(record("id-$index", "App", null, "Text $index", index.toLong())) }
 
         assertEquals(20, store.snapshot().size)
         assertEquals("id-24", store.snapshot().first().id)
@@ -104,7 +113,7 @@ class MayraNotificationIntelligenceTest {
         val spoken = brief.spokenText()
 
         assertTrue(spoken.contains("1 sensitive notifications were protected"))
-        assertFalse(spoken.any(Char::isDigit) && spoken.contains("482911"))
+        assertFalse(spoken.contains("482911"))
     }
 
     @Test
@@ -129,6 +138,31 @@ class MayraNotificationIntelligenceTest {
 
         assertTrue(result is NotificationReplyResult.Blocked)
         assertEquals("Replies are disabled for this app.", (result as NotificationReplyResult.Blocked).message)
+    }
+
+    @Test
+    fun `ignored app reply is blocked`() {
+        val result = MayraNotificationReplyRuntime.prepare(
+            notificationId = "missing",
+            replyText = "Hello",
+            policy = NotificationAppPolicy("chat.app", mode = NotificationPrivacyMode.IGNORE)
+        )
+
+        assertTrue(result is NotificationReplyResult.Blocked)
+        assertEquals("This app is ignored by notification privacy settings.", (result as NotificationReplyResult.Blocked).message)
+    }
+
+    @Test
+    fun `otp notification reply is always blocked`() {
+        val result = MayraNotificationReplyRuntime.prepare(
+            notificationId = "missing",
+            replyText = "Use this code",
+            policy = NotificationAppPolicy("bank.app"),
+            sensitivity = NotificationSensitivity.OTP
+        )
+
+        assertTrue(result is NotificationReplyResult.Blocked)
+        assertEquals("Replies to OTP notifications are blocked for safety.", (result as NotificationReplyResult.Blocked).message)
     }
 
     private fun record(
