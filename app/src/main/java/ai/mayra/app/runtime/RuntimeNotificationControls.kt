@@ -42,9 +42,11 @@ internal fun RuntimeNotificationControlsCard() {
     val context = LocalContext.current
     val preferences = remember(context) { RuntimeAttentionPreferences(context) }
     val schedulePreferences = remember(context) { RuntimeAttentionSchedulePreferences(context) }
+    val immediatePreferences = remember(context) { RuntimeAttentionImmediatePreferences(context) }
     val diagnostics = remember(context) { RuntimeAttentionDiagnostics(context) }
     var preferenceState by remember { mutableStateOf(preferences.read()) }
     var scheduleState by remember { mutableStateOf(schedulePreferences.read()) }
+    var immediateState by remember { mutableStateOf(immediatePreferences.read()) }
     var readiness by remember { mutableStateOf(notificationReadiness(context)) }
     var diagnosticsState by remember { mutableStateOf(diagnostics.read()) }
     var notice by remember { mutableStateOf<String?>(null) }
@@ -63,6 +65,7 @@ internal fun RuntimeNotificationControlsCard() {
     fun reload(message: String? = null) {
         preferenceState = preferences.read()
         scheduleState = schedulePreferences.read()
+        immediateState = immediatePreferences.read()
         readiness = notificationReadiness(context)
         diagnosticsState = diagnostics.read()
         notice = message
@@ -73,6 +76,7 @@ internal fun RuntimeNotificationControlsCard() {
             delay(DIAGNOSTICS_REFRESH_MILLIS)
             diagnosticsState = diagnostics.read()
             scheduleState = schedulePreferences.read()
+            immediateState = immediatePreferences.read()
             readiness = notificationReadiness(context)
         }
     }
@@ -82,11 +86,20 @@ internal fun RuntimeNotificationControlsCard() {
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val now = System.currentTimeMillis()
             Text("Runtime alerts", fontWeight = FontWeight.SemiBold)
-            Text(preferenceState.status(System.currentTimeMillis()))
+            Text(preferenceState.status(now))
             Text(notificationReadinessMessage(readiness))
             Text(scheduleState.status())
-            Text(diagnosticsState?.status(System.currentTimeMillis()) ?: "Background scan has not run yet")
+            Text(
+                nextBackgroundScanEstimate(
+                    schedule = scheduleState,
+                    lastCompletedAt = diagnosticsState?.completedAt,
+                    now = now
+                )
+            )
+            Text(diagnosticsState?.status(now) ?: "Background scan has not run yet")
+            Text(immediateState.status(now))
             notice?.let { Text(it) }
 
             when (readiness) {
@@ -112,7 +125,7 @@ internal fun RuntimeNotificationControlsCard() {
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!preferenceState.enabled || !preferenceState.canNotify(System.currentTimeMillis())) {
+                if (!preferenceState.enabled || !preferenceState.canNotify(now)) {
                     OutlinedButton(
                         onClick = {
                             preferences.resume()
@@ -153,7 +166,9 @@ internal fun RuntimeNotificationControlsCard() {
                     RuntimeAttentionScheduler.runNow(context)
                     reload(backgroundScanQueuedMessage())
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = immediateState.phase != RuntimeAttentionImmediatePhase.QUEUED &&
+                    immediateState.phase != RuntimeAttentionImmediatePhase.RUNNING
             ) { Text("Run background scan now") }
 
             TextButton(
