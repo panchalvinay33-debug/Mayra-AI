@@ -4,6 +4,7 @@ import ai.mayra.app.MainActivity
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.action.MayraActionControlActivity
 import ai.mayra.app.background.MayraNotificationCenterActivity
+import ai.mayra.app.calendar.MayraAgendaActivity
 import ai.mayra.app.identity.MayraIdentityActivity
 import ai.mayra.app.owner.MayraOwnerModeStore
 import ai.mayra.app.owner.MayraOwnerSetupActivity
@@ -54,9 +55,7 @@ class MayraPresenceActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val settingsStore = MayraSettingsStore(this)
-        if (!settingsStore.read().onboardingCompleted) {
-            startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ONBOARDING, true))
-        }
+        if (!settingsStore.read().onboardingCompleted) startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ONBOARDING, true))
         setContent {
             MayraAITheme {
                 MayraPresenceHome(
@@ -70,6 +69,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onOwnerSetup = { startActivity(Intent(this, MayraOwnerSetupActivity::class.java)) },
                     onPeople = { startActivity(Intent(this, MayraIdentityActivity::class.java)) },
                     onReminders = { startActivity(Intent(this, MayraReminderActivity::class.java)) },
+                    onAgenda = { startActivity(Intent(this, MayraAgendaActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
             }
@@ -79,108 +79,57 @@ class MayraPresenceActivity : ComponentActivity() {
 
 @Composable
 private fun MayraPresenceHome(
-    userName: String,
-    ownerSummary: String,
-    onChat: () -> Unit,
-    onRuntime: () -> Unit,
-    onPulse: () -> Unit,
-    onNotifications: () -> Unit,
-    onActionControls: () -> Unit,
-    onOwnerSetup: () -> Unit,
-    onPeople: () -> Unit,
-    onReminders: () -> Unit,
-    onSettings: () -> Unit
+    userName: String, ownerSummary: String,
+    onChat: () -> Unit, onRuntime: () -> Unit, onPulse: () -> Unit,
+    onNotifications: () -> Unit, onActionControls: () -> Unit, onOwnerSetup: () -> Unit,
+    onPeople: () -> Unit, onReminders: () -> Unit, onAgenda: () -> Unit, onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
     val state = pulse.toPresenceState()
     val greeting = proactiveGreeting(userName, Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
-
     LaunchedEffect(Unit) {
-        MayraRuntime.deviceRuntime.capture(force = true)
-        pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
-        while (true) {
-            delay(15_000)
-            MayraRuntime.deviceRuntime.capture(force = false)
-            pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
-        }
+        MayraRuntime.deviceRuntime.capture(force = true); pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
+        while (true) { delay(15_000); MayraRuntime.deviceRuntime.capture(force = false); pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest()) }
     }
-
     Scaffold { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(Modifier.height(8.dp))
-            Text("MAYRA", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            MayraPresenceOrb(state = state)
-            Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(greeting, style = MaterialTheme.typography.titleMedium)
-            Text(pulse.message, style = MaterialTheme.typography.bodyMedium)
-
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold)
-                    Text(ownerSummary, style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = onOwnerSetup, modifier = Modifier.fillMaxWidth()) { Text("Complete phone access setup") }
-                }
-            }
-
-            pulse.healthScore?.let { score ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Phone health", fontWeight = FontWeight.SemiBold)
-                            Text("$score / 100", fontWeight = FontWeight.Bold)
-                        }
-                        Text("${pulse.batteryText} battery · ${pulse.networkText}")
-                        Text("${pulse.storageText} storage · ${pulse.memoryText} memory", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-
-            pulse.suggestions.firstOrNull()?.let { insight ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("I noticed this", fontWeight = FontWeight.SemiBold)
-                        Text(insight.title, fontWeight = FontWeight.Medium)
-                        Text(insight.message, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-
+            Spacer(Modifier.height(8.dp)); Text("MAYRA", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            MayraPresenceOrb(state = state); Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(greeting, style = MaterialTheme.typography.titleMedium); Text(pulse.message, style = MaterialTheme.typography.bodyMedium)
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold); Text(ownerSummary, style = MaterialTheme.typography.bodySmall)
+                Button(onClick = onOwnerSetup, modifier = Modifier.fillMaxWidth()) { Text("Complete phone access setup") }
+            } }
+            pulse.healthScore?.let { score -> Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Phone health", fontWeight = FontWeight.SemiBold); Text("$score / 100", fontWeight = FontWeight.Bold) }
+                Text("${pulse.batteryText} battery · ${pulse.networkText}"); Text("${pulse.storageText} storage · ${pulse.memoryText} memory", style = MaterialTheme.typography.bodySmall)
+            } } }
+            pulse.suggestions.firstOrNull()?.let { insight -> Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("I noticed this", fontWeight = FontWeight.SemiBold); Text(insight.title, fontWeight = FontWeight.Medium); Text(insight.message, style = MaterialTheme.typography.bodySmall)
+            } } }
             Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Talk to Mayra") }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
                 OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
             }
+            OutlinedButton(onClick = onAgenda, modifier = Modifier.fillMaxWidth()) { Text("Personal agenda") }
             OutlinedButton(onClick = onReminders, modifier = Modifier.fillMaxWidth()) { Text("Reminders & follow-ups") }
             OutlinedButton(onClick = onPeople, modifier = Modifier.fillMaxWidth()) { Text("People & relationships") }
             OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Notification intelligence") }
             OutlinedButton(onClick = onActionControls, modifier = Modifier.fillMaxWidth()) { Text("Action safety") }
             OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Settings") }
-
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Your phone, with a mind", fontWeight = FontWeight.SemiBold)
-                    Text("• Understand the phone’s health and connection")
-                    Text("• Remember who Mummy, Papa, Boss and trusted people are")
-                    Text("• Save reminders locally, alert, snooze and follow up")
-                    Text("• Summarise notifications and protect sensitive content")
-                    Text("• Ask anything in Hindi, Hinglish or English")
-                    Text("• Speak naturally and hear Mayra reply")
-                    Text("• Open apps, prepare calls and messages safely")
-                    Text("• Run workflows and background checks")
-                    Text("• Stop all action execution instantly when needed")
-                    Text("• Stay useful offline and become smarter online")
-                }
-            }
-
-            Text(
-                "Owner Mode maximizes access you explicitly grant on your own phone. Android secure boundaries, app security and critical-action protections are not secretly bypassed.",
-                style = MaterialTheme.typography.bodySmall
-            )
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Your phone, with a mind", fontWeight = FontWeight.SemiBold)
+                Text("• Understand phone health and connection"); Text("• Remember people and relationships")
+                Text("• Run a private agenda, reminders and follow-ups"); Text("• Summarise notifications and protect sensitive content")
+                Text("• Speak naturally in Hindi, Hinglish or English"); Text("• Open apps, prepare calls and messages safely")
+                Text("• Stop all action execution instantly"); Text("• Stay useful offline and become smarter online")
+            } }
+            Text("Owner Mode maximizes access you explicitly grant. Android secure boundaries and critical-action protections are not secretly bypassed.", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
