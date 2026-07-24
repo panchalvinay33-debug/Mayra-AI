@@ -19,9 +19,7 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
-        <intent>
-            <action android:name="android.media.action.IMAGE_CAPTURE" />
-        </intent>
+        <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
         <intent>
             <action android:name="android.intent.action.OPEN_DOCUMENT" />
             <category android:name="android.intent.category.OPENABLE" />
@@ -35,25 +33,13 @@
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
 
-        <activity
-            android:name=".ai.AiProviderActivity"
-            android:exported="false" />
+        <activity android:name=".pulse.MayraPulseActivity" android:exported="false" />
+        <activity android:name=".ai.AiProviderActivity" android:exported="false" />
+        <activity android:name=".settings.SettingsActivity" android:exported="false" />
+        <activity android:name=".runtime.RuntimeControlActivity" android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
 
-        <activity
-            android:name=".settings.SettingsActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".runtime.RuntimeControlActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".MainActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".presence.MayraPresenceActivity"
-            android:exported="true">
+        <activity android:name=".presence.MayraPresenceActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -65,25 +51,13 @@
             android:exported="false"
             android:label="Mayra notification intelligence"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.service.notification.default_filter_types"
-                android:value="conversations|alerting" />
-            <meta-data
-                android:name="android.service.notification.disabled_filter_types"
-                android:value="ongoing|silent" />
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="conversations|alerting" />
+            <meta-data android:name="android.service.notification.disabled_filter_types" android:value="ongoing|silent" />
         </service>
 
-        <receiver
-            android:name=".runtime.RuntimeAttentionActionReceiver"
-            android:exported="false" />
-
-        <receiver
-            android:name=".background.MayraBootReceiver"
-            android:enabled="true"
-            android:exported="false">
+        <receiver android:name=".runtime.RuntimeAttentionActionReceiver" android:exported="false" />
+        <receiver android:name=".background.MayraBootReceiver" android:enabled="true" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
