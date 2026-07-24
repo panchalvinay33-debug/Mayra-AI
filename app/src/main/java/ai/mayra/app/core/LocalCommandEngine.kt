@@ -1,5 +1,6 @@
 package ai.mayra.app.core
 
+import ai.mayra.app.background.MayraNotificationIntelligenceRuntime
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -36,6 +37,8 @@ class LocalCommandEngine(
                 DeviceInfoType.TIME -> currentTime()
                 DeviceInfoType.BATTERY ->
                     "Battery reading needs Android device access. The command is understood and ready for the device-action layer."
+                DeviceInfoType.NOTIFICATIONS ->
+                    MayraNotificationIntelligenceRuntime.store.summary().spokenText()
             }
 
             is AssistantIntent.Chat -> respondToChat(intent.message, recentMessages)
@@ -57,7 +60,7 @@ class LocalCommandEngine(
                 "I’m Mayra, your personal AI assistant. I can already chat, accept voice input, remember the current conversation, understand common phone commands, and work offline."
 
             normalized.containsAny("help", "what can you do", "kya kar sakti", "क्या कर सकती", "madad", "मदद") ->
-                "You can ask for the date or time, use voice input, or say commands such as open an app, call someone, send a message, create a reminder, check battery, or clear chat. Device actions are being connected safely with confirmation."
+                "You can ask for the date or time, use voice input, ask for a protected notification brief, or say commands such as open an app, call someone, prepare a message, create a reminder, check battery, or clear chat. Device actions stay behind permission and confirmation."
 
             normalized.containsAny("date", "today", "aaj", "tarikh", "आज", "तारीख") -> currentDate()
             normalized.containsAny("thank", "thanks", "dhanyavad", "shukriya", "धन्यवाद", "शुक्रिया") ->
