@@ -13,16 +13,16 @@ import ai.mayra.app.core.actions.DeviceActionSafetyGate
 import ai.mayra.app.core.actions.DeviceActionType
 import ai.mayra.app.core.actions.DevicePermission
 import ai.mayra.app.core.actions.PermissionSnapshot
+import ai.mayra.app.identity.MayraContactIdentityEngine
+import ai.mayra.app.identity.MayraContactIdentityStore
+import ai.mayra.app.identity.MayraContactTrust
+import ai.mayra.app.identity.MayraIdentityResolution
 import android.content.Context
 
 /**
  * Production bridge between Mayra's framework-neutral command layer and Android device actions.
- *
- * Targets are resolved before execution, permission checks happen before sensitive provider reads,
- * and high-risk actions are held behind the one-time confirmation gate. The Android constructor
- * routes all execution through the shared [MayraActionRuntime], so the global kill switch, audit,
- * capability policy, verification and fallback layers govern real chat and voice commands.
- * Injected tests may continue using the legacy coordinator directly.
+ * Identity aliases resolve to an Android contact name before the existing contact resolver reads
+ * the actual number. Ambiguous people are never guessed.
  */
 class AndroidActionExecutor(
     private val permissionSnapshot: () -> PermissionSnapshot,
@@ -30,7 +30,8 @@ class AndroidActionExecutor(
     private val installedAppResolver: InstalledAppResolver,
     private val coordinator: DeviceActionCoordinator,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val sharedEngine: MayraActionEngine? = null
+    private val sharedEngine: MayraActionEngine? = null,
+    private val identityEngine: MayraContactIdentityEngine? = null
 ) : ActionExecutor {
 
     constructor(context: Context) : this(
@@ -45,7 +46,8 @@ class AndroidActionExecutor(
             safetyGate = DeviceActionSafetyGate(),
             runner = AndroidDeviceActionRunner(context.applicationContext)
         ),
-        sharedEngine = MayraActionRuntime.install(context.applicationContext)
+        sharedEngine = MayraActionRuntime.install(context.applicationContext),
+        identityEngine = MayraContactIdentityStore(context.applicationContext).engine()
     )
 
     private var pendingConfirmationToken: String? = null
@@ -77,44 +79,46 @@ class AndroidActionExecutor(
         if (DevicePermission.READ_CONTACTS !in permissions.granted) {
             return submit(request(DeviceActionType.CALL_CONTACT, name), permissions)
         }
-
-        return when (val resolution = contactResolver.resolve(name)) {
-            is ContactResolution.Resolved -> submit(
-                request(DeviceActionType.CALL_CONTACT, resolution.contact.normalizedPhoneNumber),
-                permissions
-            )
-            is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
-                "I found multiple contacts: ${resolution.candidates.joinToString { it.displayName }}. Please say the full name."
-            )
-            ContactResolution.NotFound -> ActionExecutionResult.NotSupported(
-                "I couldn't find a contact named ${name.trim()}."
-            )
-        }
-    }
-
-    override suspend fun sendMessage(
-        recipient: String,
-        message: String?
-    ): ActionExecutionResult {
-        val permissions = permissionSnapshot()
-        if (DevicePermission.READ_CONTACTS !in permissions.granted) {
-            return submit(request(DeviceActionType.SEND_MESSAGE, recipient, message), permissions)
-        }
-
-        return when (val resolution = contactResolver.resolve(recipient)) {
+        val identity = resolveIdentity(name) ?: return ambiguousIdentityResult(name)
+        return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
                 request(
-                    DeviceActionType.SEND_MESSAGE,
+                    DeviceActionType.CALL_CONTACT,
                     resolution.contact.normalizedPhoneNumber,
-                    message
+                    metadata = identity.metadata
                 ),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
-                "I found multiple contacts: ${resolution.candidates.joinToString { it.displayName }}. Please say the full name."
+                "I found multiple Android contacts for ${identity.contactName}: ${resolution.candidates.joinToString { it.displayName }}. Please use the exact saved name."
             )
             ContactResolution.NotFound -> ActionExecutionResult.NotSupported(
-                "I couldn't find a contact named ${recipient.trim()}."
+                "${identity.displayName} maps to ${identity.contactName}, but that Android contact was not found. Update People & Relationships or Contacts."
+            )
+        }
+    }
+
+    override suspend fun sendMessage(recipient: String, message: String?): ActionExecutionResult {
+        val permissions = permissionSnapshot()
+        if (DevicePermission.READ_CONTACTS !in permissions.granted) {
+            return submit(request(DeviceActionType.SEND_MESSAGE, recipient, message), permissions)
+        }
+        val identity = resolveIdentity(recipient) ?: return ambiguousIdentityResult(recipient)
+        return when (val resolution = contactResolver.resolve(identity.contactName)) {
+            is ContactResolution.Resolved -> submit(
+                request(
+                    DeviceActionType.SEND_MESSAGE,
+                    resolution.contact.normalizedPhoneNumber,
+                    message,
+                    identity.metadata
+                ),
+                permissions
+            )
+            is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
+                "I found multiple Android contacts for ${identity.contactName}: ${resolution.candidates.joinToString { it.displayName }}. Please use the exact saved name."
+            )
+            ContactResolution.NotFound -> ActionExecutionResult.NotSupported(
+                "${identity.displayName} maps to ${identity.contactName}, but that Android contact was not found. Update People & Relationships or Contacts."
             )
         }
     }
@@ -127,38 +131,57 @@ class AndroidActionExecutor(
         val token = pendingConfirmationToken
             ?: return ActionExecutionResult.NotSupported("There is no action waiting for confirmation.")
         pendingConfirmationToken = null
-        return sharedEngine
-            ?.confirm(token)
-            ?.toActionResult()
-            ?: coordinator.confirm(token).toActionResult()
+        return sharedEngine?.confirm(token)?.toActionResult() ?: coordinator.confirm(token).toActionResult()
     }
 
     override suspend fun rejectPending(): ActionExecutionResult {
         val token = pendingConfirmationToken
             ?: return ActionExecutionResult.NotSupported("There is no action waiting for confirmation.")
         pendingConfirmationToken = null
-        return sharedEngine
-            ?.reject(token)
-            ?.toActionResult()
-            ?: coordinator.reject(token).toActionResult()
+        return sharedEngine?.reject(token)?.toActionResult() ?: coordinator.reject(token).toActionResult()
     }
 
     fun hasPendingConfirmation(): Boolean = pendingConfirmationToken != null
 
+    private fun resolveIdentity(query: String): IdentityTarget? {
+        val engine = identityEngine ?: return IdentityTarget(query.trim(), query.trim(), emptyMap())
+        return when (val result = engine.resolve(query)) {
+            is MayraIdentityResolution.Resolved -> IdentityTarget(
+                contactName = result.identity.canonicalContactName,
+                displayName = result.identity.relationship ?: result.identity.canonicalContactName,
+                metadata = buildMap {
+                    put("identityId", result.identity.id)
+                    put("relationship", result.identity.relationship.orEmpty())
+                    put("identityTrust", result.identity.trust.name)
+                    put("preferredChannel", result.identity.preferredChannel.name)
+                    if (result.identity.trust == MayraContactTrust.TRUSTED) put("trustedContact", "true")
+                    if (result.identity.trust == MayraContactTrust.SENSITIVE) put("sensitive", "true")
+                }
+            )
+            is MayraIdentityResolution.Ambiguous -> null
+            is MayraIdentityResolution.Unmapped -> IdentityTarget(query.trim(), query.trim(), emptyMap())
+        }
+    }
+
+    private fun ambiguousIdentityResult(query: String): ActionExecutionResult.NotSupported {
+        val candidates = (identityEngine?.resolve(query) as? MayraIdentityResolution.Ambiguous)
+            ?.candidates
+            .orEmpty()
+            .joinToString { it.relationship ?: it.canonicalContactName }
+        return ActionExecutionResult.NotSupported(
+            if (candidates.isBlank()) "I could not safely resolve ${query.trim()}." else "I found multiple people for ${query.trim()}: $candidates. Please say the exact relationship or contact name."
+        )
+    }
+
     private suspend fun submit(
         request: DeviceActionRequest,
         permissions: PermissionSnapshot = permissionSnapshot()
-    ): ActionExecutionResult = sharedEngine
-        ?.submit(request, permissions)
-        ?.toActionResult()
+    ): ActionExecutionResult = sharedEngine?.submit(request, permissions)?.toActionResult()
         ?: coordinator.submit(request, permissions).toActionResult()
 
     private fun MayraActionResult.toActionResult(): ActionExecutionResult = when (this) {
         is MayraActionResult.Completed -> ActionExecutionResult.Success
-        is MayraActionResult.AwaitingPermission -> permissionResult(
-            missing = missing,
-            permanentlyDenied = permanentlyDenied
-        )
+        is MayraActionResult.AwaitingPermission -> permissionResult(missing, permanentlyDenied)
         is MayraActionResult.AwaitingConfirmation -> {
             pendingConfirmationToken = ticket.token
             val protection = when {
@@ -166,17 +189,13 @@ class AndroidActionExecutor(
                 risk.strongAuthenticationRecommended -> " Device authentication may be requested for sensitive actions."
                 else -> ""
             }
-            ActionExecutionResult.ConfirmationRequired(
-                "$prompt Say yes to continue or no to cancel.$protection"
-            )
+            ActionExecutionResult.ConfirmationRequired("$prompt Say yes to continue or no to cancel.$protection")
         }
         is MayraActionResult.Blocked -> ActionExecutionResult.NotSupported(
             listOfNotNull(capability.reason, fallback.instruction).distinct().joinToString(" ")
         )
         is MayraActionResult.Rejected -> ActionExecutionResult.Failure(reason)
-        is MayraActionResult.Failed -> ActionExecutionResult.Failure(
-            "$message ${fallback.instruction}".trim()
-        )
+        is MayraActionResult.Failed -> ActionExecutionResult.Failure("$message ${fallback.instruction}".trim())
     }
 
     private fun DeviceActionExecutionResult.toActionResult(): ActionExecutionResult = when (this) {
@@ -184,9 +203,7 @@ class AndroidActionExecutor(
         is DeviceActionExecutionResult.AwaitingPermission -> permissionResult(missing, permanentlyDenied)
         is DeviceActionExecutionResult.AwaitingConfirmation -> {
             pendingConfirmationToken = ticket.token
-            ActionExecutionResult.ConfirmationRequired(
-                "$prompt Say yes to continue or no to cancel."
-            )
+            ActionExecutionResult.ConfirmationRequired("$prompt Say yes to continue or no to cancel.")
         }
         is DeviceActionExecutionResult.Rejected -> ActionExecutionResult.Failure(reason)
         is DeviceActionExecutionResult.Failed -> ActionExecutionResult.Failure(message)
@@ -210,12 +227,14 @@ class AndroidActionExecutor(
     private fun request(
         type: DeviceActionType,
         target: String,
-        payload: String? = null
+        payload: String? = null,
+        metadata: Map<String, String> = emptyMap()
     ) = DeviceActionRequest(
         type = type,
         target = target.trim(),
         payload = payload?.trim()?.takeIf(String::isNotBlank),
-        createdAt = clock()
+        createdAt = clock(),
+        metadata = metadata
     )
 
     private fun DevicePermission.userFacingName(): String = when (this) {
@@ -226,4 +245,10 @@ class AndroidActionExecutor(
         DevicePermission.POST_NOTIFICATIONS -> "notifications"
         DevicePermission.SCHEDULE_EXACT_ALARM -> "exact reminders"
     }
+
+    private data class IdentityTarget(
+        val contactName: String,
+        val displayName: String,
+        val metadata: Map<String, String>
+    )
 }
