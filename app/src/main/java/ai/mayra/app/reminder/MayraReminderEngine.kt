@@ -5,8 +5,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Clock
 import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
@@ -102,7 +100,15 @@ class MayraReminderParser(
     private fun parseClockTime(text: String): LocalTime? {
         val match = CLOCK_TIME.find(text)
         if (match != null) {
-            var hour = match.groupValues[1].toIntOrNull() ?: return null
+            val rawMatch = match.value.lowercase(Locale.ROOT)
+            val hourToken = match.groupValues[1]
+            val hasTimeSignal = rawMatch.contains(':') || rawMatch.contains('.') ||
+                rawMatch.contains("am") || rawMatch.contains("pm") ||
+                rawMatch.contains("baje") || rawMatch.contains("बजे") ||
+                text.containsAny("at $hourToken", "ko $hourToken", "subah", "सुबह", "shaam", "शाम", "raat", "रात", "evening", "morning", "night", "afternoon")
+            if (!hasTimeSignal) return null
+
+            var hour = hourToken.toIntOrNull() ?: return null
             val minute = match.groupValues[2].toIntOrNull() ?: 0
             val marker = match.groupValues[3].lowercase(Locale.ROOT)
             if (hour !in 0..23 || minute !in 0..59) return null
@@ -111,7 +117,7 @@ class MayraReminderParser(
             if (marker.isBlank() && hour in 1..11) {
                 when {
                     text.containsAny("evening", "shaam", "शाम", "night", "raat", "रात") -> hour += 12
-                    text.containsAny("afternoon", "dopahar", "दोपहर") && hour < 12 -> hour += 12
+                    text.containsAny("afternoon", "dopahar", "दोपहर") -> hour += 12
                 }
             }
             return LocalTime.of(hour, minute)
@@ -182,23 +188,18 @@ class MayraReminderStore(context: Context, private val maxEntries: Int = 500) {
         .sortedBy { it.dueAt }
 
     fun due(now: Long = System.currentTimeMillis()): List<MayraReminder> = active(now).filter { it.dueAt <= now }
-
     fun complete(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
         it.copy(state = ReminderState.COMPLETED, updatedAt = now)
     }
-
     fun cancel(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
         it.copy(state = ReminderState.CANCELLED, updatedAt = now)
     }
-
     fun snooze(id: String, duration: Duration, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
         it.copy(state = ReminderState.SNOOZED, dueAt = now + duration.toMillis(), updatedAt = now)
     }
-
     fun markNotified(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
         it.copy(state = ReminderState.DUE, updatedAt = now, notificationCount = it.notificationCount + 1, lastNotifiedAt = now)
     }
-
     fun markMissed(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
         it.copy(state = ReminderState.MISSED, updatedAt = now)
     }
