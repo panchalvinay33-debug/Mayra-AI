@@ -64,9 +64,12 @@ internal fun runtimeControlIntent(context: Context): Intent =
     Intent(context.applicationContext, RuntimeControlActivity::class.java)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
+internal fun runtimeAttentionActionIntent(context: Context, action: String): Intent =
+    Intent(context.applicationContext, RuntimeAttentionActionReceiver::class.java).setAction(action)
+
 object RuntimeAttentionNotifier {
     private const val CHANNEL_ID = "mayra_runtime_attention"
-    private const val NOTIFICATION_ID = 4102
+    private const val NOTIFICATION_ID = RuntimeAttentionActionReceiver.NOTIFICATION_ID
     private const val PREFS = "runtime_attention_notifications"
     private const val LAST_FINGERPRINT = "last_fingerprint"
 
@@ -74,6 +77,9 @@ object RuntimeAttentionNotifier {
     fun scanAndNotify(context: Context, snapshot: RuntimeControlSnapshot): Boolean {
         val appContext = context.applicationContext
         RuntimeAttentionScheduler.sync(appContext)
+        val preferences = RuntimeAttentionPreferences(appContext)
+        if (!preferences.read().canNotify(System.currentTimeMillis())) return false
+
         val alert = snapshot.toAttentionAlert() ?: run {
             appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(LAST_FINGERPRINT).apply()
@@ -81,14 +87,26 @@ object RuntimeAttentionNotifier {
         }
         if (!canPostNotifications(appContext)) return false
 
-        val preferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (preferences.getString(LAST_FINGERPRINT, null) == alert.fingerprint) return false
+        val fingerprintPreferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (fingerprintPreferences.getString(LAST_FINGERPRINT, null) == alert.fingerprint) return false
 
         ensureChannel(appContext)
-        val pendingIntent = PendingIntent.getActivity(
+        val contentIntent = PendingIntent.getActivity(
             appContext,
             NOTIFICATION_ID,
             runtimeControlIntent(appContext),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val snoozeIntent = PendingIntent.getBroadcast(
+            appContext,
+            NOTIFICATION_ID + 1,
+            runtimeAttentionActionIntent(appContext, RuntimeAttentionActionReceiver.ACTION_SNOOZE),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val disableIntent = PendingIntent.getBroadcast(
+            appContext,
+            NOTIFICATION_ID + 2,
+            runtimeAttentionActionIntent(appContext, RuntimeAttentionActionReceiver.ACTION_DISABLE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
@@ -96,13 +114,15 @@ object RuntimeAttentionNotifier {
             .setContentTitle(alert.title)
             .setContentText(alert.message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(alert.message))
-            .setContentIntent(pendingIntent)
+            .setContentIntent(contentIntent)
+            .addAction(0, "Snooze 1 hour", snoozeIntent)
+            .addAction(0, "Turn off alerts", disableIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
 
         NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
-        preferences.edit().putString(LAST_FINGERPRINT, alert.fingerprint).apply()
+        fingerprintPreferences.edit().putString(LAST_FINGERPRINT, alert.fingerprint).apply()
         return true
     }
 
