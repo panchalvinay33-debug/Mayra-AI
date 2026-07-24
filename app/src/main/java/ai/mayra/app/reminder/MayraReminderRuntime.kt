@@ -1,15 +1,18 @@
 package ai.mayra.app.reminder
 
-import ai.mayra.app.presence.MayraPresenceActivity
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -21,6 +24,7 @@ import java.util.concurrent.TimeUnit
 
 object MayraReminderRuntime {
     private const val WORK_PREFIX = "mayra-reminder-"
+    private const val FOLLOW_UP_PREFIX = "mayra-reminder-follow-up-"
 
     fun create(context: Context, parsed: ReminderParseResult.Parsed, now: Long = System.currentTimeMillis()): MayraReminder {
         val reminder = MayraReminder(
@@ -49,19 +53,34 @@ object MayraReminderRuntime {
         )
     }
 
+    fun scheduleFollowUp(context: Context, reminder: MayraReminder) {
+        if (!reminder.followUpEnabled) return
+        val request = OneTimeWorkRequestBuilder<MayraReminderFollowUpWorker>()
+            .setInitialDelay(30, TimeUnit.MINUTES)
+            .setInputData(Data.Builder().putString(MayraReminderWorker.KEY_ID, reminder.id).build())
+            .addTag(FOLLOW_UP_PREFIX + reminder.id)
+            .build()
+        WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+            FOLLOW_UP_PREFIX + reminder.id,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
     fun cancel(context: Context, id: String, now: Long = System.currentTimeMillis()): MayraReminder? {
-        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_PREFIX + id)
+        cancelWork(context, id)
         NotificationManagerCompat.from(context).cancel(id.hashCode())
         return MayraReminderStore(context).cancel(id, now)
     }
 
     fun complete(context: Context, id: String, now: Long = System.currentTimeMillis()): MayraReminder? {
-        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_PREFIX + id)
+        cancelWork(context, id)
         NotificationManagerCompat.from(context).cancel(id.hashCode())
         return MayraReminderStore(context).complete(id, now)
     }
 
     fun snooze(context: Context, id: String, duration: Duration, now: Long = System.currentTimeMillis()): MayraReminder? {
+        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(FOLLOW_UP_PREFIX + id)
         val updated = MayraReminderStore(context).snooze(id, duration, now) ?: return null
         NotificationManagerCompat.from(context).cancel(id.hashCode())
         schedule(context, updated, now)
@@ -77,12 +96,15 @@ object MayraReminderRuntime {
             schedule(context, normalized, now)
         }
     }
+
+    private fun cancelWork(context: Context, id: String) {
+        val manager = WorkManager.getInstance(context.applicationContext)
+        manager.cancelUniqueWork(WORK_PREFIX + id)
+        manager.cancelUniqueWork(FOLLOW_UP_PREFIX + id)
+    }
 }
 
-class MayraReminderWorker(
-    appContext: Context,
-    params: WorkerParameters
-) : Worker(appContext, params) {
+class MayraReminderWorker(appContext: Context, params: WorkerParameters) : Worker(appContext, params) {
     override fun doWork(): Result {
         val id = inputData.getString(KEY_ID) ?: return Result.failure()
         val store = MayraReminderStore(applicationContext)
@@ -94,19 +116,42 @@ class MayraReminderWorker(
             return Result.success()
         }
         val updated = store.markNotified(id, now) ?: return Result.success()
-        return runCatching {
+        if (MayraReminderNotifier.canNotify(applicationContext)) {
             MayraReminderNotifier.show(applicationContext, updated)
-            Result.success()
-        }.getOrElse { Result.retry() }
+        }
+        MayraReminderRuntime.scheduleFollowUp(applicationContext, updated)
+        return Result.success()
     }
 
     companion object { const val KEY_ID = "reminder_id" }
 }
 
+class MayraReminderFollowUpWorker(appContext: Context, params: WorkerParameters) : Worker(appContext, params) {
+    override fun doWork(): Result {
+        val id = inputData.getString(MayraReminderWorker.KEY_ID) ?: return Result.failure()
+        val store = MayraReminderStore(applicationContext)
+        val reminder = store.find(id) ?: return Result.success()
+        if (reminder.state !in setOf(ReminderState.DUE, ReminderState.MISSED)) return Result.success()
+        val missed = store.markMissed(id) ?: return Result.success()
+        if (MayraReminderNotifier.canNotify(applicationContext)) {
+            MayraReminderNotifier.show(applicationContext, missed, followUp = true)
+        }
+        return Result.success()
+    }
+}
+
 object MayraReminderNotifier {
     private const val CHANNEL_ID = "mayra_reminders"
 
-    fun show(context: Context, reminder: MayraReminder) {
+    fun canNotify(context: Context): Boolean {
+        val runtimePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        return runtimePermission && NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
+    @SuppressLint("MissingPermission")
+    fun show(context: Context, reminder: MayraReminder, followUp: Boolean = false) {
+        if (!canNotify(context)) return
         ensureChannel(context)
         val openIntent = PendingIntent.getActivity(
             context,
@@ -118,9 +163,11 @@ object MayraReminderNotifier {
         val snoozeIntent = actionIntent(context, reminder.id, MayraReminderActionReceiver.ACTION_SNOOZE, 2)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setContentTitle("Mayra reminder")
+            .setContentTitle(if (followUp) "Mayra follow-up" else "Mayra reminder")
             .setContentText(reminder.title)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(reminder.detail ?: reminder.title))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                if (followUp) "You have not completed this yet: ${reminder.title}" else reminder.detail ?: reminder.title
+            ))
             .setContentIntent(openIntent)
             .setAutoCancel(false)
             .setOnlyAlertOnce(false)
@@ -136,14 +183,14 @@ object MayraReminderNotifier {
         PendingIntent.getBroadcast(
             context,
             id.hashCode() * 31 + salt,
-            Intent(context, MayraReminderActionReceiver::class.java).setAction(action).putExtra(MayraReminderActionReceiver.EXTRA_ID, id),
+            Intent(context, MayraReminderActionReceiver::class.java).setAction(action)
+                .putExtra(MayraReminderActionReceiver.EXTRA_ID, id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
+        context.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Mayra reminders", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Reminders created and followed up by Mayra"
             }
