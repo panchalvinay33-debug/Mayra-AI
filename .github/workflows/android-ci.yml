@@ -1,6 +1,7 @@
 name: Android CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, phase-5-testing-foundation]
   pull_request:
@@ -12,7 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -29,54 +30,88 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Environment diagnostics
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p build/ci
+          {
+            echo "Runner: $RUNNER_NAME"
+            echo "OS: $RUNNER_OS"
+            echo "Architecture: $RUNNER_ARCH"
+            java -version
+            gradle --version
+            echo "ANDROID_HOME=$ANDROID_HOME"
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+            test -d "$ANDROID_HOME/platforms/android-35"
+          } 2>&1 | tee build/ci/environment.log
+
       - name: Compile debug sources
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p build/ci
-          gradle --no-daemon :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
+          gradle --no-daemon --max-workers=2 :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
 
       - name: Test device action safety
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-safety.log
+          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-safety.log
 
       - name: Test device action coordinator
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionCoordinatorTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-coordinator.log
+          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionCoordinatorTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-coordinator.log
 
       - name: Test Android action specifications
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-specifications.log
+          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-specifications.log
 
       - name: Test Android action runtime
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-runtime.log
+          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-runtime.log
 
       - name: Run unit tests
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee build/ci/unit-tests.log
+          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee build/ci/unit-tests.log
 
       - name: Run Android lint
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:lintDebug --stacktrace --console=plain 2>&1 | tee build/ci/lint-debug.log
+          gradle --no-daemon --max-workers=2 :app:lintDebug --stacktrace --console=plain 2>&1 | tee build/ci/lint-debug.log
+
+      - name: Build personal alpha APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          gradle --no-daemon --max-workers=2 :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-debug.log
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee build/ci/app-debug.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk build/ci/Mayra-AI-personal-alpha-debug.apk
+
+      - name: Upload personal alpha APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayra-personal-alpha-debug-${{ github.run_number }}
+          path: |
+            build/ci/Mayra-AI-personal-alpha-debug.apk
+            build/ci/app-debug.sha256
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-reports
+          name: android-reports-${{ github.run_number }}
           path: |
             build/ci/
             app/build/reports/lint-results-debug.html
@@ -84,3 +119,4 @@ jobs:
             app/build/test-results/testDebugUnitTest/
             app/build/reports/problems/
           if-no-files-found: ignore
+          retention-days: 14
