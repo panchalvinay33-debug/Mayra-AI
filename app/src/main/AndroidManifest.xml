@@ -64,6 +64,10 @@
         </service>
 
         <receiver
+            android:name=".runtime.RuntimeAttentionActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".background.MayraBootReceiver"
             android:enabled="true"
             android:exported="false">
