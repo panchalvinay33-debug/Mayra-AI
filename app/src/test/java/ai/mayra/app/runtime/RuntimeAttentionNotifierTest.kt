@@ -90,4 +90,25 @@ class RuntimeAttentionNotifierTest {
     fun `attention schedule preserves valid interval`() {
         assertEquals(30L, runtimeAttentionIntervalMinutes(30L))
     }
+
+    @Test
+    fun `enabled schedule reports normalized interval`() {
+        assertEquals(
+            "Background scans every 15 min",
+            RuntimeAttentionScheduleState(enabled = true, intervalMinutes = 1L).status()
+        )
+    }
+
+    @Test
+    fun `disabled schedule reports off`() {
+        assertEquals(
+            "Background scans are off",
+            RuntimeAttentionScheduleState(enabled = false, intervalMinutes = 15L).status()
+        )
+    }
+
+    @Test
+    fun `queued background scan has clear feedback`() {
+        assertEquals("Background runtime scan queued.", backgroundScanQueuedMessage())
+    }
 }
