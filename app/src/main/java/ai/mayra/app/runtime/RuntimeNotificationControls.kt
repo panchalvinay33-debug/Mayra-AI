@@ -35,14 +35,18 @@ internal fun notificationScanBlockedMessage(readiness: RuntimeNotificationReadin
     RuntimeNotificationReadiness.SYSTEM_BLOCKED -> "Enable notifications in system settings before scanning."
 }
 
+internal fun backgroundScanQueuedMessage(): String = "Background runtime scan queued."
+
 @Composable
 internal fun RuntimeNotificationControlsCard() {
     val context = LocalContext.current
     val preferences = remember(context) { RuntimeAttentionPreferences(context) }
+    val schedulePreferences = remember(context) { RuntimeAttentionSchedulePreferences(context) }
     val diagnostics = remember(context) { RuntimeAttentionDiagnostics(context) }
     var preferenceState by remember { mutableStateOf(preferences.read()) }
+    var scheduleState by remember { mutableStateOf(schedulePreferences.read()) }
     var readiness by remember { mutableStateOf(notificationReadiness(context)) }
-    var scanState by remember { mutableStateOf(diagnostics.read()) }
+    var diagnosticsState by remember { mutableStateOf(diagnostics.read()) }
     var notice by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -58,15 +62,17 @@ internal fun RuntimeNotificationControlsCard() {
 
     fun reload(message: String? = null) {
         preferenceState = preferences.read()
+        scheduleState = schedulePreferences.read()
         readiness = notificationReadiness(context)
-        scanState = diagnostics.read()
+        diagnosticsState = diagnostics.read()
         notice = message
     }
 
     LaunchedEffect(Unit) {
         while (true) {
             delay(DIAGNOSTICS_REFRESH_MILLIS)
-            scanState = diagnostics.read()
+            diagnosticsState = diagnostics.read()
+            scheduleState = schedulePreferences.read()
             readiness = notificationReadiness(context)
         }
     }
@@ -79,7 +85,8 @@ internal fun RuntimeNotificationControlsCard() {
             Text("Runtime alerts", fontWeight = FontWeight.SemiBold)
             Text(preferenceState.status(System.currentTimeMillis()))
             Text(notificationReadinessMessage(readiness))
-            Text(scanState?.status(System.currentTimeMillis()) ?: "Background scan has not run yet")
+            Text(scheduleState.status())
+            Text(runtimeAttentionDiagnosticsMessage(diagnosticsState, System.currentTimeMillis()))
             notice?.let { Text(it) }
 
             when (readiness) {
@@ -127,6 +134,27 @@ internal fun RuntimeNotificationControlsCard() {
                     ) { Text("Turn off") }
                 }
             }
+
+            OutlinedButton(
+                onClick = {
+                    RuntimeAttentionScheduler.setEnabled(context, !scheduleState.enabled)
+                    reload(
+                        if (scheduleState.enabled) "Background scans turned off."
+                        else "Background scans resumed."
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (scheduleState.enabled) "Turn off background scans" else "Resume background scans")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    RuntimeAttentionScheduler.runNow(context)
+                    reload(backgroundScanQueuedMessage())
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Run background scan now") }
 
             TextButton(
                 onClick = {
