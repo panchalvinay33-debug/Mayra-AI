@@ -3,20 +3,12 @@ package ai.mayra.app.core
 import ai.mayra.app.action.MayraActionRuntime
 import java.util.Locale
 
-/**
- * Routes structured assistant intents to the device-action boundary and converts execution
- * outcomes into safe, user-facing replies.
- *
- * Chat-only intents stay inside [LocalCommandEngine]. Sensitive operations remain confirmation
- * gated by the [ActionExecutor] implementation. Explicit Mayra stop/resume commands control the
- * shared action-runtime kill switch and are intentionally separate from confirmation rejection.
- */
+/** Routes structured assistant intents to safe device and Mayra-owned action boundaries. */
 class ActionDispatcher(
     private val executor: ActionExecutor = DefaultActionExecutor(),
     private val stopAllActions: () -> Unit = MayraActionRuntime::stopAll,
     private val resumeActions: () -> Unit = MayraActionRuntime::resume
 ) {
-
     suspend fun dispatch(intent: AssistantIntent): String? {
         if (intent is AssistantIntent.Chat) {
             val normalized = intent.message.trim().lowercase(Locale.ROOT)
@@ -28,38 +20,22 @@ class ActionDispatcher(
                 resumeActions()
                 return "Mayra phone actions are enabled again."
             }
-            if (normalized in confirmationWords) {
-                return executor.confirmPending().toReply("Action handed to Android.")
-            }
-            if (normalized in rejectionWords) {
-                return executor.rejectPending().toReply("Action cancelled.")
-            }
+            if (normalized in confirmationWords) return executor.confirmPending().toReply("Action handed to Android.")
+            if (normalized in rejectionWords) return executor.rejectPending().toReply("Action cancelled.")
         }
 
         return when (intent) {
-            is AssistantIntent.OpenApp -> executor.openApp(intent.appName).toReply(
-                successMessage = "Opening ${intent.appName}."
-            )
-
+            is AssistantIntent.OpenApp -> executor.openApp(intent.appName).toReply("Opening ${intent.appName}.")
             is AssistantIntent.CallContact -> executor.callContact(intent.contact).toReply(
-                successMessage = "Call flow opened for ${intent.contact}. Connection is not claimed yet."
+                "Call flow opened for ${intent.contact}. Connection is not claimed yet."
             )
-
-            is AssistantIntent.ComposeMessage -> executor.sendMessage(
-                recipient = intent.recipient,
-                message = intent.message
-            ).toReply(
-                successMessage = if (intent.message.isNullOrBlank()) {
-                    "Opening a message for ${intent.recipient}."
-                } else {
-                    "Message prepared for ${intent.recipient}. Review it before sending."
-                }
+            is AssistantIntent.ComposeMessage -> executor.sendMessage(intent.recipient, intent.message).toReply(
+                if (intent.message.isNullOrBlank()) "Opening a message for ${intent.recipient}."
+                else "Message prepared for ${intent.recipient}. Review it before sending."
             )
-
             is AssistantIntent.CreateReminder -> executor.createReminder(intent.request).toReply(
-                successMessage = "Reminder creation opened: ${intent.request}. Saving remains visible to you."
+                "Reminder saved by Mayra: ${intent.request}. You can manage, snooze or complete it from Mayra Reminders."
             )
-
             else -> null
         }
     }
