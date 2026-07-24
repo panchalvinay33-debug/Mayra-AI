@@ -2,6 +2,7 @@ package ai.mayra.app.presence
 
 import ai.mayra.app.MainActivity
 import ai.mayra.app.MayraRuntime
+import ai.mayra.app.action.MayraActionControlActivity
 import ai.mayra.app.pulse.MayraPresence
 import ai.mayra.app.pulse.MayraPulseActivity
 import ai.mayra.app.pulse.MayraPulseState
@@ -57,6 +58,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onChat = { startActivity(Intent(this, MainActivity::class.java)) },
                     onRuntime = { startActivity(Intent(this, RuntimeControlActivity::class.java)) },
                     onPulse = { startActivity(Intent(this, MayraPulseActivity::class.java)) },
+                    onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
             }
@@ -70,6 +72,7 @@ private fun MayraPresenceHome(
     onChat: () -> Unit,
     onRuntime: () -> Unit,
     onPulse: () -> Unit,
+    onActionControls: () -> Unit,
     onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
@@ -128,6 +131,7 @@ private fun MayraPresenceHome(
                 OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
                 OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
             }
+            OutlinedButton(onClick = onActionControls, modifier = Modifier.fillMaxWidth()) { Text("Action safety") }
             OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Settings") }
 
             Card(Modifier.fillMaxWidth()) {
@@ -138,6 +142,7 @@ private fun MayraPresenceHome(
                     Text("• Speak naturally and hear Mayra reply")
                     Text("• Open apps, prepare calls and messages safely")
                     Text("• Run reminders, workflows and background checks")
+                    Text("• Stop all action execution instantly when needed")
                     Text("• Stay useful offline and become smarter online")
                 }
             }
