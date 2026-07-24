@@ -35,6 +35,10 @@
         android:theme="@style/Theme.MayraAI">
 
         <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".runtime.RuntimeControlActivity"
             android:exported="false" />
 
