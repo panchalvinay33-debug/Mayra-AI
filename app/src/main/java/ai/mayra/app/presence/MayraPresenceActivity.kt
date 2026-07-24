@@ -12,6 +12,7 @@ import ai.mayra.app.pulse.MayraPresence
 import ai.mayra.app.pulse.MayraPulseActivity
 import ai.mayra.app.pulse.MayraPulseState
 import ai.mayra.app.pulse.buildMayraPulseState
+import ai.mayra.app.reminder.MayraReminderActivity
 import ai.mayra.app.runtime.RuntimeControlActivity
 import ai.mayra.app.settings.MayraSettingsStore
 import ai.mayra.app.settings.SettingsActivity
@@ -68,6 +69,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
                     onOwnerSetup = { startActivity(Intent(this, MayraOwnerSetupActivity::class.java)) },
                     onPeople = { startActivity(Intent(this, MayraIdentityActivity::class.java)) },
+                    onReminders = { startActivity(Intent(this, MayraReminderActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
             }
@@ -86,6 +88,7 @@ private fun MayraPresenceHome(
     onActionControls: () -> Unit,
     onOwnerSetup: () -> Unit,
     onPeople: () -> Unit,
+    onReminders: () -> Unit,
     onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
@@ -152,6 +155,7 @@ private fun MayraPresenceHome(
                 OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
                 OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
             }
+            OutlinedButton(onClick = onReminders, modifier = Modifier.fillMaxWidth()) { Text("Reminders & follow-ups") }
             OutlinedButton(onClick = onPeople, modifier = Modifier.fillMaxWidth()) { Text("People & relationships") }
             OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Notification intelligence") }
             OutlinedButton(onClick = onActionControls, modifier = Modifier.fillMaxWidth()) { Text("Action safety") }
@@ -162,11 +166,12 @@ private fun MayraPresenceHome(
                     Text("Your phone, with a mind", fontWeight = FontWeight.SemiBold)
                     Text("• Understand the phone’s health and connection")
                     Text("• Remember who Mummy, Papa, Boss and trusted people are")
+                    Text("• Save reminders locally, alert, snooze and follow up")
                     Text("• Summarise notifications and protect sensitive content")
                     Text("• Ask anything in Hindi, Hinglish or English")
                     Text("• Speak naturally and hear Mayra reply")
                     Text("• Open apps, prepare calls and messages safely")
-                    Text("• Run reminders, workflows and background checks")
+                    Text("• Run workflows and background checks")
                     Text("• Stop all action execution instantly when needed")
                     Text("• Stay useful offline and become smarter online")
                 }
