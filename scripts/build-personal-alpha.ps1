@@ -17,19 +17,43 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function Invoke-NativeCapture([string]$Executable, [string[]]$Arguments) {
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $Executable @Arguments 2>&1 | ForEach-Object { $_.ToString() }
+        $exitCode = $LASTEXITCODE
+        return [PSCustomObject]@{ Output = $output; ExitCode = $exitCode }
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
 Write-Step "Checking Windows build environment"
 
 if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
-    Fail "Java was not found. In Android Studio open Settings > Build Tools > Gradle and select the embedded JDK 17, or add JDK 17 to JAVA_HOME/PATH."
+    Fail "Java was not found. Point JAVA_HOME to Android Studio's embedded JDK or install JDK 17."
 }
 
-$javaVersion = (& java -version 2>&1 | Select-Object -First 1) -join ""
+$javaCheck = Invoke-NativeCapture "java" @("-version")
+if ($javaCheck.ExitCode -ne 0) {
+    Fail "Java exists but 'java -version' failed. Check JAVA_HOME and PATH."
+}
+$javaVersion = ($javaCheck.Output | Select-Object -First 1) -join ""
 Write-Host "Java: $javaVersion"
-if ($javaVersion -notmatch '"17\.') {
-    Fail "Mayra requires JDK 17. Current Java: $javaVersion"
+$javaMajorMatch = [regex]::Match($javaVersion, 'version\s+"(?<major>\d+)')
+if (-not $javaMajorMatch.Success) {
+    Fail "Could not read the Java major version from: $javaVersion"
+}
+$javaMajor = [int]$javaMajorMatch.Groups["major"].Value
+if ($javaMajor -lt 17 -or $javaMajor -gt 21) {
+    Fail "Mayra requires JDK 17 through 21 for this personal build. Current Java major version: $javaMajor"
+}
+if ($javaMajor -ne 17) {
+    Write-Host "Note: JDK $javaMajor detected. The project targets Java 17 bytecode; Gradle 8.9/AGP 8.7 can run on this JDK." -ForegroundColor Yellow
 }
 
 if (-not $env:ANDROID_SDK_ROOT -and $env:ANDROID_HOME) {
