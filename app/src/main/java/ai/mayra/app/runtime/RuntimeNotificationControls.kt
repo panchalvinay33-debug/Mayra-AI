@@ -86,7 +86,7 @@ internal fun RuntimeNotificationControlsCard() {
             Text(preferenceState.status(System.currentTimeMillis()))
             Text(notificationReadinessMessage(readiness))
             Text(scheduleState.status())
-            Text(runtimeAttentionDiagnosticsMessage(diagnosticsState, System.currentTimeMillis()))
+            Text(diagnosticsState?.status(System.currentTimeMillis()) ?: "Background scan has not run yet")
             notice?.let { Text(it) }
 
             when (readiness) {
