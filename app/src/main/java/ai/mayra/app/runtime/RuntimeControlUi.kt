@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -153,7 +155,10 @@ fun RuntimeControlDialog(
         onDismissRequest = onDismiss,
         title = { Text("Runtime control") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(state.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     runtimeSnapshotFreshness(state.capturedAt, System.currentTimeMillis()),
@@ -162,6 +167,7 @@ fun RuntimeControlDialog(
                 state.busyLabel?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 state.notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                RuntimeNotificationControlsCard()
                 state.metrics.forEach { RuntimeMetricCard(it) }
                 if (state.pendingActions.isNotEmpty()) {
                     Text("Waiting for approval", fontWeight = FontWeight.SemiBold)
