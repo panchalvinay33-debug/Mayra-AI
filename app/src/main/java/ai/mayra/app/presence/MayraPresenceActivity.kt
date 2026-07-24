@@ -4,6 +4,7 @@ import ai.mayra.app.MainActivity
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.action.MayraActionControlActivity
 import ai.mayra.app.background.MayraNotificationCenterActivity
+import ai.mayra.app.identity.MayraIdentityActivity
 import ai.mayra.app.owner.MayraOwnerModeStore
 import ai.mayra.app.owner.MayraOwnerSetupActivity
 import ai.mayra.app.owner.ownerModeSafetySummary
@@ -66,6 +67,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onNotifications = { startActivity(Intent(this, MayraNotificationCenterActivity::class.java)) },
                     onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
                     onOwnerSetup = { startActivity(Intent(this, MayraOwnerSetupActivity::class.java)) },
+                    onPeople = { startActivity(Intent(this, MayraIdentityActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
             }
@@ -83,6 +85,7 @@ private fun MayraPresenceHome(
     onNotifications: () -> Unit,
     onActionControls: () -> Unit,
     onOwnerSetup: () -> Unit,
+    onPeople: () -> Unit,
     onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
@@ -149,6 +152,7 @@ private fun MayraPresenceHome(
                 OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
                 OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
             }
+            OutlinedButton(onClick = onPeople, modifier = Modifier.fillMaxWidth()) { Text("People & relationships") }
             OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Notification intelligence") }
             OutlinedButton(onClick = onActionControls, modifier = Modifier.fillMaxWidth()) { Text("Action safety") }
             OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Settings") }
@@ -157,6 +161,7 @@ private fun MayraPresenceHome(
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Your phone, with a mind", fontWeight = FontWeight.SemiBold)
                     Text("• Understand the phone’s health and connection")
+                    Text("• Remember who Mummy, Papa, Boss and trusted people are")
                     Text("• Summarise notifications and protect sensitive content")
                     Text("• Ask anything in Hindi, Hinglish or English")
                     Text("• Speak naturally and hear Mayra reply")
