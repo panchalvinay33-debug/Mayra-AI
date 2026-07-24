@@ -1,6 +1,9 @@
 package ai.mayra.app.settings
 
+import ai.mayra.app.ai.AiProviderActivity
+import ai.mayra.app.ai.AiProviderSettingsStore
 import ai.mayra.app.ui.theme.MayraAITheme
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,6 +48,10 @@ class SettingsActivity : ComponentActivity() {
                 MayraSettingsScreen(
                     onboarding = onboarding,
                     store = remember { MayraSettingsStore(applicationContext) },
+                    aiProviderStore = remember { AiProviderSettingsStore(applicationContext) },
+                    onOpenAiProvider = {
+                        startActivity(Intent(this, AiProviderActivity::class.java))
+                    },
                     onClose = ::finish
                 )
             }
@@ -60,9 +67,12 @@ class SettingsActivity : ComponentActivity() {
 private fun MayraSettingsScreen(
     onboarding: Boolean,
     store: MayraSettingsStore,
+    aiProviderStore: AiProviderSettingsStore,
+    onOpenAiProvider: () -> Unit,
     onClose: () -> Unit
 ) {
     var settings by remember { mutableStateOf(store.read()) }
+    var aiProviderConfig by remember { mutableStateOf(aiProviderStore.read()) }
     var error by remember { mutableStateOf<String?>(null) }
     var showResetConfirmation by remember { mutableStateOf(false) }
 
@@ -132,6 +142,19 @@ private fun MayraSettingsScreen(
                 )
             }
 
+            SettingsSection("AI intelligence") {
+                aiProviderConfig = aiProviderStore.read()
+                Text(aiProviderConfig.status())
+                Text(
+                    "Connect OpenAI for full conversation while Mayra keeps phone actions inside its local safety layer.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedButton(
+                    onClick = onOpenAiProvider,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Configure AI provider") }
+            }
+
             SettingsSection("Memory and personalization") {
                 SettingsToggle(
                     title = "Memory",
@@ -161,7 +184,7 @@ private fun MayraSettingsScreen(
                     onCheckedChange = { settings = settings.copy(diagnosticsSharingEnabled = it) }
                 )
                 Text(
-                    "Mayra's profile and preferences stay in local app storage. You can reset them anytime.",
+                    "Profile preferences stay in local app storage. The AI provider key is encrypted with Android Keystore and is never displayed after saving.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -197,11 +220,13 @@ private fun MayraSettingsScreen(
         AlertDialog(
             onDismissRequest = { showResetConfirmation = false },
             title = { Text("Reset settings?") },
-            text = { Text("This clears your profile, language, voice and memory preferences. Onboarding will appear again.") },
+            text = { Text("This clears your profile, AI provider key, language, voice and memory preferences. Onboarding will appear again.") },
             confirmButton = {
                 TextButton(onClick = {
                     store.reset()
+                    aiProviderStore.reset()
                     settings = store.read()
+                    aiProviderConfig = aiProviderStore.read()
                     showResetConfirmation = false
                     onClose()
                 }) { Text("Reset") }
