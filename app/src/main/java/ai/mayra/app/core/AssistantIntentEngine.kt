@@ -101,10 +101,19 @@ class AssistantIntentEngine(
     private fun parseReminderIntent(original: String, normalized: String): AssistantIntent {
         val match = REMINDER_COMMANDS
             .mapNotNull { keyword -> normalized.indexOf(keyword).takeIf { it >= 0 }?.let { CommandMatch(keyword, it) } }
-            .minByOrNull(CommandMatch::index)
+            .sortedWith(compareBy<CommandMatch> { it.index }.thenByDescending { it.keyword.length })
+            .firstOrNull()
             ?: return AssistantIntent.Invalid("What should I remind you about?")
-        val request = original.substringAfterKeyword(match.keyword)
-            .trim().removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
+
+        val commandPattern = Regex("(?i)(^|\\s)${Regex.escape(match.keyword)}(?=\\s|$)")
+        val request = original
+            .replaceFirst(commandPattern, " ")
+            .trim()
+            .removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
+            .removeTrailingWordsIgnoreCase(REMINDER_TRAILING_WORDS)
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
         return if (request.isBlank()) {
             AssistantIntent.Invalid("What should I remind you about?")
         } else {
@@ -189,7 +198,11 @@ private fun String.matchesAny(vararg values: String): Boolean = values.any(::con
 private val OPEN_COMMANDS = listOf("open", "launch", "khol", "kholo", "chalao", "start")
 private val CALL_COMMANDS = listOf("call", "phone", "dial", "lagao", "milao")
 private val MESSAGE_COMMANDS = listOf("send message to", "send sms to", "message", "text", "sms", "msg")
-private val REMINDER_COMMANDS = listOf("remind me", "set reminder", "yaad dilana", "reminder laga")
+private val REMINDER_COMMANDS = listOf(
+    "reminder set kar do", "reminder set karo", "reminder laga do", "reminder dal do",
+    "reminder daal do", "reminder dalo", "reminder daalo", "reminder lagao",
+    "remind me", "set reminder", "yaad dila do", "yaad dilao", "yaad dilana", "reminder laga"
+)
 
 private val COMMAND_FILLER_WORDS = setOf(
     "mayra", "mira", "please", "jara", "zara", "mera", "meri", "mere", "the",
@@ -200,5 +213,8 @@ private val COMMAND_TRAILING_WORDS = setOf(
     "open", "call", "phone", "dial", "launch", "start", "khol", "kholo", "chalao"
 )
 private val MESSAGE_ACTION_WORDS = setOf("to", "ko", "likho", "bolo", "saying", "that")
-private val REMINDER_FILLER_WORDS = setOf("to", "ki", "please", "mujhe")
+private val REMINDER_FILLER_WORDS = setOf("to", "ki", "please", "mujhe", "mayra", "mira")
+private val REMINDER_TRAILING_WORDS = setOf(
+    "ka", "ki", "ke", "please", "karo", "kar", "do", "de", "dalo", "daalo", "lagao", "laga"
+)
 private val MESSAGE_SEPARATORS = listOf(":", " saying ", " that ", " bolo ", " likho ")
