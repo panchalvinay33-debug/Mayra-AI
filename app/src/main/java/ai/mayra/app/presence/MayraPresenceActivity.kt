@@ -4,6 +4,9 @@ import ai.mayra.app.MainActivity
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.action.MayraActionControlActivity
 import ai.mayra.app.background.MayraNotificationCenterActivity
+import ai.mayra.app.owner.MayraOwnerModeStore
+import ai.mayra.app.owner.MayraOwnerSetupActivity
+import ai.mayra.app.owner.ownerModeSafetySummary
 import ai.mayra.app.pulse.MayraPresence
 import ai.mayra.app.pulse.MayraPulseActivity
 import ai.mayra.app.pulse.MayraPulseState
@@ -56,11 +59,13 @@ class MayraPresenceActivity : ComponentActivity() {
             MayraAITheme {
                 MayraPresenceHome(
                     userName = remember { mutableStateOf(settingsStore.read().normalizedName) }.value,
+                    ownerSummary = remember { MayraOwnerModeStore(this).read() }.let(::ownerModeSafetySummary),
                     onChat = { startActivity(Intent(this, MainActivity::class.java)) },
                     onRuntime = { startActivity(Intent(this, RuntimeControlActivity::class.java)) },
                     onPulse = { startActivity(Intent(this, MayraPulseActivity::class.java)) },
                     onNotifications = { startActivity(Intent(this, MayraNotificationCenterActivity::class.java)) },
                     onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
+                    onOwnerSetup = { startActivity(Intent(this, MayraOwnerSetupActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
             }
@@ -71,11 +76,13 @@ class MayraPresenceActivity : ComponentActivity() {
 @Composable
 private fun MayraPresenceHome(
     userName: String,
+    ownerSummary: String,
     onChat: () -> Unit,
     onRuntime: () -> Unit,
     onPulse: () -> Unit,
     onNotifications: () -> Unit,
     onActionControls: () -> Unit,
+    onOwnerSetup: () -> Unit,
     onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
@@ -104,6 +111,14 @@ private fun MayraPresenceHome(
             Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(greeting, style = MaterialTheme.typography.titleMedium)
             Text(pulse.message, style = MaterialTheme.typography.bodyMedium)
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold)
+                    Text(ownerSummary, style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = onOwnerSetup, modifier = Modifier.fillMaxWidth()) { Text("Complete phone access setup") }
+                }
+            }
 
             pulse.healthScore?.let { score ->
                 Card(Modifier.fillMaxWidth()) {
@@ -153,7 +168,7 @@ private fun MayraPresenceHome(
             }
 
             Text(
-                "Mayra observes only signals Android allows this app to read. Risky actions stay behind permission and confirmation—alive should feel helpful, not out of control.",
+                "Owner Mode maximizes access you explicitly grant on your own phone. Android secure boundaries, app security and critical-action protections are not secretly bypassed.",
                 style = MaterialTheme.typography.bodySmall
             )
         }
