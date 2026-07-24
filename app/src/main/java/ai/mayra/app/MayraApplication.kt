@@ -6,6 +6,8 @@ import ai.mayra.app.agent.MayraAgentPlanner
 import ai.mayra.app.agent.MayraAgentRuntime
 import ai.mayra.app.agent.MayraAgentToolRegistry
 import ai.mayra.app.agent.UnavailableAgentTool
+import ai.mayra.app.ai.AiProviderSettingsStore
+import ai.mayra.app.ai.HybridMayraAssistant
 import ai.mayra.app.autonomy.MayraAutonomyCoordinator
 import ai.mayra.app.background.BackgroundTaskQueue
 import ai.mayra.app.background.MayraAmbientControlCenter
@@ -52,8 +54,12 @@ class MayraApplication : Application() {
         super.onCreate()
 
         val actionExecutor = AndroidActionExecutor(applicationContext)
-        MayraRuntime.assistant = LocalMayraAssistant(
+        val localAssistant = LocalMayraAssistant(
             LocalCommandEngine(actionDispatcher = ActionDispatcher(actionExecutor))
+        )
+        MayraRuntime.assistant = HybridMayraAssistant(
+            providerStore = AiProviderSettingsStore(applicationContext),
+            localAssistant = localAssistant
         )
 
         val eventBus = BrainEventBus()
