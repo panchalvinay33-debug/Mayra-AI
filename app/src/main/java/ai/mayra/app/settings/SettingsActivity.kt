@@ -2,6 +2,7 @@ package ai.mayra.app.settings
 
 import ai.mayra.app.ai.AiProviderActivity
 import ai.mayra.app.ai.AiProviderSettingsStore
+import ai.mayra.app.background.MayraNotificationCenterActivity
 import ai.mayra.app.pulse.MayraPulseActivity
 import ai.mayra.app.ui.theme.MayraAITheme
 import android.content.Intent
@@ -52,6 +53,7 @@ class SettingsActivity : ComponentActivity() {
                     aiProviderStore = remember { AiProviderSettingsStore(applicationContext) },
                     onOpenAiProvider = { startActivity(Intent(this, AiProviderActivity::class.java)) },
                     onOpenPulse = { startActivity(Intent(this, MayraPulseActivity::class.java)) },
+                    onOpenNotifications = { startActivity(Intent(this, MayraNotificationCenterActivity::class.java)) },
                     onClose = ::finish
                 )
             }
@@ -68,6 +70,7 @@ private fun MayraSettingsScreen(
     aiProviderStore: AiProviderSettingsStore,
     onOpenAiProvider: () -> Unit,
     onOpenPulse: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onClose: () -> Unit
 ) {
     var settings by remember { mutableStateOf(store.read()) }
@@ -86,6 +89,12 @@ private fun MayraSettingsScreen(
             SettingsSection("Mayra presence") {
                 Text("See what Mayra senses about this phone right now—battery, network, storage, memory, heat and available capabilities.")
                 OutlinedButton(onClick = onOpenPulse, modifier = Modifier.fillMaxWidth()) { Text("Open Mayra Pulse") }
+            }
+
+            SettingsSection("Notification intelligence") {
+                Text("Review locally captured unread notifications, protected summaries, per-app privacy and supported quick replies.")
+                Text("Notification Access is optional and can be revoked from Android settings at any time.", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) { Text("Open Notification Center") }
             }
 
             SettingsSection("Your profile") {
