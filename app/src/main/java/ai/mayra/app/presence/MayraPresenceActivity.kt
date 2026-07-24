@@ -17,6 +17,7 @@ import ai.mayra.app.reminder.MayraReminderActivity
 import ai.mayra.app.runtime.RuntimeControlActivity
 import ai.mayra.app.settings.MayraSettingsStore
 import ai.mayra.app.settings.SettingsActivity
+import ai.mayra.app.testing.MayraDeviceTestActivity
 import ai.mayra.app.ui.theme.MayraAITheme
 import android.content.Intent
 import android.os.Bundle
@@ -70,6 +71,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onPeople = { startActivity(Intent(this, MayraIdentityActivity::class.java)) },
                     onReminders = { startActivity(Intent(this, MayraReminderActivity::class.java)) },
                     onAgenda = { startActivity(Intent(this, MayraAgendaActivity::class.java)) },
+                    onDeviceTest = { startActivity(Intent(this, MayraDeviceTestActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
             }
@@ -82,7 +84,8 @@ private fun MayraPresenceHome(
     userName: String, ownerSummary: String,
     onChat: () -> Unit, onRuntime: () -> Unit, onPulse: () -> Unit,
     onNotifications: () -> Unit, onActionControls: () -> Unit, onOwnerSetup: () -> Unit,
-    onPeople: () -> Unit, onReminders: () -> Unit, onAgenda: () -> Unit, onSettings: () -> Unit
+    onPeople: () -> Unit, onReminders: () -> Unit, onAgenda: () -> Unit,
+    onDeviceTest: () -> Unit, onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
     val state = pulse.toPresenceState()
@@ -112,6 +115,7 @@ private fun MayraPresenceHome(
                 Text("I noticed this", fontWeight = FontWeight.SemiBold); Text(insight.title, fontWeight = FontWeight.Medium); Text(insight.message, style = MaterialTheme.typography.bodySmall)
             } } }
             Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Talk to Mayra") }
+            Button(onClick = onDeviceTest, modifier = Modifier.fillMaxWidth()) { Text("Start personal device check") }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
                 OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
