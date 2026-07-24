@@ -17,12 +17,19 @@ import ai.mayra.app.identity.MayraContactIdentityEngine
 import ai.mayra.app.identity.MayraContactIdentityStore
 import ai.mayra.app.identity.MayraContactTrust
 import ai.mayra.app.identity.MayraIdentityResolution
+import ai.mayra.app.reminder.MayraReminderParser
+import ai.mayra.app.reminder.MayraReminderRuntime
+import ai.mayra.app.reminder.ReminderParseResult
 import android.content.Context
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * Production bridge between Mayra's framework-neutral command layer and Android device actions.
  * Identity aliases resolve to an Android contact name before the existing contact resolver reads
- * the actual number. Ambiguous people are never guessed.
+ * the actual number. Ambiguous people are never guessed. Reminder commands use Mayra's own local
+ * reminder store and scheduler when an Android context is available.
  */
 class AndroidActionExecutor(
     private val permissionSnapshot: () -> PermissionSnapshot,
@@ -31,7 +38,9 @@ class AndroidActionExecutor(
     private val coordinator: DeviceActionCoordinator,
     private val clock: () -> Long = System::currentTimeMillis,
     private val sharedEngine: MayraActionEngine? = null,
-    private val identityEngine: MayraContactIdentityEngine? = null
+    private val identityEngine: MayraContactIdentityEngine? = null,
+    private val reminderContext: Context? = null,
+    private val reminderParser: MayraReminderParser = MayraReminderParser()
 ) : ActionExecutor {
 
     constructor(context: Context) : this(
@@ -47,7 +56,8 @@ class AndroidActionExecutor(
             runner = AndroidDeviceActionRunner(context.applicationContext)
         ),
         sharedEngine = MayraActionRuntime.install(context.applicationContext),
-        identityEngine = MayraContactIdentityStore(context.applicationContext).engine()
+        identityEngine = MayraContactIdentityStore(context.applicationContext).engine(),
+        reminderContext = context.applicationContext
     )
 
     private var pendingConfirmationToken: String? = null
@@ -123,9 +133,20 @@ class AndroidActionExecutor(
         }
     }
 
-    override suspend fun createReminder(request: String): ActionExecutionResult = submit(
-        request(DeviceActionType.CREATE_REMINDER, request)
-    )
+    override suspend fun createReminder(request: String): ActionExecutionResult {
+        val context = reminderContext ?: return submit(request(DeviceActionType.CREATE_REMINDER, request))
+        return when (val parsed = reminderParser.parse(request)) {
+            is ReminderParseResult.Parsed -> {
+                val reminder = MayraReminderRuntime.create(context, parsed, clock())
+                lastReminderMessage = "Reminder saved for ${formatReminderTime(reminder.dueAt)}: ${reminder.title}."
+                ActionExecutionResult.Success
+            }
+            is ReminderParseResult.NeedsClarification -> ActionExecutionResult.NotSupported(parsed.message)
+            is ReminderParseResult.Invalid -> ActionExecutionResult.Failure(parsed.message)
+        }
+    }
+
+    fun consumeLastReminderMessage(): String? = lastReminderMessage.also { lastReminderMessage = null }
 
     override suspend fun confirmPending(): ActionExecutionResult {
         val token = pendingConfirmationToken
@@ -165,9 +186,7 @@ class AndroidActionExecutor(
 
     private fun ambiguousIdentityResult(query: String): ActionExecutionResult.NotSupported {
         val candidates = (identityEngine?.resolve(query) as? MayraIdentityResolution.Ambiguous)
-            ?.candidates
-            .orEmpty()
-            .joinToString { it.relationship ?: it.canonicalContactName }
+            ?.candidates.orEmpty().joinToString { it.relationship ?: it.canonicalContactName }
         return ActionExecutionResult.NotSupported(
             if (candidates.isBlank()) "I could not safely resolve ${query.trim()}." else "I found multiple people for ${query.trim()}: $candidates. Please say the exact relationship or contact name."
         )
@@ -246,9 +265,14 @@ class AndroidActionExecutor(
         DevicePermission.SCHEDULE_EXACT_ALARM -> "exact reminders"
     }
 
+    private fun formatReminderTime(value: Long): String = DateTimeFormatter.ofPattern("EEE, d MMM · h:mm a")
+        .format(Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()))
+
     private data class IdentityTarget(
         val contactName: String,
         val displayName: String,
         val metadata: Map<String, String>
     )
+
+    private var lastReminderMessage: String? = null
 }
