@@ -24,4 +24,14 @@ class RuntimeAttentionIntentTest {
         assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
         assertTrue(intent.flags and Intent.FLAG_ACTIVITY_CLEAR_TOP != 0)
     }
+
+    @Test
+    fun `runtime alert action targets internal receiver`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        val intent = runtimeAttentionActionIntent(context, RuntimeAttentionActionReceiver.ACTION_SNOOZE)
+
+        assertEquals(RuntimeAttentionActionReceiver::class.java.name, intent.component?.className)
+        assertEquals(RuntimeAttentionActionReceiver.ACTION_SNOOZE, intent.action)
+    }
 }
