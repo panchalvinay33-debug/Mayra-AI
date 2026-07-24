@@ -8,6 +8,8 @@ import ai.mayra.app.core.actions.DeviceActionRequest
 import ai.mayra.app.core.actions.DeviceActionType
 import ai.mayra.app.core.actions.DevicePermission
 import ai.mayra.app.core.actions.PermissionSnapshot
+import ai.mayra.app.owner.MayraOwnerActionPolicy
+import ai.mayra.app.owner.StoredMayraOwnerActionPolicy
 import android.content.Context
 
 /**
@@ -22,6 +24,7 @@ class MayraSafeActionExecutor(
     private val contactResolver: ContactResolver,
     private val installedAppResolver: InstalledAppResolver,
     private val engineProvider: () -> ai.mayra.app.action.MayraActionEngine,
+    private val ownerPolicy: MayraOwnerActionPolicy = MayraOwnerActionPolicy { _, _ -> false },
     private val clock: () -> Long = System::currentTimeMillis
 ) : ActionExecutor {
 
@@ -33,7 +36,8 @@ class MayraSafeActionExecutor(
         },
         contactResolver = ContactResolver(AndroidContactPhoneDataSource(context.applicationContext)),
         installedAppResolver = InstalledAppResolver(AndroidInstalledAppDataSource(context.applicationContext)),
-        engineProvider = { MayraActionRuntime.install(context.applicationContext) }
+        engineProvider = { MayraActionRuntime.install(context.applicationContext) },
+        ownerPolicy = StoredMayraOwnerActionPolicy(context.applicationContext)
     )
 
     private var pendingConfirmationToken: String? = null
@@ -127,7 +131,19 @@ class MayraSafeActionExecutor(
     private suspend fun submit(
         request: DeviceActionRequest,
         permissions: PermissionSnapshot = permissionSnapshot()
-    ): ActionExecutionResult = engineProvider().submit(request, permissions).toActionResult()
+    ): ActionExecutionResult {
+        val engine = engineProvider()
+        val first = engine.submit(request, permissions)
+        val resolved = if (
+            first is MayraActionResult.AwaitingConfirmation &&
+            ownerPolicy.mayAutoConfirm(first.request, first.risk.level)
+        ) {
+            engine.confirm(first.ticket.token)
+        } else {
+            first
+        }
+        return resolved.toActionResult()
+    }
 
     private fun MayraActionResult.toActionResult(): ActionExecutionResult = when (this) {
         is MayraActionResult.Completed -> ActionExecutionResult.Success
