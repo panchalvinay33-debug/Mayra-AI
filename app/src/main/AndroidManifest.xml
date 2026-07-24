@@ -22,6 +22,7 @@
     </queries>
 
     <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
+        <activity android:name=".testing.MayraDeviceTestActivity" android:exported="false" />
         <activity android:name=".calendar.MayraAgendaActivity" android:exported="false" />
         <activity android:name=".reminder.MayraReminderActivity" android:exported="false" />
         <activity android:name=".identity.MayraIdentityActivity" android:exported="false" />
