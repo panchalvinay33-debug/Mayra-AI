@@ -38,11 +38,7 @@ import androidx.compose.ui.unit.dp
 class MayraNotificationCenterActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MayraAITheme {
-                MayraNotificationCenterScreen(onClose = ::finish)
-            }
-        }
+        setContent { MayraAITheme { MayraNotificationCenterScreen(onClose = ::finish) } }
     }
 }
 
@@ -54,16 +50,24 @@ private fun MayraNotificationCenterScreen(onClose: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     val records = remember(refresh) { store.snapshot() }
     val brief = remember(refresh) { store.summary() }
+    val audit = remember(refresh) { MayraNotificationReplyRuntime.auditSnapshot().take(20) }
     var notice by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<PendingNotificationReply?>(null) }
     var replyTarget by remember { mutableStateOf<String?>(null) }
     var replyText by remember { mutableStateOf("") }
 
+    fun updatePolicy(record: MayraNotificationRecord, transform: (NotificationAppPolicy) -> NotificationAppPolicy, message: String) {
+        privacyStore.save(transform(privacyStore.policyFor(record.sourcePackage)))
+        notice = message
+        refresh++
+    }
+
     fun prepareReply(record: MayraNotificationRecord) {
         val result = MayraNotificationReplyRuntime.prepare(
             notificationId = record.id,
             replyText = replyText,
-            policy = privacyStore.policyFor(record.sourcePackage)
+            policy = privacyStore.policyFor(record.sourcePackage),
+            sensitivity = record.sensitivity
         )
         when (result) {
             is NotificationReplyResult.AwaitingConfirmation -> {
@@ -74,15 +78,12 @@ private fun MayraNotificationCenterScreen(onClose: () -> Unit) {
             is NotificationReplyResult.Failed -> notice = result.message
             is NotificationReplyResult.Sent -> notice = result.message
         }
+        refresh++
     }
 
     Scaffold { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(18.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Mayra Notification Center", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -97,25 +98,22 @@ private fun MayraNotificationCenterScreen(onClose: () -> Unit) {
                 }
             }
 
-            notice?.let {
-                Card(Modifier.fillMaxWidth()) {
-                    Text(it, modifier = Modifier.padding(12.dp))
-                }
-            }
+            notice?.let { Card(Modifier.fillMaxWidth()) { Text(it, modifier = Modifier.padding(12.dp)) } }
 
             pending?.let { confirmation ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Reply confirmation", fontWeight = FontWeight.SemiBold)
                         Text(confirmation.preview)
+                        Text("This confirmation expires quickly. The source app controls final delivery.", style = MaterialTheme.typography.bodySmall)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = {
-                                    when (val result = MayraNotificationReplyRuntime.confirm(context, confirmation.token)) {
-                                        is NotificationReplyResult.Sent -> notice = result.message
-                                        is NotificationReplyResult.Blocked -> notice = result.message
-                                        is NotificationReplyResult.Failed -> notice = result.message
-                                        is NotificationReplyResult.AwaitingConfirmation -> Unit
+                                    notice = when (val result = MayraNotificationReplyRuntime.confirm(context, confirmation.token)) {
+                                        is NotificationReplyResult.Sent -> result.message
+                                        is NotificationReplyResult.Blocked -> result.message
+                                        is NotificationReplyResult.Failed -> result.message
+                                        is NotificationReplyResult.AwaitingConfirmation -> "Reply still requires confirmation."
                                     }
                                     pending = null
                                     replyTarget = null
@@ -126,13 +124,13 @@ private fun MayraNotificationCenterScreen(onClose: () -> Unit) {
                             ) { Text("Confirm send") }
                             OutlinedButton(
                                 onClick = {
-                                    val result = MayraNotificationReplyRuntime.reject(confirmation.token)
-                                    notice = when (result) {
+                                    notice = when (val result = MayraNotificationReplyRuntime.reject(confirmation.token)) {
                                         is NotificationReplyResult.Blocked -> result.message
                                         is NotificationReplyResult.Failed -> result.message
                                         else -> "Reply cancelled."
                                     }
                                     pending = null
+                                    refresh++
                                 },
                                 modifier = Modifier.weight(1f)
                             ) { Text("Cancel") }
@@ -142,15 +140,18 @@ private fun MayraNotificationCenterScreen(onClose: () -> Unit) {
             }
 
             records.forEach { record ->
+                val policy = privacyStore.policyFor(record.sourcePackage)
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(record.appLabel, fontWeight = FontWeight.SemiBold)
                             Text(record.sensitivity.name.lowercase())
                         }
+                        Text("Privacy: ${policy.mode.name.lowercase()} · replies ${if (policy.allowReply) "on" else "off"} · read aloud ${if (policy.allowReadAloud) "on" else "off"}", style = MaterialTheme.typography.bodySmall)
                         record.title.takeIf(String::isNotBlank)?.let { Text(it, fontWeight = FontWeight.Medium) }
                         Text(record.text)
-                        if (record.replyAvailable) {
+
+                        if (record.replyAvailable && policy.allowReply && policy.mode != NotificationPrivacyMode.IGNORE) {
                             if (replyTarget == record.id) {
                                 OutlinedTextField(
                                     value = replyText,
@@ -167,48 +168,63 @@ private fun MayraNotificationCenterScreen(onClose: () -> Unit) {
                                 ) { Text("Review reply") }
                             } else {
                                 OutlinedButton(
-                                    onClick = {
-                                        replyTarget = record.id
-                                        replyText = ""
-                                    },
+                                    onClick = { replyTarget = record.id; replyText = "" },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Reply safely") }
                             }
                         }
+
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { updatePolicy(record, { it.copy(mode = NotificationPrivacyMode.FULL) }, "Future ${record.appLabel} content can be shown after built-in sensitive redaction.") },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Full") }
+                            OutlinedButton(
+                                onClick = { updatePolicy(record, { it.copy(mode = NotificationPrivacyMode.REDACT_CONTENT) }, "Future ${record.appLabel} content will be hidden.") },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Hide") }
+                            OutlinedButton(
+                                onClick = { updatePolicy(record, { it.copy(mode = NotificationPrivacyMode.IGNORE, allowReply = false, allowReadAloud = false) }, "Future ${record.appLabel} notifications will be ignored.") },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Ignore") }
+                        }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(
-                                onClick = {
-                                    val current = privacyStore.policyFor(record.sourcePackage)
-                                    privacyStore.save(current.copy(mode = NotificationPrivacyMode.REDACT_CONTENT))
-                                    notice = "Future ${record.appLabel} notification content will be hidden."
-                                },
+                                onClick = { updatePolicy(record, { it.copy(allowReply = !it.allowReply) }, "Replies ${if (policy.allowReply) "disabled" else "enabled"} for ${record.appLabel}.") },
+                                enabled = policy.mode != NotificationPrivacyMode.IGNORE,
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Hide content") }
+                            ) { Text(if (policy.allowReply) "Disable replies" else "Enable replies") }
                             OutlinedButton(
-                                onClick = {
-                                    val current = privacyStore.policyFor(record.sourcePackage)
-                                    privacyStore.save(current.copy(mode = NotificationPrivacyMode.IGNORE, allowReply = false))
-                                    notice = "Future ${record.appLabel} notifications will be ignored."
-                                },
+                                onClick = { updatePolicy(record, { it.copy(allowReadAloud = !it.allowReadAloud) }, "Private read-aloud ${if (policy.allowReadAloud) "disabled" else "enabled"} for ${record.appLabel}.") },
+                                enabled = policy.mode != NotificationPrivacyMode.IGNORE && record.sensitivity != NotificationSensitivity.OTP,
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Ignore app") }
+                            ) { Text(if (policy.allowReadAloud) "Mute aloud" else "Allow aloud") }
                         }
                     }
                 }
             }
 
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Reply safety history", fontWeight = FontWeight.SemiBold)
+                    if (audit.isEmpty()) Text("No notification replies have been processed yet.")
+                    audit.forEach { event ->
+                        Text("• ${event.status.name.replace('_', ' ').lowercase()} · ${event.sourcePackage.ifBlank { "unknown app" }} · ${event.detail}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedButton(
+                        onClick = { MayraNotificationReplyRuntime.clearAudit(); notice = "Reply safety history cleared."; refresh++ },
+                        enabled = audit.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Clear reply history") }
+                }
+            }
+
             OutlinedButton(
-                onClick = {
-                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                },
+                onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Notification access settings") }
             OutlinedButton(
-                onClick = {
-                    store.clear()
-                    notice = "Captured notification view cleared."
-                    refresh++
-                },
+                onClick = { store.clear(); notice = "Captured notification view cleared."; refresh++ },
                 enabled = records.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Clear captured notifications") }
