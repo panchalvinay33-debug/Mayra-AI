@@ -78,8 +78,15 @@ private fun OwnerSetupScreen(onClose: () -> Unit) {
             SettingToggle("Direct low-risk actions", "Open apps, show routes and similar low-risk actions without extra confirmation.", preferences.directLowRiskActions) {
                 save(preferences.copy(directLowRiskActions = it), "Low-risk action preference updated.")
             }
-            SettingToggle("Direct medium-risk actions", "Personal mode may skip confirmation for selected medium-risk handoffs. Calls, sends, destructive and critical actions remain protected.", preferences.directMediumRiskActions) {
+            SettingToggle("Direct medium-risk actions", "Run reminders and similar medium-risk actions directly on your phone.", preferences.directMediumRiskActions) {
                 save(preferences.copy(directMediumRiskActions = it), "Medium-risk action preference updated.")
+            }
+            SettingToggle(
+                "Trusted direct call/message handoffs",
+                "Optional personal mode. Mayra may skip the extra confirmation for ordinary call and message handoffs. Sensitive, destructive, financial, legal and critical actions never use this bypass.",
+                preferences.trustedDirectHandoffs
+            ) {
+                save(preferences.copy(trustedDirectHandoffs = it), if (it) "Trusted direct handoffs enabled." else "Trusted direct handoffs disabled.")
             }
             SettingToggle("Proactive living presence", "Allow Mayra to surface phone health, notification and routine suggestions.", preferences.proactivePresence) {
                 save(preferences.copy(proactivePresence = it), "Proactive presence preference updated.")
