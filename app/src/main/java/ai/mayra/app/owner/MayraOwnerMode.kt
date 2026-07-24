@@ -1,7 +1,9 @@
 package ai.mayra.app.owner
 
+import ai.mayra.app.background.MayraNotificationListener
+import ai.mayra.app.action.MayraActionRisk
+import ai.mayra.app.core.actions.DeviceActionRequest
 import android.Manifest
-import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -10,21 +12,12 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import ai.mayra.app.background.MayraNotificationListener
 
 enum class OwnerAccessState { READY, ACTION_REQUIRED, DEVICE_UNSUPPORTED }
 
 enum class OwnerCapability {
-    MICROPHONE,
-    CONTACTS,
-    CAMERA,
-    PHONE_CALLS,
-    SMS,
-    NOTIFICATIONS,
-    NOTIFICATION_ACCESS,
-    ACCESSIBILITY,
-    BATTERY_BACKGROUND,
-    DEFAULT_APPS
+    MICROPHONE, CONTACTS, CAMERA, PHONE_CALLS, SMS, NOTIFICATIONS,
+    NOTIFICATION_ACCESS, ACCESSIBILITY, BATTERY_BACKGROUND, DEFAULT_APPS
 }
 
 data class OwnerCapabilityStatus(
@@ -38,7 +31,8 @@ data class OwnerCapabilityStatus(
 data class MayraOwnerPreferences(
     val enabled: Boolean = true,
     val directLowRiskActions: Boolean = true,
-    val directMediumRiskActions: Boolean = false,
+    val directMediumRiskActions: Boolean = true,
+    val trustedDirectHandoffs: Boolean = false,
     val proactivePresence: Boolean = true,
     val keepBackgroundRuntime: Boolean = true
 )
@@ -49,7 +43,8 @@ class MayraOwnerModeStore(context: Context) {
     fun read(): MayraOwnerPreferences = MayraOwnerPreferences(
         enabled = preferences.getBoolean(KEY_ENABLED, true),
         directLowRiskActions = preferences.getBoolean(KEY_DIRECT_LOW, true),
-        directMediumRiskActions = preferences.getBoolean(KEY_DIRECT_MEDIUM, false),
+        directMediumRiskActions = preferences.getBoolean(KEY_DIRECT_MEDIUM, true),
+        trustedDirectHandoffs = preferences.getBoolean(KEY_TRUSTED_HANDOFFS, false),
         proactivePresence = preferences.getBoolean(KEY_PROACTIVE, true),
         keepBackgroundRuntime = preferences.getBoolean(KEY_BACKGROUND, true)
     )
@@ -59,6 +54,7 @@ class MayraOwnerModeStore(context: Context) {
             .putBoolean(KEY_ENABLED, value.enabled)
             .putBoolean(KEY_DIRECT_LOW, value.directLowRiskActions)
             .putBoolean(KEY_DIRECT_MEDIUM, value.directMediumRiskActions)
+            .putBoolean(KEY_TRUSTED_HANDOFFS, value.trustedDirectHandoffs)
             .putBoolean(KEY_PROACTIVE, value.proactivePresence)
             .putBoolean(KEY_BACKGROUND, value.keepBackgroundRuntime)
             .apply()
@@ -69,8 +65,33 @@ class MayraOwnerModeStore(context: Context) {
         const val KEY_ENABLED = "enabled"
         const val KEY_DIRECT_LOW = "direct_low"
         const val KEY_DIRECT_MEDIUM = "direct_medium"
+        const val KEY_TRUSTED_HANDOFFS = "trusted_handoffs"
         const val KEY_PROACTIVE = "proactive"
         const val KEY_BACKGROUND = "background"
+    }
+}
+
+fun interface MayraOwnerActionPolicy {
+    fun mayAutoConfirm(request: DeviceActionRequest, risk: MayraActionRisk): Boolean
+}
+
+class StoredMayraOwnerActionPolicy(context: Context) : MayraOwnerActionPolicy {
+    private val store = MayraOwnerModeStore(context.applicationContext)
+
+    override fun mayAutoConfirm(request: DeviceActionRequest, risk: MayraActionRisk): Boolean {
+        val settings = store.read()
+        if (!settings.enabled) return false
+        if (request.metadata["financial"] == "true" ||
+            request.metadata["legalAcceptance"] == "true" ||
+            request.metadata["destructive"] == "true" ||
+            request.metadata["publicPost"] == "true" ||
+            request.metadata["sensitive"] == "true") return false
+        return when (risk) {
+            MayraActionRisk.LOW -> settings.directLowRiskActions
+            MayraActionRisk.MEDIUM -> settings.directMediumRiskActions
+            MayraActionRisk.HIGH -> settings.trustedDirectHandoffs
+            MayraActionRisk.CRITICAL -> false
+        }
     }
 }
 
@@ -110,8 +131,7 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
 
     fun readinessScore(statuses: List<OwnerCapabilityStatus> = snapshot()): Int {
         if (statuses.isEmpty()) return 0
-        val ready = statuses.count { it.state == OwnerAccessState.READY }
-        return (ready * 100) / statuses.size
+        return (statuses.count { it.state == OwnerAccessState.READY } * 100) / statuses.size
     }
 
     private fun runtimePermission(capability: OwnerCapability, title: String, permission: String): OwnerCapabilityStatus {
@@ -135,8 +155,7 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
     private fun notificationPermission(): OwnerCapabilityStatus {
         val runtimeGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        val enabled = NotificationManagerCompat.from(appContext).areNotificationsEnabled()
-        val ready = runtimeGranted && enabled
+        val ready = runtimeGranted && NotificationManagerCompat.from(appContext).areNotificationsEnabled()
         return OwnerCapabilityStatus(
             OwnerCapability.NOTIFICATIONS,
             if (ready) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
@@ -154,13 +173,15 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
             if (enabled) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
             "Notification intelligence",
             if (enabled) "Ready" else "Enable Notification Access so Mayra can summarize and safely reply to supported notifications.",
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", component.flattenToString())
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                .putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", component.flattenToString())
         )
     }
 }
 
 internal fun ownerModeSafetySummary(preferences: MayraOwnerPreferences): String = when {
     !preferences.enabled -> "Owner Mode is off. Mayra uses standard confirmation behavior."
+    preferences.trustedDirectHandoffs -> "Owner Mode is active with trusted direct call/message handoffs. Sensitive, destructive, financial, legal and critical actions remain protected."
     preferences.directMediumRiskActions -> "Owner Mode is active: low and medium risk actions may run directly; high and critical actions still require confirmation."
     preferences.directLowRiskActions -> "Owner Mode is active: low risk actions may run directly; medium, high and critical actions still require confirmation."
     else -> "Owner Mode is active with confirmations preserved for all actions."
