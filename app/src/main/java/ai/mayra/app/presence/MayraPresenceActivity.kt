@@ -3,6 +3,7 @@ package ai.mayra.app.presence
 import ai.mayra.app.MainActivity
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.action.MayraActionControlActivity
+import ai.mayra.app.background.MayraNotificationCenterActivity
 import ai.mayra.app.pulse.MayraPresence
 import ai.mayra.app.pulse.MayraPulseActivity
 import ai.mayra.app.pulse.MayraPulseState
@@ -58,6 +59,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onChat = { startActivity(Intent(this, MainActivity::class.java)) },
                     onRuntime = { startActivity(Intent(this, RuntimeControlActivity::class.java)) },
                     onPulse = { startActivity(Intent(this, MayraPulseActivity::class.java)) },
+                    onNotifications = { startActivity(Intent(this, MayraNotificationCenterActivity::class.java)) },
                     onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
                     onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                 )
@@ -72,6 +74,7 @@ private fun MayraPresenceHome(
     onChat: () -> Unit,
     onRuntime: () -> Unit,
     onPulse: () -> Unit,
+    onNotifications: () -> Unit,
     onActionControls: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -131,6 +134,7 @@ private fun MayraPresenceHome(
                 OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
                 OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
             }
+            OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Notification intelligence") }
             OutlinedButton(onClick = onActionControls, modifier = Modifier.fillMaxWidth()) { Text("Action safety") }
             OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Settings") }
 
@@ -138,6 +142,7 @@ private fun MayraPresenceHome(
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Your phone, with a mind", fontWeight = FontWeight.SemiBold)
                     Text("• Understand the phone’s health and connection")
+                    Text("• Summarise notifications and protect sensitive content")
                     Text("• Ask anything in Hindi, Hinglish or English")
                     Text("• Speak naturally and hear Mayra reply")
                     Text("• Open apps, prepare calls and messages safely")
