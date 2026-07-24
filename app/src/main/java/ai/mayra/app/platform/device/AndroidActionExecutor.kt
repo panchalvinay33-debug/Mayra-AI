@@ -3,6 +3,7 @@ package ai.mayra.app.platform.device
 import ai.mayra.app.action.MayraActionEngine
 import ai.mayra.app.action.MayraActionResult
 import ai.mayra.app.action.MayraActionRuntime
+import ai.mayra.app.calendar.MayraAgendaRuntime
 import ai.mayra.app.core.ActionExecutionResult
 import ai.mayra.app.core.ActionExecutor
 import ai.mayra.app.core.actions.AndroidDeviceActionRunner
@@ -25,12 +26,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/**
- * Production bridge between Mayra's framework-neutral command layer and Android device actions.
- * Identity aliases resolve to an Android contact name before the existing contact resolver reads
- * the actual number. Ambiguous people are never guessed. Reminder commands use Mayra's own local
- * reminder store and scheduler when an Android context is available.
- */
 class AndroidActionExecutor(
     private val permissionSnapshot: () -> PermissionSnapshot,
     private val contactResolver: ContactResolver,
@@ -45,9 +40,7 @@ class AndroidActionExecutor(
 
     constructor(context: Context) : this(
         permissionSnapshot = {
-            DevicePermissionSnapshotProvider(
-                AndroidDevicePermissionStateReader(context.applicationContext)
-            ).snapshot()
+            DevicePermissionSnapshotProvider(AndroidDevicePermissionStateReader(context.applicationContext)).snapshot()
         },
         contactResolver = ContactResolver(AndroidContactPhoneDataSource(context.applicationContext)),
         installedAppResolver = InstalledAppResolver(AndroidInstalledAppDataSource(context.applicationContext)),
@@ -57,30 +50,26 @@ class AndroidActionExecutor(
         ),
         sharedEngine = MayraActionRuntime.install(context.applicationContext),
         identityEngine = MayraContactIdentityStore(context.applicationContext).engine(),
-        reminderContext = context.applicationContext
+        reminderContext = context.applicationContext.also(MayraAgendaRuntime::install)
     )
 
     private var pendingConfirmationToken: String? = null
+    private var lastReminderMessage: String? = null
 
     override suspend fun openApp(packageOrName: String): ActionExecutionResult {
         val clean = packageOrName.trim()
         if (clean.isBlank()) return ActionExecutionResult.Failure("App name cannot be blank")
-
         return when (val resolution = installedAppResolver.resolve(clean)) {
-            is AppResolution.Resolved -> submit(
-                DeviceActionRequest(
-                    type = DeviceActionType.OPEN_APP,
-                    target = resolution.app.label,
-                    createdAt = clock(),
-                    metadata = mapOf("packageName" to resolution.app.packageName)
-                )
-            )
+            is AppResolution.Resolved -> submit(DeviceActionRequest(
+                type = DeviceActionType.OPEN_APP,
+                target = resolution.app.label,
+                createdAt = clock(),
+                metadata = mapOf("packageName" to resolution.app.packageName)
+            ))
             is AppResolution.Ambiguous -> ActionExecutionResult.NotSupported(
                 "I found multiple apps: ${resolution.candidates.joinToString { it.label }}. Please use the full app name."
             )
-            AppResolution.NotFound -> ActionExecutionResult.NotSupported(
-                "I couldn't find an installed app named $clean."
-            )
+            AppResolution.NotFound -> ActionExecutionResult.NotSupported("I couldn't find an installed app named $clean.")
         }
     }
 
@@ -92,11 +81,7 @@ class AndroidActionExecutor(
         val identity = resolveIdentity(name) ?: return ambiguousIdentityResult(name)
         return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
-                request(
-                    DeviceActionType.CALL_CONTACT,
-                    resolution.contact.normalizedPhoneNumber,
-                    metadata = identity.metadata
-                ),
+                request(DeviceActionType.CALL_CONTACT, resolution.contact.normalizedPhoneNumber, metadata = identity.metadata),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
@@ -116,12 +101,7 @@ class AndroidActionExecutor(
         val identity = resolveIdentity(recipient) ?: return ambiguousIdentityResult(recipient)
         return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
-                request(
-                    DeviceActionType.SEND_MESSAGE,
-                    resolution.contact.normalizedPhoneNumber,
-                    message,
-                    identity.metadata
-                ),
+                request(DeviceActionType.SEND_MESSAGE, resolution.contact.normalizedPhoneNumber, message, identity.metadata),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
@@ -188,7 +168,8 @@ class AndroidActionExecutor(
         val candidates = (identityEngine?.resolve(query) as? MayraIdentityResolution.Ambiguous)
             ?.candidates.orEmpty().joinToString { it.relationship ?: it.canonicalContactName }
         return ActionExecutionResult.NotSupported(
-            if (candidates.isBlank()) "I could not safely resolve ${query.trim()}." else "I found multiple people for ${query.trim()}: $candidates. Please say the exact relationship or contact name."
+            if (candidates.isBlank()) "I could not safely resolve ${query.trim()}."
+            else "I found multiple people for ${query.trim()}: $candidates. Please say the exact relationship or contact name."
         )
     }
 
@@ -273,6 +254,4 @@ class AndroidActionExecutor(
         val displayName: String,
         val metadata: Map<String, String>
     )
-
-    private var lastReminderMessage: String? = null
 }
