@@ -33,6 +33,7 @@
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
 
+        <activity android:name=".action.MayraActionControlActivity" android:exported="false" />
         <activity android:name=".pulse.MayraPulseActivity" android:exported="false" />
         <activity android:name=".ai.AiProviderActivity" android:exported="false" />
         <activity android:name=".settings.SettingsActivity" android:exported="false" />
