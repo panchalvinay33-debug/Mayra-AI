@@ -147,12 +147,12 @@ class MayraReminderParser(
     }
 
     private companion object {
-        val RELATIVE_MINUTES = Regex("(?i)\\b(?:in\\s+)?(\\d{1,5})\\s*(?:minute|minutes|min|mins|मिनट)(?:\\s+(?:mein|me|में|baad|बाद))?\\b")
-        val RELATIVE_HOURS = Regex("(?i)\\b(?:in\\s+)?(\\d{1,3})\\s*(?:hour|hours|hr|hrs|ghante|घंटे)(?:\\s+(?:mein|me|में|baad|बाद))?\\b")
+        val RELATIVE_MINUTES = Regex("(?i)\\b(?:in\\s+)?(\\d{1,5})\\s*(?:minute|minutes|min|mins|मिनट)(?:\\s+(?:mein|me|में|ke\\s+baad|के\\s+बाद|baad|बाद))?\\b")
+        val RELATIVE_HOURS = Regex("(?i)\\b(?:in\\s+)?(\\d{1,3})\\s*(?:hour|hours|hr|hrs|ghante|घंटे)(?:\\s+(?:mein|me|में|ke\\s+baad|के\\s+बाद|baad|बाद))?\\b")
         val CLOCK_TIME = Regex("(?i)\\b([01]?\\d|2[0-3])(?:[:.]([0-5]\\d))?\\s*(am|pm)?(?:\\s*(?:baje|बजे))?\\b")
         val DAY_WORDS = Regex("(?i)\\b(day after tomorrow|tomorrow|today|parso|kal|aaj|परसों|कल|आज)\\b")
         val DAY_AND_TIME = Regex("(?i)\\b(day after tomorrow|tomorrow|today|parso|kal|aaj|परसों|कल|आज)\\b.*?\\b([01]?\\d|2[0-3])(?:[:.]([0-5]\\d))?\\s*(am|pm)?(?:\\s*(?:baje|बजे))?\\b")
-        val TIME_FILLERS = Regex("(?i)\\b(at|ko|में|me|mein|baje|बजे|morning|subah|सुबह|afternoon|dopahar|दोपहर|evening|shaam|शाम|night|raat|रात)\\b")
+        val TIME_FILLERS = Regex("(?i)\\b(at|ko|में|me|mein|baje|बजे|morning|subah|सुबह|afternoon|dopahar|दोपहर|evening|shaam|शाम|night|raat|रात|ka|ki|ke)\\b")
     }
 }
 
