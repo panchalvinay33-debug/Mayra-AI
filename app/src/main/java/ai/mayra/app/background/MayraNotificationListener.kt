@@ -19,35 +19,76 @@ class MayraNotificationListener : NotificationListenerService() {
         val preferences = AmbientPreferenceStore(applicationContext).read()
         if (!preferences.notificationIntelligenceEnabled) return
 
+        val sourcePackage = sbn.packageName.orEmpty()
+        val privacyPolicy = NotificationPrivacyStore(applicationContext).policyFor(sourcePackage)
+        if (privacyPolicy.mode == NotificationPrivacyMode.IGNORE) return
+
         val extras = notification.extras
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
-        if (title.isBlank() && text.isBlank()) return
+        val rawTitle = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val rawText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+        if (rawTitle.isBlank() && rawText.isBlank()) return
+
+        val sensitivity = NotificationContentGuard.classify(
+            title = rawTitle,
+            text = rawText,
+            secretVisibility = notification.visibility == Notification.VISIBILITY_SECRET
+        )
+        val (safeTitle, safeText) = NotificationContentGuard.sanitize(
+            title = rawTitle,
+            text = rawText,
+            sensitivity = sensitivity,
+            mode = privacyPolicy.mode
+        )
+        val notificationId = sbn.key ?: "$sourcePackage:${sbn.id}:${sbn.postTime}"
+        val replyAvailable = privacyPolicy.allowReply && MayraNotificationReplyRuntime.register(
+            notificationId = notificationId,
+            sourcePackage = sourcePackage,
+            notification = notification
+        )
+        val appLabel = resolveAppLabel(sourcePackage)
+
+        val record = MayraNotificationRecord(
+            id = notificationId,
+            sourcePackage = sourcePackage,
+            appLabel = appLabel,
+            title = safeTitle,
+            text = safeText,
+            postedAt = sbn.postTime,
+            conversationKey = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
+                ?.toString()?.take(200),
+            groupKey = sbn.groupKey?.take(300),
+            sensitivity = sensitivity,
+            replyAvailable = replyAvailable,
+            clearable = sbn.isClearable,
+            ongoing = sbn.isOngoing
+        )
+        MayraNotificationIntelligenceRuntime.store.upsert(record)
 
         val event = AmbientEvent(
-            sourcePackage = sbn.packageName.orEmpty(),
-            title = title.take(MAX_TITLE_LENGTH),
-            text = text.take(MAX_TEXT_LENGTH),
+            sourcePackage = sourcePackage,
+            title = safeTitle.take(MAX_TITLE_LENGTH),
+            text = safeText.take(MAX_TEXT_LENGTH),
             timestamp = sbn.postTime
         )
         if (preferences.retainLocalHistory) AmbientEventStore(applicationContext).append(event)
 
         val normalized = ContextNotification(
-            id = sbn.key ?: "${sbn.packageName}:${sbn.id}:${sbn.postTime}",
-            sourcePackage = sbn.packageName.orEmpty(),
-            appLabel = resolveAppLabel(sbn.packageName.orEmpty()),
+            id = notificationId,
+            sourcePackage = sourcePackage,
+            appLabel = appLabel,
             title = event.title,
             text = event.text,
             postedAt = event.timestamp,
-            conversationKey = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()?.take(200),
+            conversationKey = record.conversationKey,
             categoryHint = notification.category,
             ongoing = sbn.isOngoing,
             silent = notification.priority <= Notification.PRIORITY_LOW,
             clearable = sbn.isClearable,
-            sensitiveHint = notification.visibility == Notification.VISIBILITY_SECRET,
-            groupKey = sbn.groupKey?.take(300)
+            sensitiveHint = sensitivity != NotificationSensitivity.NORMAL,
+            groupKey = record.groupKey
         )
-        val locked = (getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)?.isDeviceLocked == true
+        val locked = (getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)
+            ?.isDeviceLocked == true
         val insight = MayraContextHolder.runtime.analyzeNotification(
             normalized,
             AttentionContext(
@@ -74,6 +115,14 @@ class MayraNotificationListener : NotificationListenerService() {
                 createdAt = event.timestamp
             )
         )
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        val sourcePackage = sbn?.packageName.orEmpty()
+        val notificationId = sbn?.key ?: return
+        if (sourcePackage == packageName) return
+        MayraNotificationIntelligenceRuntime.store.remove(notificationId)
+        MayraNotificationReplyRuntime.remove(notificationId)
     }
 
     private fun resolveAppLabel(packageName: String): String = runCatching {
