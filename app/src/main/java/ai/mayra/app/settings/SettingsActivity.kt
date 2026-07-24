@@ -2,6 +2,7 @@ package ai.mayra.app.settings
 
 import ai.mayra.app.ai.AiProviderActivity
 import ai.mayra.app.ai.AiProviderSettingsStore
+import ai.mayra.app.pulse.MayraPulseActivity
 import ai.mayra.app.ui.theme.MayraAITheme
 import android.content.Intent
 import android.os.Bundle
@@ -49,18 +50,15 @@ class SettingsActivity : ComponentActivity() {
                     onboarding = onboarding,
                     store = remember { MayraSettingsStore(applicationContext) },
                     aiProviderStore = remember { AiProviderSettingsStore(applicationContext) },
-                    onOpenAiProvider = {
-                        startActivity(Intent(this, AiProviderActivity::class.java))
-                    },
+                    onOpenAiProvider = { startActivity(Intent(this, AiProviderActivity::class.java)) },
+                    onOpenPulse = { startActivity(Intent(this, MayraPulseActivity::class.java)) },
                     onClose = ::finish
                 )
             }
         }
     }
 
-    companion object {
-        const val EXTRA_ONBOARDING = "mayra.extra.ONBOARDING"
-    }
+    companion object { const val EXTRA_ONBOARDING = "mayra.extra.ONBOARDING" }
 }
 
 @Composable
@@ -69,6 +67,7 @@ private fun MayraSettingsScreen(
     store: MayraSettingsStore,
     aiProviderStore: AiProviderSettingsStore,
     onOpenAiProvider: () -> Unit,
+    onOpenPulse: () -> Unit,
     onClose: () -> Unit
 ) {
     var settings by remember { mutableStateOf(store.read()) }
@@ -78,33 +77,21 @@ private fun MayraSettingsScreen(
 
     Scaffold { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                if (onboarding) "Welcome to Mayra AI" else "Mayra settings",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                if (onboarding) {
-                    "Set up how Mayra should speak, remember and personalize your experience."
-                } else {
-                    settings.summary()
-                }
-            )
+            Text(if (onboarding) "Welcome to Mayra AI" else "Mayra settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(if (onboarding) "Set up how Mayra should speak, remember and personalize your experience." else settings.summary())
+
+            SettingsSection("Mayra presence") {
+                Text("See what Mayra senses about this phone right now—battery, network, storage, memory, heat and available capabilities.")
+                OutlinedButton(onClick = onOpenPulse, modifier = Modifier.fillMaxWidth()) { Text("Open Mayra Pulse") }
+            }
 
             SettingsSection("Your profile") {
                 OutlinedTextField(
                     value = settings.userName,
-                    onValueChange = { value ->
-                        settings = settings.copy(userName = value.take(MayraSettings.MAX_NAME_LENGTH))
-                        error = null
-                    },
+                    onValueChange = { value -> settings = settings.copy(userName = value.take(MayraSettings.MAX_NAME_LENGTH)); error = null },
                     label = { Text("What should Mayra call you?") },
                     supportingText = { Text("Stored only in this app on your device.") },
                     singleLine = true,
@@ -114,103 +101,54 @@ private fun MayraSettingsScreen(
 
             SettingsSection("Language") {
                 MayraLanguage.entries.forEach { language ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = settings.language == language,
-                            onClick = { settings = settings.copy(language = language) }
-                        )
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = settings.language == language, onClick = { settings = settings.copy(language = language) })
                         Text(language.label)
                     }
                 }
             }
 
             SettingsSection("Voice") {
-                SettingsToggle(
-                    title = "Speak Mayra's responses",
-                    description = "Read assistant replies aloud when voice mode is active.",
-                    checked = settings.speakResponses,
-                    onCheckedChange = { settings = settings.copy(speakResponses = it) }
-                )
-                SettingsToggle(
-                    title = "Start continuous voice by default",
-                    description = "Keep listening after Mayra finishes speaking.",
-                    checked = settings.continuousVoiceByDefault,
-                    onCheckedChange = { settings = settings.copy(continuousVoiceByDefault = it) }
-                )
+                SettingsToggle("Speak Mayra's responses", "Read assistant replies aloud when voice mode is active.", settings.speakResponses) { settings = settings.copy(speakResponses = it) }
+                SettingsToggle("Start continuous voice by default", "Keep listening after Mayra finishes speaking.", settings.continuousVoiceByDefault) { settings = settings.copy(continuousVoiceByDefault = it) }
             }
 
             SettingsSection("AI intelligence") {
                 aiProviderConfig = aiProviderStore.read()
                 Text(aiProviderConfig.status())
-                Text(
-                    "Connect OpenAI for full conversation while Mayra keeps phone actions inside its local safety layer.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                OutlinedButton(
-                    onClick = onOpenAiProvider,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Configure AI provider") }
+                Text("Connect OpenAI for full conversation while Mayra keeps phone actions inside its local safety layer.", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = onOpenAiProvider, modifier = Modifier.fillMaxWidth()) { Text("Configure AI provider") }
             }
 
             SettingsSection("Memory and personalization") {
                 SettingsToggle(
-                    title = "Memory",
-                    description = "Allow Mayra to remember useful preferences and context.",
-                    checked = settings.memoryEnabled,
-                    onCheckedChange = {
-                        settings = settings.copy(
-                            memoryEnabled = it,
-                            personalizationEnabled = settings.personalizationEnabled && it
-                        )
-                    }
-                )
+                    "Memory", "Allow Mayra to remember useful preferences and context.", settings.memoryEnabled
+                ) { enabled -> settings = settings.copy(memoryEnabled = enabled, personalizationEnabled = settings.personalizationEnabled && enabled) }
                 SettingsToggle(
-                    title = "Personalization",
-                    description = "Use saved preferences to tailor answers and actions.",
-                    checked = settings.personalizationEnabled,
-                    enabled = settings.memoryEnabled,
-                    onCheckedChange = { settings = settings.copy(personalizationEnabled = it) }
-                )
+                    "Personalization", "Use saved preferences to tailor answers and actions.", settings.personalizationEnabled,
+                    enabled = settings.memoryEnabled
+                ) { settings = settings.copy(personalizationEnabled = it) }
             }
 
             SettingsSection("Privacy") {
-                SettingsToggle(
-                    title = "Share anonymous diagnostics",
-                    description = "Off by default. No conversations are included by this setting.",
-                    checked = settings.diagnosticsSharingEnabled,
-                    onCheckedChange = { settings = settings.copy(diagnosticsSharingEnabled = it) }
-                )
-                Text(
-                    "Profile preferences stay in local app storage. The AI provider key is encrypted with Android Keystore and is never displayed after saving.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                SettingsToggle("Share anonymous diagnostics", "Off by default. No conversations are included by this setting.", settings.diagnosticsSharingEnabled) { settings = settings.copy(diagnosticsSharingEnabled = it) }
+                Text("Profile preferences stay in local app storage. The AI provider key is encrypted with Android Keystore and is never displayed after saving.", style = MaterialTheme.typography.bodySmall)
             }
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-
             Button(
                 onClick = {
                     val validation = settings.validationMessage()
-                    if (validation != null) {
-                        error = validation
-                    } else {
+                    if (validation != null) error = validation else {
                         if (onboarding) store.completeOnboarding(settings) else store.save(settings)
                         onClose()
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (onboarding) "Finish setup" else "Save settings")
-            }
+            ) { Text(if (onboarding) "Finish setup" else "Save settings") }
 
             if (!onboarding) {
-                OutlinedButton(
-                    onClick = { showResetConfirmation = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Reset Mayra settings") }
+                OutlinedButton(onClick = { showResetConfirmation = true }, modifier = Modifier.fillMaxWidth()) { Text("Reset Mayra settings") }
                 TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
             }
         }
@@ -223,17 +161,11 @@ private fun MayraSettingsScreen(
             text = { Text("This clears your profile, AI provider key, language, voice and memory preferences. Onboarding will appear again.") },
             confirmButton = {
                 TextButton(onClick = {
-                    store.reset()
-                    aiProviderStore.reset()
-                    settings = store.read()
-                    aiProviderConfig = aiProviderStore.read()
-                    showResetConfirmation = false
-                    onClose()
+                    store.reset(); aiProviderStore.reset(); settings = store.read(); aiProviderConfig = aiProviderStore.read()
+                    showResetConfirmation = false; onClose()
                 }) { Text("Reset") }
             },
-            dismissButton = {
-                TextButton(onClick = { showResetConfirmation = false }) { Text("Cancel") }
-            }
+            dismissButton = { TextButton(onClick = { showResetConfirmation = false }) { Text("Cancel") } }
         )
     }
 }
@@ -241,10 +173,7 @@ private fun MayraSettingsScreen(
 @Composable
 private fun SettingsSection(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold)
             HorizontalDivider()
             content()
@@ -260,19 +189,12 @@ private fun SettingsToggle(
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.Medium)
             Text(description, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            enabled = enabled,
-            onCheckedChange = onCheckedChange
-        )
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }
