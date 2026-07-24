@@ -14,6 +14,11 @@ class AssistantIntentEngine(
         return when {
             normalized.matchesAny("clear chat", "clear conversation", "delete chat", "chat clear") ->
                 AssistantIntent.ClearConversation
+            normalized.matchesAny(
+                "read notifications", "notification summary", "notification brief",
+                "notifications padhkar batao", "notification padhkar batao",
+                "notifications batao", "notification batao", "unread notifications"
+            ) -> AssistantIntent.DeviceInfo(DeviceInfoType.NOTIFICATIONS)
             normalized.matchesAny("what time", "current time", "time kya", "samay kya", "kitne baje") ->
                 AssistantIntent.DeviceInfo(DeviceInfoType.TIME)
             normalized.matchesAny("battery", "charge kitna", "battery kitni", "charge kitni") ->
@@ -176,7 +181,7 @@ sealed interface AssistantIntent {
     data object ClearConversation : AssistantIntent
 }
 
-enum class DeviceInfoType { TIME, BATTERY }
+enum class DeviceInfoType { TIME, BATTERY, NOTIFICATIONS }
 
 private data class CommandMatch(val keyword: String, val index: Int)
 private fun String.matchesAny(vararg values: String): Boolean = values.any(::contains)
