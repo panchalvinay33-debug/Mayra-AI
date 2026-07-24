@@ -33,6 +33,7 @@
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
 
+        <activity android:name=".reminder.MayraReminderActivity" android:exported="false" />
         <activity android:name=".identity.MayraIdentityActivity" android:exported="false" />
         <activity android:name=".owner.MayraOwnerSetupActivity" android:exported="false" />
         <activity android:name=".background.MayraNotificationCenterActivity" android:exported="false" />
@@ -60,6 +61,7 @@
             <meta-data android:name="android.service.notification.disabled_filter_types" android:value="ongoing|silent" />
         </service>
 
+        <receiver android:name=".reminder.MayraReminderActionReceiver" android:exported="false" />
         <receiver android:name=".runtime.RuntimeAttentionActionReceiver" android:exported="false" />
         <receiver android:name=".background.MayraBootReceiver" android:enabled="true" android:exported="false">
             <intent-filter>
