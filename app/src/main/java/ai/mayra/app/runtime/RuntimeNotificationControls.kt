@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 internal fun notificationScanMessage(posted: Boolean): String =
     if (posted) "Runtime alert posted." else "No new runtime alert to post."
@@ -37,8 +39,10 @@ internal fun notificationScanBlockedMessage(readiness: RuntimeNotificationReadin
 internal fun RuntimeNotificationControlsCard() {
     val context = LocalContext.current
     val preferences = remember(context) { RuntimeAttentionPreferences(context) }
+    val diagnostics = remember(context) { RuntimeAttentionDiagnostics(context) }
     var preferenceState by remember { mutableStateOf(preferences.read()) }
     var readiness by remember { mutableStateOf(notificationReadiness(context)) }
+    var scanState by remember { mutableStateOf(diagnostics.read()) }
     var notice by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -55,7 +59,16 @@ internal fun RuntimeNotificationControlsCard() {
     fun reload(message: String? = null) {
         preferenceState = preferences.read()
         readiness = notificationReadiness(context)
+        scanState = diagnostics.read()
         notice = message
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(DIAGNOSTICS_REFRESH_MILLIS)
+            scanState = diagnostics.read()
+            readiness = notificationReadiness(context)
+        }
     }
 
     Card(Modifier.fillMaxWidth()) {
@@ -66,6 +79,7 @@ internal fun RuntimeNotificationControlsCard() {
             Text("Runtime alerts", fontWeight = FontWeight.SemiBold)
             Text(preferenceState.status(System.currentTimeMillis()))
             Text(notificationReadinessMessage(readiness))
+            Text(scanState?.status(System.currentTimeMillis()) ?: "Background scan has not run yet")
             notice?.let { Text(it) }
 
             when (readiness) {
@@ -136,3 +150,5 @@ internal fun RuntimeNotificationControlsCard() {
         }
     }
 }
+
+private const val DIAGNOSTICS_REFRESH_MILLIS = 15_000L
