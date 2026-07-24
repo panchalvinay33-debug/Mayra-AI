@@ -35,14 +35,27 @@ class RuntimeAttentionWorker(
     appContext: Context,
     params: WorkerParameters
 ) : CoroutineWorker(appContext, params) {
-    override suspend fun doWork(): Result = runCatching {
-        if (!MayraRuntime.installed) return Result.retry()
-        RuntimeAttentionNotifier.scanAndNotify(
-            applicationContext,
-            MayraRuntime.controlCenter.snapshot()
-        )
-        Result.success()
-    }.getOrElse { Result.retry() }
+    override suspend fun doWork(): Result {
+        val diagnostics = RuntimeAttentionDiagnostics(applicationContext)
+        if (!MayraRuntime.installed) {
+            diagnostics.record(RuntimeAttentionScanOutcome.RUNTIME_UNAVAILABLE)
+            return Result.retry()
+        }
+        return runCatching {
+            val posted = RuntimeAttentionNotifier.scanAndNotify(
+                applicationContext,
+                MayraRuntime.controlCenter.snapshot()
+            )
+            diagnostics.record(
+                if (posted) RuntimeAttentionScanOutcome.ALERT_POSTED
+                else RuntimeAttentionScanOutcome.NO_NEW_ALERT
+            )
+            Result.success()
+        }.getOrElse {
+            diagnostics.record(RuntimeAttentionScanOutcome.SNAPSHOT_FAILED)
+            Result.retry()
+        }
+    }
 }
 
 private const val MIN_PERIODIC_INTERVAL_MINUTES = 15L
