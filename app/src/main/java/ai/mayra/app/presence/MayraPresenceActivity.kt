@@ -55,12 +55,6 @@ class MayraPresenceActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        // Recreate keeps the greeting and profile immediately in sync after onboarding/settings.
-        if (hasWindowFocus()) recreate()
-    }
 }
 
 @Composable
