@@ -43,7 +43,13 @@ object MayraReminderRuntime {
         val delay = (reminder.dueAt - now).coerceAtLeast(0L)
         val request = OneTimeWorkRequestBuilder<MayraReminderWorker>()
             .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .setInputData(Data.Builder().putString(MayraReminderWorker.KEY_ID, reminder.id).build())
+            .setInputData(
+                Data.Builder()
+                    .putString(MayraReminderWorker.KEY_ID, reminder.id)
+                    .putLong(MayraReminderWorker.KEY_REVISION, reminder.revision)
+                    .putLong(MayraReminderWorker.KEY_DUE_AT, reminder.dueAt)
+                    .build()
+            )
             .addTag(WORK_PREFIX + reminder.id)
             .build()
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
@@ -54,10 +60,15 @@ object MayraReminderRuntime {
     }
 
     fun scheduleFollowUp(context: Context, reminder: MayraReminder) {
-        if (!reminder.followUpEnabled) return
+        if (!reminder.followUpEnabled || reminder.state != ReminderState.DUE) return
         val request = OneTimeWorkRequestBuilder<MayraReminderFollowUpWorker>()
             .setInitialDelay(30, TimeUnit.MINUTES)
-            .setInputData(Data.Builder().putString(MayraReminderWorker.KEY_ID, reminder.id).build())
+            .setInputData(
+                Data.Builder()
+                    .putString(MayraReminderWorker.KEY_ID, reminder.id)
+                    .putLong(MayraReminderWorker.KEY_REVISION, reminder.revision)
+                    .build()
+            )
             .addTag(FOLLOW_UP_PREFIX + reminder.id)
             .build()
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
@@ -68,20 +79,24 @@ object MayraReminderRuntime {
     }
 
     fun cancel(context: Context, id: String, now: Long = System.currentTimeMillis()): MayraReminder? {
+        val updated = MayraReminderStore(context).cancel(id, now) ?: return null
         cancelWork(context, id)
         NotificationManagerCompat.from(context).cancel(id.hashCode())
-        return MayraReminderStore(context).cancel(id, now)
+        return updated
     }
 
     fun complete(context: Context, id: String, now: Long = System.currentTimeMillis()): MayraReminder? {
+        val updated = MayraReminderStore(context).complete(id, now) ?: return null
         cancelWork(context, id)
         NotificationManagerCompat.from(context).cancel(id.hashCode())
-        return MayraReminderStore(context).complete(id, now)
+        return updated
     }
 
     fun snooze(context: Context, id: String, duration: Duration, now: Long = System.currentTimeMillis()): MayraReminder? {
-        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(FOLLOW_UP_PREFIX + id)
         val updated = MayraReminderStore(context).snooze(id, duration, now) ?: return null
+        val manager = WorkManager.getInstance(context.applicationContext)
+        manager.cancelUniqueWork(WORK_PREFIX + id)
+        manager.cancelUniqueWork(FOLLOW_UP_PREFIX + id)
         NotificationManagerCompat.from(context).cancel(id.hashCode())
         schedule(context, updated, now)
         return updated
@@ -90,10 +105,14 @@ object MayraReminderRuntime {
     fun rescheduleAll(context: Context, now: Long = System.currentTimeMillis()) {
         val store = MayraReminderStore(context)
         store.active(now).forEach { reminder ->
-            val normalized = if (reminder.dueAt < now && reminder.state != ReminderState.DUE) {
-                store.markMissed(reminder.id, now) ?: reminder
-            } else reminder
-            schedule(context, normalized, now)
+            when {
+                reminder.state == ReminderState.DUE -> scheduleFollowUp(context, reminder)
+                reminder.dueAt < now -> {
+                    val normalized = store.markMissed(reminder.id, now) ?: reminder
+                    schedule(context, normalized, now)
+                }
+                else -> schedule(context, reminder, now)
+            }
         }
     }
 
@@ -107,15 +126,26 @@ object MayraReminderRuntime {
 class MayraReminderWorker(appContext: Context, params: WorkerParameters) : Worker(appContext, params) {
     override fun doWork(): Result {
         val id = inputData.getString(KEY_ID) ?: return Result.failure()
+        val expectedRevision = inputData.getLong(KEY_REVISION, MISSING_LONG)
+        val expectedDueAt = inputData.getLong(KEY_DUE_AT, MISSING_LONG)
+        if (expectedRevision == MISSING_LONG || expectedDueAt == MISSING_LONG) return Result.success()
+
         val store = MayraReminderStore(applicationContext)
         val reminder = store.find(id) ?: return Result.success()
-        if (reminder.state in setOf(ReminderState.COMPLETED, ReminderState.CANCELLED)) return Result.success()
+        if (reminder.revision != expectedRevision || reminder.dueAt != expectedDueAt) return Result.success()
+        if (!ReminderLifecyclePolicy.canNotify(reminder.state)) return Result.success()
+
         val now = System.currentTimeMillis()
-        if (reminder.dueAt > now + 2_000L) {
+        if (reminder.dueAt > now + EARLY_TOLERANCE_MILLIS) {
             MayraReminderRuntime.schedule(applicationContext, reminder, now)
             return Result.success()
         }
-        val updated = store.markNotified(id, now) ?: return Result.success()
+        val updated = store.markNotified(
+            id = id,
+            expectedRevision = expectedRevision,
+            expectedDueAt = expectedDueAt,
+            now = now
+        ) ?: return Result.success()
         if (MayraReminderNotifier.canNotify(applicationContext)) {
             MayraReminderNotifier.show(applicationContext, updated)
         }
@@ -123,15 +153,24 @@ class MayraReminderWorker(appContext: Context, params: WorkerParameters) : Worke
         return Result.success()
     }
 
-    companion object { const val KEY_ID = "reminder_id" }
+    companion object {
+        const val KEY_ID = "reminder_id"
+        const val KEY_REVISION = "reminder_revision"
+        const val KEY_DUE_AT = "reminder_due_at"
+        private const val MISSING_LONG = Long.MIN_VALUE
+        private const val EARLY_TOLERANCE_MILLIS = 2_000L
+    }
 }
 
 class MayraReminderFollowUpWorker(appContext: Context, params: WorkerParameters) : Worker(appContext, params) {
     override fun doWork(): Result {
         val id = inputData.getString(MayraReminderWorker.KEY_ID) ?: return Result.failure()
+        val expectedRevision = inputData.getLong(MayraReminderWorker.KEY_REVISION, Long.MIN_VALUE)
+        if (expectedRevision == Long.MIN_VALUE) return Result.success()
+
         val store = MayraReminderStore(applicationContext)
         val reminder = store.find(id) ?: return Result.success()
-        if (reminder.state !in setOf(ReminderState.DUE, ReminderState.MISSED)) return Result.success()
+        if (reminder.revision != expectedRevision || reminder.state != ReminderState.DUE) return Result.success()
         val missed = store.markMissed(id) ?: return Result.success()
         if (MayraReminderNotifier.canNotify(applicationContext)) {
             MayraReminderNotifier.show(applicationContext, missed, followUp = true)
@@ -159,15 +198,17 @@ object MayraReminderNotifier {
             Intent(context, MayraReminderActivity::class.java).putExtra(MayraReminderActivity.EXTRA_ID, reminder.id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val completeIntent = actionIntent(context, reminder.id, MayraReminderActionReceiver.ACTION_COMPLETE, 1)
-        val snoozeIntent = actionIntent(context, reminder.id, MayraReminderActionReceiver.ACTION_SNOOZE, 2)
+        val completeIntent = actionIntent(context, reminder, MayraReminderActionReceiver.ACTION_COMPLETE, 1)
+        val snoozeIntent = actionIntent(context, reminder, MayraReminderActionReceiver.ACTION_SNOOZE, 2)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(if (followUp) "Mayra follow-up" else "Mayra reminder")
             .setContentText(reminder.title)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(
-                if (followUp) "You have not completed this yet: ${reminder.title}" else reminder.detail ?: reminder.title
-            ))
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    if (followUp) "You have not completed this yet: ${reminder.title}" else reminder.detail ?: reminder.title
+                )
+            )
             .setContentIntent(openIntent)
             .setAutoCancel(false)
             .setOnlyAlertOnce(false)
@@ -179,12 +220,14 @@ object MayraReminderNotifier {
         NotificationManagerCompat.from(context).notify(reminder.id.hashCode(), notification)
     }
 
-    private fun actionIntent(context: Context, id: String, action: String, salt: Int): PendingIntent =
+    private fun actionIntent(context: Context, reminder: MayraReminder, action: String, salt: Int): PendingIntent =
         PendingIntent.getBroadcast(
             context,
-            id.hashCode() * 31 + salt,
-            Intent(context, MayraReminderActionReceiver::class.java).setAction(action)
-                .putExtra(MayraReminderActionReceiver.EXTRA_ID, id),
+            reminder.id.hashCode() * 31 + salt,
+            Intent(context, MayraReminderActionReceiver::class.java)
+                .setAction(action)
+                .putExtra(MayraReminderActionReceiver.EXTRA_ID, reminder.id)
+                .putExtra(MayraReminderActionReceiver.EXTRA_REVISION, reminder.revision),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -201,6 +244,9 @@ object MayraReminderNotifier {
 class MayraReminderActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val id = intent?.getStringExtra(EXTRA_ID) ?: return
+        val expectedRevision = intent.getLongExtra(EXTRA_REVISION, Long.MIN_VALUE)
+        val current = MayraReminderStore(context).find(id) ?: return
+        if (expectedRevision == Long.MIN_VALUE || current.revision != expectedRevision) return
         when (intent.action) {
             ACTION_COMPLETE -> MayraReminderRuntime.complete(context, id)
             ACTION_SNOOZE -> MayraReminderRuntime.snooze(context, id, Duration.ofMinutes(10))
@@ -210,6 +256,7 @@ class MayraReminderActionReceiver : BroadcastReceiver() {
 
     companion object {
         const val EXTRA_ID = "reminder_id"
+        const val EXTRA_REVISION = "reminder_revision"
         const val ACTION_COMPLETE = "ai.mayra.app.reminder.COMPLETE"
         const val ACTION_SNOOZE = "ai.mayra.app.reminder.SNOOZE"
         const val ACTION_CANCEL = "ai.mayra.app.reminder.CANCEL"
