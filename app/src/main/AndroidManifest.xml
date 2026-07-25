@@ -32,6 +32,7 @@
         android:usesCleartextTraffic="false"
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
+        <activity android:name=".workspace.MayraWorkspaceActivity" android:exported="false" />
         <activity android:name=".diagnostics.MayraStartupDiagnosticsActivity" android:exported="false" />
         <activity android:name=".document.MayraDocumentReaderActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryPrivacyActivity" android:exported="false" />
