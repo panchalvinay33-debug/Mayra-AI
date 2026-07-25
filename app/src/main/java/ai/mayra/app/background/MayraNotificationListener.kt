@@ -4,6 +4,7 @@ import ai.mayra.app.context.AttentionAction
 import ai.mayra.app.context.AttentionContext
 import ai.mayra.app.context.ContextNotification
 import ai.mayra.app.context.MayraContextHolder
+import ai.mayra.app.safety.MayraGlobalStopStore
 import android.app.KeyguardManager
 import android.app.Notification
 import android.content.Context
@@ -21,8 +22,6 @@ class MayraNotificationListener : NotificationListenerService() {
 
         val sourcePackage = sbn.packageName.orEmpty()
         val privacyPolicy = NotificationPrivacyStore(applicationContext).policyFor(sourcePackage)
-        if (privacyPolicy.mode == NotificationPrivacyMode.IGNORE) return
-
         val extras = notification.extras
         val rawTitle = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val rawText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
@@ -33,6 +32,17 @@ class MayraNotificationListener : NotificationListenerService() {
             text = rawText,
             secretVisibility = notification.visibility == Notification.VISIBILITY_SECRET
         )
+        val stopped = MayraGlobalStopStore(applicationContext).snapshot().stopped
+        val decision = MayraNotificationSafetyPolicy.decide(
+            privacyMode = privacyPolicy.mode,
+            allowReply = privacyPolicy.allowReply,
+            sensitivity = sensitivity,
+            rawConversationKey = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString(),
+            globalStopActive = stopped,
+            proactiveSuggestionsEnabled = preferences.proactiveSuggestionsEnabled
+        )
+        if (!decision.capture) return
+
         val (safeTitle, safeText) = NotificationContentGuard.sanitize(
             title = rawTitle,
             text = rawText,
@@ -40,7 +50,7 @@ class MayraNotificationListener : NotificationListenerService() {
             mode = privacyPolicy.mode
         )
         val notificationId = sbn.key ?: "$sourcePackage:${sbn.id}:${sbn.postTime}"
-        val replyAvailable = privacyPolicy.allowReply && MayraNotificationReplyRuntime.register(
+        val replyAvailable = decision.registerReply && MayraNotificationReplyRuntime.register(
             notificationId = notificationId,
             sourcePackage = sourcePackage,
             notification = notification
@@ -54,9 +64,8 @@ class MayraNotificationListener : NotificationListenerService() {
             title = safeTitle,
             text = safeText,
             postedAt = sbn.postTime,
-            conversationKey = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
-                ?.toString()?.take(200),
-            groupKey = sbn.groupKey?.take(300),
+            conversationKey = decision.safeConversationKey,
+            groupKey = sbn.groupKey?.replace(Regex("[\\r\\n\\t]+"), " ")?.take(160),
             sensitivity = sensitivity,
             replyAvailable = replyAvailable,
             clearable = sbn.isClearable,
@@ -98,7 +107,7 @@ class MayraNotificationListener : NotificationListenerService() {
                 userBusy = false
             )
         )
-        if (!preferences.proactiveSuggestionsEnabled) return
+        if (!decision.allowProactiveTask) return
 
         val taskType = when (insight.action) {
             AttentionAction.INTERRUPT -> "context.notification_interrupt"
