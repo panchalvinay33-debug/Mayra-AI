@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mayra AI</string>
+    <string name="mayra_assistive_description">Optional user-enabled screen context for visible, non-sensitive assistance. Mayra does not read passwords or perform hidden automatic actions.</string>
+</resources>
