@@ -25,6 +25,10 @@ $requiredFiles = @(
     "app/src/main/java/ai/mayra/app/diagnostics/MayraStartupHealth.kt",
     "app/src/main/java/ai/mayra/app/diagnostics/MayraStartupDiagnosticsActivity.kt",
     "app/src/test/java/ai/mayra/app/diagnostics/MayraStartupHealthTest.kt",
+    "app/src/main/java/ai/mayra/app/safety/MayraGlobalStop.kt",
+    "app/src/test/java/ai/mayra/app/safety/MayraGlobalStopStoreTest.kt",
+    "app/src/main/java/ai/mayra/app/action/MayraActionRuntime.kt",
+    "app/src/main/java/ai/mayra/app/background/MayraBootReceiver.kt",
     "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt",
     "app/src/test/java/ai/mayra/app/memory/MayraMemoryBackupEngineTest.kt",
     "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt",
@@ -96,6 +100,14 @@ $results.Add((Write-Check "Startup health begins" ($applicationText -match 'star
 $results.Add((Write-Check "Startup health completes" ($applicationText -match 'startupHealth\.complete\(\)') 'Successful starts are marked complete'))
 $safeStartupSteps = [regex]::Matches($applicationText, 'startupHealth\.safeStep\(').Count
 $results.Add((Write-Check "Non-critical startup containment" ($safeStartupSteps -ge 10) "Found $safeStartupSteps guarded startup steps"))
+
+$globalStopText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/safety/MayraGlobalStop.kt") -Raw
+$actionRuntimeText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/action/MayraActionRuntime.kt") -Raw
+$bootReceiverText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/background/MayraBootReceiver.kt") -Raw
+$results.Add((Write-Check "Persistent Global Stop" ($globalStopText -match 'mayra_global_stop' -and $globalStopText -match 'KEY_GENERATION') 'Stop state survives process death, reboot and update'))
+$results.Add((Write-Check "Action runtime obeys Global Stop" ($actionRuntimeText -match 'MayraGlobalStopStore' -and $actionRuntimeText -match 'store\.isStopped\(\)') 'Action engine restores persisted stop state'))
+$results.Add((Write-Check "Boot path obeys Global Stop" ($bootReceiverText -match 'MayraGlobalStopStore' -and $bootReceiverText -match 'if \(globallyStopped\)') 'Automation and floating companion remain stopped after reboot'))
+$results.Add((Write-Check "Reminders survive Global Stop" ($bootReceiverText -match 'MayraReminderRuntime\.rescheduleAll' -and $bootReceiverText.IndexOf('MayraReminderRuntime.rescheduleAll') -lt $bootReceiverText.IndexOf('if (globallyStopped)')) 'Owner-created reminder commitments remain scheduled'))
 
 $backupText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt") -Raw
 $results.Add((Write-Check "Authenticated backup encryption" ($backupText -match 'AES/GCM/NoPadding') 'Backup uses AES-GCM'))
