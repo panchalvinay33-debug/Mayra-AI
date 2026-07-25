@@ -1,9 +1,13 @@
 package ai.mayra.app.owner
 
 import ai.mayra.app.ui.theme.MayraAITheme
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -25,6 +32,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +56,24 @@ private fun OwnerSetupScreen(onClose: () -> Unit) {
     val score = remember(refresh) { inspector.readinessScore(statuses) }
     var notice by remember { mutableStateOf<String?>(null) }
 
+    val basicPermissions = remember {
+        buildList {
+            add(Manifest.permission.RECORD_AUDIO)
+            add(Manifest.permission.READ_CONTACTS)
+            add(Manifest.permission.CAMERA)
+            add(Manifest.permission.CALL_PHONE)
+            add(Manifest.permission.SEND_SMS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.toTypedArray()
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        refresh++
+        val granted = results.count { it.value }
+        notice = "$granted of ${results.size} requested permissions allowed. You can change any choice later in Android settings."
+    }
+
     fun save(updated: MayraOwnerPreferences, message: String) {
         preferences = updated
         store.save(updated)
@@ -56,90 +82,136 @@ private fun OwnerSetupScreen(onClose: () -> Unit) {
 
     Scaffold { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("Mayra Owner Setup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Private sideload mode for your own phone. This maximizes supported Android access without pretending to bypass Android security.")
+            Text("Mayra Access Journey", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Give Mayra only the access you choose. Basic permissions use Android popups; special access opens the correct protected system screen.")
 
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Access readiness", fontWeight = FontWeight.SemiBold)
-                    Text("$score / 100")
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f))
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Access readiness", fontWeight = FontWeight.SemiBold)
+                        Text("$score%", fontWeight = FontWeight.Bold)
+                    }
+                    LinearProgressIndicator(progress = { score / 100f }, modifier = Modifier.fillMaxWidth())
                     Text(ownerModeSafetySummary(preferences), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
-            notice?.let { Card(Modifier.fillMaxWidth()) { Text(it, Modifier.padding(12.dp)) } }
+            notice?.let {
+                Card(Modifier.fillMaxWidth()) { Text(it, Modifier.padding(14.dp)) }
+            }
 
-            SettingToggle("Owner Mode", "Use personal-device defaults instead of future Play Store defaults.", preferences.enabled) {
+            AccessStepCard(
+                number = "1",
+                title = "Basic phone access",
+                detail = "Microphone, contacts, camera, calls, SMS and notifications. Android will show its own permission dialogs.",
+                action = "Request basic access",
+                onAction = { permissionLauncher.launch(basicPermissions) }
+            )
+
+            Text("Special access", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            statuses.filter { it.capability !in BASIC_CAPABILITIES }.forEach { status ->
+                AccessStatusCard(
+                    status = status,
+                    onOpen = {
+                        status.settingsIntent?.let { intent ->
+                            runCatching { context.startActivity(intent) }
+                                .onFailure { notice = "This settings screen is not available on this device." }
+                        }
+                    }
+                )
+            }
+
+            Text("Owner preferences", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            SettingToggle("Owner Mode", "Use personal-device defaults while keeping critical safeguards.", preferences.enabled) {
                 save(preferences.copy(enabled = it), if (it) "Owner Mode enabled." else "Owner Mode disabled.")
             }
-            SettingToggle("Direct low-risk actions", "Open apps, show routes and similar low-risk actions without extra confirmation.", preferences.directLowRiskActions) {
+            SettingToggle("Direct low-risk actions", "Open apps and similar harmless actions without an extra confirmation.", preferences.directLowRiskActions) {
                 save(preferences.copy(directLowRiskActions = it), "Low-risk action preference updated.")
             }
-            SettingToggle("Direct medium-risk actions", "Run reminders and similar medium-risk actions directly on your phone.", preferences.directMediumRiskActions) {
+            SettingToggle("Direct medium-risk actions", "Run reminders and similar personal actions directly.", preferences.directMediumRiskActions) {
                 save(preferences.copy(directMediumRiskActions = it), "Medium-risk action preference updated.")
             }
             SettingToggle(
-                "Trusted direct call/message handoffs",
-                "Optional personal mode. Mayra may skip the extra confirmation for ordinary call and message handoffs. Sensitive, destructive, financial, legal and critical actions never use this bypass.",
+                "Trusted call/message handoffs",
+                "Optional. Sensitive, destructive, financial, legal and critical actions remain protected.",
                 preferences.trustedDirectHandoffs
             ) {
-                save(preferences.copy(trustedDirectHandoffs = it), if (it) "Trusted direct handoffs enabled." else "Trusted direct handoffs disabled.")
+                save(preferences.copy(trustedDirectHandoffs = it), "Trusted handoff preference updated.")
             }
-            SettingToggle("Proactive living presence", "Allow Mayra to surface phone health, notification and routine suggestions.", preferences.proactivePresence) {
+            SettingToggle("Proactive living presence", "Allow useful phone-health, notification and routine suggestions.", preferences.proactivePresence) {
                 save(preferences.copy(proactivePresence = it), "Proactive presence preference updated.")
             }
-            SettingToggle("Background runtime", "Keep supported workers and monitoring active under Android background limits.", preferences.keepBackgroundRuntime) {
+            SettingToggle("Background runtime", "Keep supported reminder and companion services active under Android limits.", preferences.keepBackgroundRuntime) {
                 save(preferences.copy(keepBackgroundRuntime = it), "Background runtime preference updated.")
             }
 
-            Text("Phone access checklist", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            statuses.forEach { status ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(status.title, fontWeight = FontWeight.SemiBold)
-                            Text(status.state.name.replace('_', ' ').lowercase())
-                        }
-                        Text(status.detail, style = MaterialTheme.typography.bodySmall)
-                        status.settingsIntent?.let { intent ->
-                            OutlinedButton(
-                                onClick = {
-                                    runCatching { context.startActivity(intent) }
-                                        .onFailure { notice = "This settings screen is not available on this device." }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("Open setup") }
-                        }
-                    }
-                }
-            }
-
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Hard Android limits", fontWeight = FontWeight.SemiBold)
-                    Text("• Full incoming-call control requires Mayra to become the default dialer and implement complete Telecom UI.")
-                    Text("• Accessibility must be manually enabled and cannot bypass secure fields, banking protections or app security.")
-                    Text("• Root-only operations will not work on a normal non-rooted phone.")
-                    Text("• Background execution can still be delayed by Android/OEM battery management.")
-                    Text("• WhatsApp and other apps only support what their intents, APIs or notification actions expose.")
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("Protected boundaries", fontWeight = FontWeight.SemiBold)
+                    Text("Mayra does not bypass secure fields, banking protections, OTP rules, Android consent screens or third-party app restrictions.", style = MaterialTheme.typography.bodySmall)
                 }
             }
 
             Button(onClick = { refresh++ }, modifier = Modifier.fillMaxWidth()) { Text("Refresh access status") }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Finish access setup") }
+        }
+    }
+}
+
+@Composable
+private fun AccessStepCard(number: String, title: String, detail: String, action: String, onAction: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("STEP $number", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall)
+            Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) { Text(action) }
+        }
+    }
+}
+
+@Composable
+private fun AccessStatusCard(status: OwnerCapabilityStatus, onOpen: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(status.title, fontWeight = FontWeight.SemiBold)
+                Text(
+                    when (status.state) {
+                        OwnerAccessState.READY -> "Ready"
+                        OwnerAccessState.ACTION_REQUIRED -> "Setup"
+                        OwnerAccessState.DEVICE_UNSUPPORTED -> "Unavailable"
+                    },
+                    color = if (status.state == OwnerAccessState.READY) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Text(status.detail, style = MaterialTheme.typography.bodySmall)
+            if (status.state == OwnerAccessState.ACTION_REQUIRED && status.settingsIntent != null) {
+                OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("Open Android setup") }
+            }
         }
     }
 }
 
 @Composable
 private fun SettingToggle(title: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, fontWeight = FontWeight.SemiBold)
@@ -149,3 +221,12 @@ private fun SettingToggle(title: String, detail: String, checked: Boolean, onChe
         }
     }
 }
+
+private val BASIC_CAPABILITIES = setOf(
+    OwnerCapability.MICROPHONE,
+    OwnerCapability.CONTACTS,
+    OwnerCapability.CAMERA,
+    OwnerCapability.PHONE_CALLS,
+    OwnerCapability.SMS,
+    OwnerCapability.NOTIFICATIONS
+)
