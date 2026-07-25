@@ -407,15 +407,16 @@ class FloatingMayraService : Service() {
 }
 
 internal class FloatingMayraPreferences(context: Context) {
-    private val values = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val values = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     var enabled: Boolean
         get() = values.getBoolean(KEY_ENABLED, false)
         set(value) { values.edit().putBoolean(KEY_ENABLED, value).apply() }
     var x: Int
-        get() = values.getInt(KEY_X, dp(context, 8))
+        get() = values.getInt(KEY_X, dp(appContext, 8))
         set(value) { values.edit().putInt(KEY_X, value).apply() }
     var y: Int
-        get() = values.getInt(KEY_Y, dp(context, 180))
+        get() = values.getInt(KEY_Y, dp(appContext, 180))
         set(value) { values.edit().putInt(KEY_Y, value).apply() }
 
     private companion object {
