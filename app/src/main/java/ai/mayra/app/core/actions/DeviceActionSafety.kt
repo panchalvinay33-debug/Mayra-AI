@@ -54,17 +54,15 @@ data class DeviceActionRequest(
             DeviceActionType.SEND_MESSAGE -> ActionRiskLevel.HIGH
         }
 
+    /**
+     * Calls and messages are review-first Android handoffs. Mayra needs contact lookup access when
+     * resolving an owner-selected contact, but never requests direct CALL_PHONE or SEND_SMS access.
+     */
     val requiredPermissions: Set<DevicePermission>
         get() = when (type) {
             DeviceActionType.OPEN_APP -> setOf(DevicePermission.QUERY_APPS)
-            DeviceActionType.CALL_CONTACT -> setOf(
-                DevicePermission.READ_CONTACTS,
-                DevicePermission.CALL_PHONE
-            )
-            DeviceActionType.SEND_MESSAGE -> setOf(
-                DevicePermission.READ_CONTACTS,
-                DevicePermission.SEND_MESSAGES
-            )
+            DeviceActionType.CALL_CONTACT,
+            DeviceActionType.SEND_MESSAGE -> setOf(DevicePermission.READ_CONTACTS)
             DeviceActionType.CREATE_REMINDER -> setOf(DevicePermission.POST_NOTIFICATIONS)
         }
 
@@ -346,7 +344,9 @@ class DeviceActionSafetyGate(
 
     private fun removePending(token: String): PendingConfirmation? {
         val pending = confirmations.remove(token) ?: return null
-        pendingByFingerprint.remove(pending.fingerprint, token)
+        if (pendingByFingerprint[pending.fingerprint] == token) {
+            pendingByFingerprint.remove(pending.fingerprint)
+        }
         return pending
     }
 
@@ -361,7 +361,7 @@ class DeviceActionSafetyGate(
     }
 
     private fun confirmationPrompt(request: DeviceActionRequest): String = when (request.type) {
-        DeviceActionType.CALL_CONTACT -> "Confirm call to ${safePromptTarget(request.target)}."
+        DeviceActionType.CALL_CONTACT -> "Confirm opening the dialer for ${safePromptTarget(request.target)}."
         DeviceActionType.SEND_MESSAGE -> if (request.payload.isNullOrBlank()) {
             "Confirm opening a message to ${safePromptTarget(request.target)}."
         } else {
