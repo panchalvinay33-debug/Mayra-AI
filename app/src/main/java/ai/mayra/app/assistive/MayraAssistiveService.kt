@@ -3,6 +3,7 @@ package ai.mayra.app.assistive
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -60,13 +61,15 @@ class MayraAssistiveService : AccessibilityService() {
                 if (node !== root) node.recycle()
             }
         }
+
+        while (pending.isNotEmpty()) pending.removeFirst().recycle()
         return results.take(MAX_TEXT_ITEMS)
     }
 
     private fun AccessibilityNodeInfo.isSensitiveInput(): Boolean {
         val classNameText = className?.toString().orEmpty()
         val hint = hintText?.toString().orEmpty().lowercase()
-        val labels = listOf(text, contentDescription, paneTitle)
+        val labels = listOf(text, contentDescription)
             .mapNotNull { it?.toString()?.lowercase() }
             .joinToString(" ")
         return classNameText.contains("password", ignoreCase = true) ||
