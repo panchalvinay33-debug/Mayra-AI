@@ -1,6 +1,10 @@
 param()
 
 $ErrorActionPreference = "Stop"
+$powerShellHost = (Get-Process -Id $PID).Path
+if (-not $powerShellHost -or -not (Test-Path $powerShellHost)) {
+    throw "Could not resolve the current PowerShell host."
+}
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw "ASSERTION FAILED: $Message" }
@@ -13,17 +17,16 @@ function Invoke-Verifier(
     [switch]$AllowSkipped
 ) {
     $arguments = @(
-        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-NoProfile",
         "-File", $Verifier,
         "-ApkPath", $Apk,
         "-ManifestPath", $Manifest
     )
     if ($AllowSkipped) { $arguments += "-AllowSkippedGates" }
-    & powershell.exe @arguments *> $null
+    & $powerShellHost @arguments *> $null
     return $LASTEXITCODE
 }
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
 $verifier = Join-Path $PSScriptRoot "verify-personal-alpha-artifact.ps1"
 if (-not (Test-Path $verifier)) { throw "Verifier not found: $verifier" }
 
@@ -32,7 +35,8 @@ New-Item -ItemType Directory -Force -Path $temp | Out-Null
 try {
     $apkName = "mayra-personal-alpha-0123456789012345678901234567890123456789.apk"
     $apk = Join-Path $temp $apkName
-    [System.IO.File]::WriteAllBytes($apk, [byte[]](1, 2, 3, 4, 5, 6, 7, 8))
+    $originalBytes = [byte[]](1, 2, 3, 4, 5, 6, 7, 8)
+    [System.IO.File]::WriteAllBytes($apk, $originalBytes)
     $hash = (Get-FileHash -Algorithm SHA256 $apk).Hash.ToLowerInvariant()
     $size = (Get-Item $apk).Length
     $manifestPath = Join-Path $temp "artifact-manifest.json"
@@ -64,9 +68,10 @@ try {
     Write-Manifest
     Assert-True ((Invoke-Verifier $verifier $apk $manifestPath) -eq 0) "Valid artifact must pass."
 
-    Add-Content -Encoding Byte -Path $apk -Value 9
+    $stream = [System.IO.File]::Open($apk, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write)
+    try { $stream.WriteByte(9) } finally { $stream.Dispose() }
     Assert-True ((Invoke-Verifier $verifier $apk $manifestPath) -ne 0) "Tampered APK must fail."
-    [System.IO.File]::WriteAllBytes($apk, [byte[]](1, 2, 3, 4, 5, 6, 7, 8))
+    [System.IO.File]::WriteAllBytes($apk, $originalBytes)
 
     Write-Manifest -FileName "wrong.apk"
     Assert-True ((Invoke-Verifier $verifier $apk $manifestPath) -ne 0) "Wrong file name must fail."
