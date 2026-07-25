@@ -26,6 +26,7 @@
     </queries>
 
     <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
+        <activity android:name=".document.MayraDocumentReaderActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryPrivacyActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryBackupActivity" android:exported="false" />
         <activity android:name=".document.MayraDocumentActivity" android:exported="false" />
