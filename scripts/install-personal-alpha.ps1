@@ -1,8 +1,10 @@
 param(
     [switch]$FreshInstall,
     [switch]$GrantCommonPermissions,
+    [switch]$AllowUnverifiedArtifact,
     [string]$DeviceSerial = "",
-    [string]$ApkPath = ""
+    [string]$ApkPath = "",
+    [string]$ArtifactManifestPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,11 +16,6 @@ function Write-Step([string]$Message) {
 function Fail([string]$Message) {
     Write-Host "`nINSTALL BLOCKED: $Message" -ForegroundColor Red
     exit 1
-}
-
-function Invoke-Adb([string]$AdbPath, [string[]]$SerialArguments, [string[]]$Arguments) {
-    & $AdbPath @SerialArguments @Arguments
-    return $LASTEXITCODE
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -41,11 +38,35 @@ try {
     Fail "APK not found at '$ApkPath'. Run .\scripts\build-personal-alpha.ps1 first."
 }
 
-$apkHash = (Get-FileHash -Algorithm SHA256 $apk).Hash
-$apkSizeMb = [Math]::Round((Get-Item $apk).Length / 1MB, 2)
+$manifestCandidate = if ($ArtifactManifestPath) {
+    $ArtifactManifestPath
+} else {
+    Join-Path (Split-Path -Parent $apk) "artifact-manifest.json"
+}
+$verifiedArtifact = $false
+$sourceSha = "unverified"
+if (Test-Path $manifestCandidate) {
+    Write-Step "Verifying APK provenance"
+    $verifyScript = Join-Path $PSScriptRoot "verify-personal-alpha-artifact.ps1"
+    if (-not (Test-Path $verifyScript)) { Fail "Artifact verifier is missing: $verifyScript" }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $verifyScript -ApkPath $apk -ManifestPath $manifestCandidate
+    if ($LASTEXITCODE -ne 0) { Fail "APK provenance verification failed." }
+    $artifactManifest = Get-Content $manifestCandidate -Raw | ConvertFrom-Json
+    $sourceSha = [string]$artifactManifest.source.sha
+    $verifiedArtifact = $true
+} elseif (-not $AllowUnverifiedArtifact) {
+    Fail "artifact-manifest.json was not found beside the APK. Build again with the controlled Personal Alpha script, or explicitly use -AllowUnverifiedArtifact for a non-release diagnostic install."
+} else {
+    Write-Host "WARNING: Installing an APK without verified provenance." -ForegroundColor Yellow
+}
+
+$apkHash = (Get-FileHash -Algorithm SHA256 $apk).Hash.ToLowerInvariant()
+$apkSizeBytes = (Get-Item $apk).Length
+$apkSizeMb = [Math]::Round($apkSizeBytes / 1MB, 2)
 Write-Host "APK: $apk"
 Write-Host "Size: $apkSizeMb MB"
 Write-Host "SHA-256: $apkHash"
+Write-Host "Source SHA: $sourceSha"
 
 $adb = Get-Command adb -ErrorAction SilentlyContinue
 if (-not $adb) {
@@ -90,6 +111,7 @@ $manufacturer = (& $adbPath @serialArgs shell getprop ro.product.manufacturer).T
 $model = (& $adbPath @serialArgs shell getprop ro.product.model).Trim()
 $androidVersion = (& $adbPath @serialArgs shell getprop ro.build.version.release).Trim()
 $sdkLevel = (& $adbPath @serialArgs shell getprop ro.build.version.sdk).Trim()
+$buildFingerprint = (& $adbPath @serialArgs shell getprop ro.build.fingerprint).Trim()
 Write-Host "Phone: $manufacturer $model"
 Write-Host "Android: $androidVersion (SDK $sdkLevel)"
 
@@ -108,8 +130,6 @@ if ($GrantCommonPermissions) {
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.READ_CONTACTS",
-        "android.permission.CALL_PHONE",
-        "android.permission.SEND_SMS",
         "android.permission.POST_NOTIFICATIONS"
     )
     foreach ($permission in $permissions) {
@@ -120,26 +140,53 @@ if ($GrantCommonPermissions) {
     }
 }
 
+Write-Step "Verifying installed package"
+$packagePath = (& $adbPath @serialArgs shell pm path ai.mayra.app).Trim()
+if ($LASTEXITCODE -ne 0 -or $packagePath -notmatch '^package:') {
+    Fail "Android did not report the installed ai.mayra.app package."
+}
+$packageDump = (& $adbPath @serialArgs shell dumpsys package ai.mayra.app) -join "`n"
+$versionName = ([regex]::Match($packageDump, 'versionName=([^\s]+)')).Groups[1].Value
+$versionCode = ([regex]::Match($packageDump, 'versionCode=(\d+)')).Groups[1].Value
+
 Write-Step "Launching Mayra"
 & $adbPath @serialArgs shell monkey -p ai.mayra.app -c android.intent.category.LAUNCHER 1 | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "Mayra was installed but the launcher request failed." }
 
 $installReportDir = Join-Path $repoRoot "build\personal-alpha"
 New-Item -ItemType Directory -Force -Path $installReportDir | Out-Null
-$installSummary = @"
-Mayra AI Personal Alpha Installation
-Installed: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-Device serial: $DeviceSerial
-Device: $manufacturer $model
-Android: $androidVersion
-SDK: $sdkLevel
-APK: $apk
-APK SHA-256: $apkHash
-Fresh install: $FreshInstall
-Common permissions requested: $GrantCommonPermissions
-"@
-$installSummary | Set-Content -Encoding UTF8 (Join-Path $installReportDir "install-summary.txt")
+$installedAt = (Get-Date).ToString("o")
+$installData = [PSCustomObject]@{
+    schema = "mayra.personal-alpha.install.v1"
+    installedAt = $installedAt
+    sourceSha = $sourceSha
+    artifactVerified = $verifiedArtifact
+    apkPath = $apk
+    apkSha256 = $apkHash
+    apkSizeBytes = $apkSizeBytes
+    device = [PSCustomObject]@{
+        serial = $DeviceSerial
+        manufacturer = $manufacturer
+        model = $model
+        androidVersion = $androidVersion
+        sdk = $sdkLevel
+        buildFingerprint = $buildFingerprint
+    }
+    package = [PSCustomObject]@{
+        name = "ai.mayra.app"
+        path = $packagePath
+        versionName = $versionName
+        versionCode = $versionCode
+    }
+    options = [PSCustomObject]@{
+        freshInstall = [bool]$FreshInstall
+        commonPermissionsRequested = [bool]$GrantCommonPermissions
+    }
+}
+$installData | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $installReportDir "install-manifest.json")
 
 Write-Host "`nSUCCESS: Mayra AI installed and launch requested." -ForegroundColor Green
+Write-Host "Installed package: ai.mayra.app $versionName ($versionCode)"
+Write-Host "Install evidence: build\personal-alpha\install-manifest.json"
 Write-Host "On the phone, complete onboarding and open 'Start personal device check'."
 Write-Host "Notification Access, overlay, Accessibility and battery settings must still be enabled manually from Mayra Access."
