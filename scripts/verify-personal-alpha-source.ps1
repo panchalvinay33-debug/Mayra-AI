@@ -47,8 +47,8 @@ $requiredFiles = @(
     "app/src/main/java/ai/mayra/app/ai/OpenAiAssistant.kt",
     "app/src/test/java/ai/mayra/app/ai/AiProviderSafetyPolicyTest.kt",
     "app/src/main/java/ai/mayra/app/identity/MayraContactIdentity.kt",
-    "app/src/test/java/ai/mayra/app/identity/MayraContactIdentityEngineTest.kt",
-    "app/src/main/java/ai/mayra/app/core/actions/DeviceActionModels.kt",
+    "app/src/test/java/ai/mayra/app/identity/MayraContactIdentityTest.kt",
+    "app/src/main/java/ai/mayra/app/core/actions/DeviceActionSafety.kt",
     "app/src/main/java/ai/mayra/app/core/actions/AndroidDeviceActionSpec.kt",
     "app/src/test/java/ai/mayra/app/core/actions/DeviceActionSafetyGateReliabilityTest.kt",
     "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt",
@@ -160,7 +160,7 @@ $results.Add((Write-Check "Online AI bounded transport" ($onlineAssistantText -m
 $results.Add((Write-Check "Offline AI fallback retained" ($onlineAssistantText -match 'offlineFallback' -and $onlineAssistantText -match 'offline brain') 'Remote failure retains local Mayra'))
 
 $identityText = Read-Text "app/src/main/java/ai/mayra/app/identity/MayraContactIdentity.kt"
-$actionModelsText = Read-Text "app/src/main/java/ai/mayra/app/core/actions/DeviceActionModels.kt"
+$actionModelsText = Read-Text "app/src/main/java/ai/mayra/app/core/actions/DeviceActionSafety.kt"
 $actionSpecText = Read-Text "app/src/main/java/ai/mayra/app/core/actions/AndroidDeviceActionSpec.kt"
 $safeExecutorText = Read-Text "app/src/main/java/ai/mayra/app/platform/device/MayraSafeActionExecutor.kt"
 $androidExecutorText = Read-Text "app/src/main/java/ai/mayra/app/platform/device/AndroidActionExecutor.kt"
