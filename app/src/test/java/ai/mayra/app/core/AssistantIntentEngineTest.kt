@@ -66,6 +66,14 @@ class AssistantIntentEngineTest {
     }
 
     @Test
+    fun mobileReportedContactSearchCallExtractsOnlyMummy() {
+        assertEquals(
+            AssistantIntent.CallContact("mummy"),
+            engine.parse("contact mein search karo Mummy aur call karo")
+        )
+    }
+
+    @Test
     fun messageCommandSeparatesRecipientAndBody() {
         assertEquals(
             AssistantIntent.ComposeMessage(
@@ -88,6 +96,14 @@ class AssistantIntentEngineTest {
     }
 
     @Test
+    fun mobileReportedNumberPhraseExtractsOnlyMummy() {
+        assertEquals(
+            AssistantIntent.ComposeMessage("Mummy", null),
+            engine.parse("mummy ke number per message karo")
+        )
+    }
+
+    @Test
     fun messageWithoutBodyStillCreatesComposerIntent() {
         assertEquals(
             AssistantIntent.ComposeMessage("Rahul", null),
@@ -100,6 +116,14 @@ class AssistantIntentEngineTest {
         assertEquals(
             AssistantIntent.CreateReminder("Call the customer Tomorrow at 5 PM"),
             engine.parse("Remind me Call the customer Tomorrow at 5 PM")
+        )
+    }
+
+    @Test
+    fun mobileReportedReminderPhraseRemainsAnAction() {
+        assertEquals(
+            AssistantIntent.CreateReminder("10 minut ke bad Pani Peene"),
+            engine.parse("Mayra 10 minut ke bad Pani Peene Ka reminder dalo")
         )
     }
 
