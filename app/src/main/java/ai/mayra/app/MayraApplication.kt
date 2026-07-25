@@ -38,6 +38,7 @@ import ai.mayra.app.execution.MayraExecutionCoordinator
 import ai.mayra.app.knowledge.MayraKnowledgeStore
 import ai.mayra.app.knowledge.MayraPersonalIntelligence
 import ai.mayra.app.knowledge.MayraPersonalMemory
+import ai.mayra.app.knowledge.MemoryAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import ai.mayra.app.runtime.MayraRuntimeControlCenter
 import ai.mayra.app.runtime.RuntimeAttentionNotifier
@@ -57,9 +58,13 @@ class MayraApplication : Application() {
         val localAssistant = LocalMayraAssistant(
             LocalCommandEngine(actionDispatcher = ActionDispatcher(actionExecutor))
         )
-        MayraRuntime.assistant = HybridMayraAssistant(
+        val hybridAssistant = HybridMayraAssistant(
             providerStore = AiProviderSettingsStore(applicationContext),
             localAssistant = localAssistant
+        )
+        MayraRuntime.assistant = MemoryAwareMayraAssistant(
+            context = applicationContext,
+            delegate = hybridAssistant
         )
 
         val eventBus = BrainEventBus()
