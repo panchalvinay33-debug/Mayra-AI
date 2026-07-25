@@ -9,23 +9,27 @@ import ai.mayra.app.knowledge.TimelineEventType
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import java.security.SecureRandom
-import kotlin.test.BeforeTest
-import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class MayraMemoryBackupEngineTest {
-    private val context: Context = ApplicationProvider.getApplicationContext()
+    private lateinit var context: Context
 
-    @BeforeTest
+    @Before
     fun resetMemory() {
+        context = ApplicationProvider.getApplicationContext()
         context.getSharedPreferences("mayra_personal_memory", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
     @Test
-    fun `encrypted envelope round trips notes checklist and timeline`() {
+    fun encryptedEnvelopeRoundTripsNotesChecklistAndTimeline() {
         val payload = MayraMemoryBackupEngine.BackupPayload(
             notes = listOf(
                 PersonalNote(
@@ -61,7 +65,7 @@ class MayraMemoryBackupEngineTest {
     }
 
     @Test
-    fun `wrong password and modified ciphertext are rejected`() {
+    fun wrongPasswordAndModifiedCiphertextAreRejected() {
         val payload = MayraMemoryBackupEngine.BackupPayload(emptyList(), emptyList(), generatedAt = 1L)
         val encrypted = MayraMemoryBackupEngine.encrypt(payload, "Mayra2026".toCharArray(), deterministicRandom())
 
@@ -75,7 +79,7 @@ class MayraMemoryBackupEngineTest {
     }
 
     @Test
-    fun `restore is additive and duplicate safe`() {
+    fun restoreIsAdditiveAndDuplicateSafe() {
         val memory = MayraPersonalMemory(context)
         val payload = MayraMemoryBackupEngine.BackupPayload(
             notes = listOf(PersonalNote(id = "note-1", title = "Remember this")),
@@ -99,7 +103,7 @@ class MayraMemoryBackupEngineTest {
     }
 
     @Test
-    fun `password policy requires a letter number and minimum length`() {
+    fun passwordPolicyRequiresLetterNumberAndMinimumLength() {
         assertFailsWith<IllegalArgumentException> { MayraMemoryBackupEngine.requireStrongPassword("short1".toCharArray()) }
         assertFailsWith<IllegalArgumentException> { MayraMemoryBackupEngine.requireStrongPassword("onlyletters".toCharArray()) }
         assertFailsWith<IllegalArgumentException> { MayraMemoryBackupEngine.requireStrongPassword("12345678".toCharArray()) }
