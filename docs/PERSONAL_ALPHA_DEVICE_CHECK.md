@@ -6,7 +6,7 @@ This is the owner-first validation gate for the private sideloaded build. It is 
 
 Mayra is ready to enter a controlled personal-device alpha as soon as the current branch successfully compiles into a debug APK. The latest source is not yet claimed build-verified because GitHub Actions is failing before Checkout with an empty step list.
 
-Physical testing is necessary because voice, overlays, Accessibility, notifications, WorkManager, OEM battery management, contacts, app intents, phone actions and local-memory persistence cannot be proven by unit tests alone.
+Physical testing is necessary because voice, overlays, Accessibility, notifications, WorkManager, OEM battery management, contacts, app intents, phone actions, document providers and local-memory persistence cannot be proven by unit tests alone.
 
 ## Before installing
 
@@ -19,7 +19,7 @@ Physical testing is necessary because voice, overlays, Accessibility, notificati
 
 ## Mandatory first-alpha checks
 
-The in-app **Start personal device check** screen records the core results. Floating, assistive and Memory V2 checks are recorded manually until they are added to that screen.
+The in-app **Start personal device check** screen records the core results. Floating, assistive, Memory V2, voice-note and document checks are recorded manually until they are added to that screen.
 
 1. Onboarding and settings persistence.
 2. Living Home launcher and animated Mayra rendering.
@@ -41,6 +41,8 @@ The in-app **Start personal device check** screen records the core results. Floa
 18. Memory privacy: confirm OTP, password, card-like and secret-key content is rejected from normal memory.
 19. Chat recall: ask a question matching a saved preference and confirm the relevant answer without exposing unrelated memory.
 20. Personal briefing: confirm pinned/open items appear while sensitive entries remain excluded.
+21. Voice Notes: capture speech, edit the transcript, save it and confirm it appears as a voice transcript in Memory.
+22. Document Library: add a PDF/document, search it by name, reopen it after app restart and remove it cleanly.
 
 ## Floating Mayra device flow
 
@@ -76,13 +78,31 @@ The in-app **Start personal device check** screen records the core results. Floa
 9. Ask an unrelated question and confirm unrelated private notes are not quoted or dumped.
 10. Install a later APK over the existing one and confirm notes, checklist state and pins persist.
 
+## Voice Notes flow
+
+1. Open `Memory & notes → Voice note`.
+2. Record a harmless sentence and confirm Android speech recognition returns a transcript.
+3. Edit the transcript before saving and confirm nothing is saved before pressing Save.
+4. Save it and confirm the entry appears in Memory as `voice transcript` with the `voice-note` tag.
+5. Dictate credential-like test wording and confirm the normal-memory privacy guard rejects it.
+
+## Document Library flow
+
+1. Open `Memory & notes → Documents`.
+2. Add one harmless PDF or text document through Android's document picker.
+3. Confirm the name, MIME type and size are indexed locally.
+4. Search by part of the filename and open it in a compatible viewer.
+5. Close and reopen Mayra; confirm persistent URI access still allows opening the file.
+6. Remove the library entry and confirm Mayra releases its persisted read permission where Android permits.
+7. Confirm Mayra does not claim full-text search, page extraction or AI summary in this foundation build.
+
 ## Alpha acceptance gate
 
 Controlled personal alpha use is acceptable when:
 
 - The app installs and starts without a crash.
 - Onboarding, chat, voice and settings pass.
-- At least 15 of 20 checks pass.
+- At least 17 of 22 checks pass.
 - Reminder create/alert, global action stop, Floating Mayra stop and memory privacy rejection all pass.
 - No wrong-contact, duplicate-send or false-success behavior is observed.
 - No sensitive notification, password, PIN, OTP, card-like or secret-key content leaks into Mayra screens, speech, chat context or audit history.
@@ -98,14 +118,15 @@ After the first pass:
 1. Create a reminder at least 10 minutes in the future.
 2. Enable Floating Mayra and place it on a known screen edge.
 3. Create a pinned memory and an incomplete checklist.
-4. Reboot the phone.
-5. Confirm the reminder remains visible and eventually alerts.
-6. Confirm background runtime schedule is restored.
-7. Confirm Floating Mayra restores only when its saved preference is enabled.
-8. Confirm memory, pin and checklist state remain intact.
-9. Install a newer debug APK over the existing app.
-10. Confirm settings, identities, reminders, agenda events, memories and floating position persist.
-11. Confirm stale notification reply handles do not survive process death and are reported honestly.
+4. Add one document to the local library.
+5. Reboot the phone.
+6. Confirm the reminder remains visible and eventually alerts.
+7. Confirm background runtime schedule is restored.
+8. Confirm Floating Mayra restores only when its saved preference is enabled.
+9. Confirm memory, pin, checklist and document-library state remain intact.
+10. Install a newer debug APK over the existing app.
+11. Confirm settings, identities, reminders, agenda events, memories, document entries and floating position persist.
+12. Confirm stale notification reply handles do not survive process death and are reported honestly.
 
 ## Known conditional features
 
@@ -119,10 +140,10 @@ After the first pass:
 - Android/OEM Accessibility output differs between apps; an empty snapshot must be reported honestly.
 - Memory recall is lexical and bounded in this build; it is not a perfect semantic-memory system.
 - Normal memory intentionally rejects credential-like content rather than acting as a password manager.
+- Voice Notes depends on the Android speech-recognition service installed on the device.
+- Document Library stores persistent URI access and metadata only; full document parsing is not implemented yet.
 
 ## Remaining work after the first alpha begins
-
-The first alpha should generate the next coding priorities from real failures. Expected major remaining modules are:
 
 1. Fresh compile/test/lint validation and APK packaging.
 2. Crash and compatibility fixes discovered on the Motorola device.
@@ -131,12 +152,11 @@ The first alpha should generate the next coding priorities from real failures. E
 5. Deterministic, visible assistive actions with confirmations where legally and technically supported.
 6. Recurring reminder/event execution and event notifications.
 7. Conflict/free-time intelligence.
-8. Voice-note recording and transcription linked to Memory Center.
-9. File/PDF intelligence UI.
-10. Default assistant invocation prototype.
-11. Default dialer/InCallService prototype.
-12. WhatsApp assisted messaging adapter.
-13. Semantic memory ranking, edit/restore UI and encrypted secure-reference vault.
+8. Full PDF/text extraction, page search and privacy-safe document summaries.
+9. Default assistant invocation prototype.
+10. Default dialer/InCallService prototype.
+11. WhatsApp assisted messaging adapter.
+12. Semantic memory ranking, edit/restore UI and encrypted secure-reference vault.
 
 ## Honest readiness estimate
 
