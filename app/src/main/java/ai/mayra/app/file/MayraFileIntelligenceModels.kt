@@ -14,6 +14,7 @@ data class MayraIndexedFile(
     val modifiedAt: Long,
     val sourceKind: MayraIndexedSourceKind,
     val relativeLocation: String? = null,
+    val grantRootUri: String? = null,
     val fingerprint: String,
     val state: MayraIndexState = MayraIndexState.METADATA_ONLY,
     val extractedText: String? = null,
@@ -24,6 +25,9 @@ data class MayraIndexedFile(
         require(Uri.parse(uri).scheme in setOf("content", "file")) { "Only local Android file URIs may be indexed." }
         require(displayName.isNotBlank()) { "Indexed file requires a display name." }
         require(sizeBytes >= 0L) { "Indexed file size cannot be negative." }
+        require(grantRootUri == null || Uri.parse(grantRootUri).scheme == "content") {
+            "SAF grant roots must be content URIs."
+        }
     }
 
     fun searchableText(): String = listOfNotNull(displayName, relativeLocation, extractedText)
@@ -60,6 +64,29 @@ data class MayraFileIndexSnapshot(
             .take(limit.coerceIn(1, 100))
             .map { it.first }
             .toList()
+    }
+}
+
+object MayraFileIndexReconciler {
+    fun reconcile(
+        existing: List<MayraIndexedFile>,
+        scanned: List<MayraIndexedFile>,
+        authoritativeKinds: Set<MayraIndexedSourceKind>
+    ): List<MayraIndexedFile> {
+        val existingByUri = existing.associateBy { it.uri }
+        val retained = existing.filter { it.sourceKind !in authoritativeKinds }.associateBy { it.uri }.toMutableMap()
+        scanned.distinctBy { it.uri }.forEach { candidate ->
+            val previous = existingByUri[candidate.uri]
+            retained[candidate.uri] = if (previous != null && previous.fingerprint == candidate.fingerprint) {
+                candidate.copy(
+                    state = previous.state,
+                    extractedText = previous.extractedText,
+                    indexedAt = previous.indexedAt,
+                    failure = previous.failure
+                )
+            } else candidate
+        }
+        return retained.values.toList()
     }
 }
 
