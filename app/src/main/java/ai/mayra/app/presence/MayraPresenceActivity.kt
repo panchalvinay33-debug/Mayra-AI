@@ -23,7 +23,10 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,13 +35,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,7 +56,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -56,7 +68,9 @@ class MayraPresenceActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val settingsStore = MayraSettingsStore(this)
-        if (!settingsStore.read().onboardingCompleted) startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ONBOARDING, true))
+        if (!settingsStore.read().onboardingCompleted) {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ONBOARDING, true))
+        }
         setContent {
             MayraAITheme {
                 MayraPresenceHome(
@@ -81,59 +95,253 @@ class MayraPresenceActivity : ComponentActivity() {
 
 @Composable
 private fun MayraPresenceHome(
-    userName: String, ownerSummary: String,
-    onChat: () -> Unit, onRuntime: () -> Unit, onPulse: () -> Unit,
-    onNotifications: () -> Unit, onActionControls: () -> Unit, onOwnerSetup: () -> Unit,
-    onPeople: () -> Unit, onReminders: () -> Unit, onAgenda: () -> Unit,
-    onDeviceTest: () -> Unit, onSettings: () -> Unit
+    userName: String,
+    ownerSummary: String,
+    onChat: () -> Unit,
+    onRuntime: () -> Unit,
+    onPulse: () -> Unit,
+    onNotifications: () -> Unit,
+    onActionControls: () -> Unit,
+    onOwnerSetup: () -> Unit,
+    onPeople: () -> Unit,
+    onReminders: () -> Unit,
+    onAgenda: () -> Unit,
+    onDeviceTest: () -> Unit,
+    onSettings: () -> Unit
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
+    var menuExpanded by remember { mutableStateOf(false) }
     val state = pulse.toPresenceState()
     val greeting = proactiveGreeting(userName, Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+
     LaunchedEffect(Unit) {
-        MayraRuntime.deviceRuntime.capture(force = true); pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
-        while (true) { delay(15_000); MayraRuntime.deviceRuntime.capture(force = false); pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest()) }
+        MayraRuntime.deviceRuntime.capture(force = true)
+        pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
+        while (true) {
+            delay(15_000)
+            MayraRuntime.deviceRuntime.capture(force = false)
+            pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
+        }
     }
+
     Scaffold { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.background,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.055f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
         ) {
-            Spacer(Modifier.height(8.dp)); Text("MAYRA", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            MayraPresenceOrb(state = state); Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(greeting, style = MaterialTheme.typography.titleMedium); Text(pulse.message, style = MaterialTheme.typography.bodyMedium)
-            Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold); Text(ownerSummary, style = MaterialTheme.typography.bodySmall)
-                Button(onClick = onOwnerSetup, modifier = Modifier.fillMaxWidth()) { Text("Complete phone access setup") }
-            } }
-            pulse.healthScore?.let { score -> Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Phone health", fontWeight = FontWeight.SemiBold); Text("$score / 100", fontWeight = FontWeight.Bold) }
-                Text("${pulse.batteryText} battery · ${pulse.networkText}"); Text("${pulse.storageText} storage · ${pulse.memoryText} memory", style = MaterialTheme.typography.bodySmall)
-            } } }
-            pulse.suggestions.firstOrNull()?.let { insight -> Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("I noticed this", fontWeight = FontWeight.SemiBold); Text(insight.title, fontWeight = FontWeight.Medium); Text(insight.message, style = MaterialTheme.typography.bodySmall)
-            } } }
-            Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Talk to Mayra") }
-            Button(onClick = onDeviceTest, modifier = Modifier.fillMaxWidth()) { Text("Start personal device check") }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onPulse, modifier = Modifier.weight(1f)) { Text("Phone pulse") }
-                OutlinedButton(onClick = onRuntime, modifier = Modifier.weight(1f)) { Text("Live activity") }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                LivingHomeHeader(
+                    onMenu = { menuExpanded = true },
+                    menuExpanded = menuExpanded,
+                    onDismissMenu = { menuExpanded = false },
+                    onAgenda = onAgenda,
+                    onReminders = onReminders,
+                    onNotifications = onNotifications,
+                    onPeople = onPeople,
+                    onPulse = onPulse,
+                    onRuntime = onRuntime,
+                    onActionControls = onActionControls,
+                    onDeviceTest = onDeviceTest,
+                    onOwnerSetup = onOwnerSetup,
+                    onSettings = onSettings
+                )
+
+                Spacer(Modifier.height(2.dp))
+                MayraCharacterPresence(
+                    state = state,
+                    modifier = Modifier.clickable(onClick = onChat)
+                )
+                Text(
+                    state.label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    greeting,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    state.prompt,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Button(
+                    onClick = onChat,
+                    modifier = Modifier.fillMaxWidth().height(58.dp),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text("Talk to Mayra", fontWeight = FontWeight.SemiBold)
+                }
+
+                CompactAccessCard(ownerSummary = ownerSummary, onOpen = onOwnerSetup)
+
+                LivingInfoCard(
+                    eyebrow = "TODAY",
+                    title = pulse.message.ifBlank { "Your day is ready" },
+                    detail = pulse.healthScore?.let { score ->
+                        "Phone health $score / 100 · ${pulse.batteryText} battery · ${pulse.networkText}"
+                    } ?: "Open your agenda for reminders, events and follow-ups.",
+                    actionLabel = "Open my day",
+                    onAction = onAgenda
+                )
+
+                val insight = pulse.suggestions.firstOrNull()
+                LivingInfoCard(
+                    eyebrow = "MAYRA NOTICED",
+                    title = insight?.title ?: "Everything looks calm",
+                    detail = insight?.message ?: "I’ll surface something here only when it can genuinely help.",
+                    actionLabel = "Phone pulse",
+                    onAction = onPulse
+                )
+
+                Text(
+                    "Mayra stays useful offline, respects Android boundaries and never reports an action as complete unless it can verify it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
             }
-            OutlinedButton(onClick = onAgenda, modifier = Modifier.fillMaxWidth()) { Text("Personal agenda") }
-            OutlinedButton(onClick = onReminders, modifier = Modifier.fillMaxWidth()) { Text("Reminders & follow-ups") }
-            OutlinedButton(onClick = onPeople, modifier = Modifier.fillMaxWidth()) { Text("People & relationships") }
-            OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Notification intelligence") }
-            OutlinedButton(onClick = onActionControls, modifier = Modifier.fillMaxWidth()) { Text("Action safety") }
-            OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Settings") }
-            Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Your phone, with a mind", fontWeight = FontWeight.SemiBold)
-                Text("• Understand phone health and connection"); Text("• Remember people and relationships")
-                Text("• Run a private agenda, reminders and follow-ups"); Text("• Summarise notifications and protect sensitive content")
-                Text("• Speak naturally in Hindi, Hinglish or English"); Text("• Open apps, prepare calls and messages safely")
-                Text("• Stop all action execution instantly"); Text("• Stay useful offline and become smarter online")
-            } }
-            Text("Owner Mode maximizes access you explicitly grant. Android secure boundaries and critical-action protections are not secretly bypassed.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun LivingHomeHeader(
+    onMenu: () -> Unit,
+    menuExpanded: Boolean,
+    onDismissMenu: () -> Unit,
+    onAgenda: () -> Unit,
+    onReminders: () -> Unit,
+    onNotifications: () -> Unit,
+    onPeople: () -> Unit,
+    onPulse: () -> Unit,
+    onRuntime: () -> Unit,
+    onActionControls: () -> Unit,
+    onDeviceTest: () -> Unit,
+    onOwnerSetup: () -> Unit,
+    onSettings: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text("MAYRA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+            Text("Living companion", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box {
+            Surface(
+                modifier = Modifier.clickable(onClick = onMenu),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            ) {
+                Text("⋮", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp))
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = onDismissMenu) {
+                MenuLabel("MY DAY")
+                MenuItem("Personal agenda", onAgenda, onDismissMenu)
+                MenuItem("Reminders & follow-ups", onReminders, onDismissMenu)
+                MenuItem("Notification intelligence", onNotifications, onDismissMenu)
+                MenuLabel("MY PEOPLE")
+                MenuItem("People & relationships", onPeople, onDismissMenu)
+                MenuLabel("PHONE CONTROL")
+                MenuItem("Phone pulse", onPulse, onDismissMenu)
+                MenuItem("Live activity", onRuntime, onDismissMenu)
+                MenuItem("Action safety", onActionControls, onDismissMenu)
+                MenuItem("Personal device check", onDeviceTest, onDismissMenu)
+                MenuLabel("MAYRA ACCESS")
+                MenuItem("Permissions & owner setup", onOwnerSetup, onDismissMenu)
+                MenuLabel("SETTINGS")
+                MenuItem("Language, voice, AI & privacy", onSettings, onDismissMenu)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun MenuItem(label: String, action: () -> Unit, dismiss: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        onClick = {
+            dismiss()
+            action()
+        }
+    )
+}
+
+@Composable
+private fun CompactAccessCard(ownerSummary: String, onOpen: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold)
+                Text(ownerSummary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+            }
+            TextButton(onClick = onOpen) { Text("Access") }
+        }
+    }
+}
+
+@Composable
+private fun LivingInfoCard(
+    eyebrow: String,
+    title: String,
+    detail: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(eyebrow, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onAction, modifier = Modifier.align(Alignment.End)) { Text(actionLabel) }
         }
     }
 }
