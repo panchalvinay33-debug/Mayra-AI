@@ -87,7 +87,7 @@ class MayraOwnerModeTest {
             OwnerCapabilityStatus(OwnerCapability.SMS, OwnerAccessState.DEVICE_UNSUPPORTED, "SMS", "No telephony")
         )
 
-        assertEquals(50, inspector.readinessScore(statuses))
+        assertEquals(66, inspector.readinessScore(statuses))
     }
 
     private fun request(
