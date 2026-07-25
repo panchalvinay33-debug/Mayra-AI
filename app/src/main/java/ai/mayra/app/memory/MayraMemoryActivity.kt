@@ -91,7 +91,7 @@ private fun MayraMemoryScreen(onClose: () -> Unit) {
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Capture & library", fontWeight = FontWeight.SemiBold)
+                    Text("Capture, library & backup", fontWeight = FontWeight.SemiBold)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = { context.startActivity(Intent(context, MayraVoiceNotesActivity::class.java)) },
@@ -102,6 +102,10 @@ private fun MayraMemoryScreen(onClose: () -> Unit) {
                             modifier = Modifier.weight(1f)
                         ) { Text("Documents") }
                     }
+                    OutlinedButton(
+                        onClick = { context.startActivity(Intent(context, MayraMemoryBackupActivity::class.java)) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Backup normal memory") }
                 }
             }
 
