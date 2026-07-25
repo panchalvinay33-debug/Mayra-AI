@@ -10,12 +10,20 @@ class MayraFileGrantRegistry(context: Context) {
 
     fun register(treeUri: Uri, label: String): MayraFileGrant {
         require(treeUri.scheme == "content") { "Only content tree URIs are supported." }
-        appContext.contentResolver.takePersistableUriPermission(
-            treeUri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        )
+        val resolver = appContext.contentResolver
+        val readFlag = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        val writeFlag = Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        runCatching { resolver.takePersistableUriPermission(treeUri, readFlag or writeFlag) }
+            .recoverCatching { resolver.takePersistableUriPermission(treeUri, readFlag) }
+            .getOrThrow()
+        require(hasPersistedReadAccess(treeUri.toString())) { "The selected folder did not grant persistent read access." }
+
         val now = System.currentTimeMillis()
-        val grant = MayraFileGrant(treeUri.toString(), label.trim().take(120).ifBlank { "Selected folder" }, now)
+        val grant = MayraFileGrant(
+            treeUri = treeUri.toString(),
+            label = label.trim().take(120).ifBlank { "Selected folder" },
+            grantedAt = now
+        )
         val current = indexStore.read()
         val next = (current.grants.filterNot { it.treeUri == grant.treeUri } + grant).takeLast(MAX_GRANTS)
         indexStore.write(current.copy(grants = next, generation = current.generation + 1, updatedAt = now))
@@ -26,16 +34,22 @@ class MayraFileGrantRegistry(context: Context) {
 
     fun remove(treeUri: String) {
         val uri = Uri.parse(treeUri)
-        runCatching {
-            appContext.contentResolver.releasePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
+        val permission = appContext.contentResolver.persistedUriPermissions.firstOrNull { it.uri == uri }
+        if (permission != null) {
+            var flags = 0
+            if (permission.isReadPermission) flags = flags or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            if (permission.isWritePermission) flags = flags or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            if (flags != 0) runCatching { appContext.contentResolver.releasePersistableUriPermission(uri, flags) }
         }
         val current = indexStore.read()
+        val removedGrant = current.grants.firstOrNull { it.treeUri == treeUri }
+        val cutoff = removedGrant?.grantedAt ?: Long.MAX_VALUE
         indexStore.write(current.copy(
             grants = current.grants.filterNot { it.treeUri == treeUri },
-            files = current.files.filterNot { it.sourceKind == MayraIndexedSourceKind.SAF_TREE && it.uri.startsWith(treeUri) },
+            files = current.files.filterNot {
+                it.sourceKind == MayraIndexedSourceKind.SAF_TREE && it.indexedAt >= cutoff &&
+                    (it.relativeLocation?.startsWith(removedGrant?.label.orEmpty(), ignoreCase = true) == true)
+            },
             generation = current.generation + 1,
             updatedAt = System.currentTimeMillis()
         ))
