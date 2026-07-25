@@ -33,6 +33,16 @@ class MayraDocumentTextReader(private val context: Context) {
         }.getOrElse { DocumentTextPreview.Error("Mayra could not read this document safely.") }
     }
 
+    fun search(preview: DocumentTextPreview.Ready, query: String, maxMatches: Int = 20): List<DocumentTextMatch> {
+        require(maxMatches in 1..100)
+        val term = query.trim()
+        if (term.length < 2) return emptyList()
+        return preview.text.lineSequence().mapIndexedNotNull { index, line ->
+            if (!line.contains(term, ignoreCase = true)) null
+            else DocumentTextMatch(lineNumber = index + 1, preview = line.trim().take(240))
+        }.take(maxMatches).toList()
+    }
+
     companion object {
         fun isSupportedTextType(mimeType: String, name: String): Boolean {
             val type = mimeType.lowercase()
@@ -50,3 +60,5 @@ sealed interface DocumentTextPreview {
     data class Error(val reason: String) : DocumentTextPreview
     data object Empty : DocumentTextPreview
 }
+
+data class DocumentTextMatch(val lineNumber: Int, val preview: String)
