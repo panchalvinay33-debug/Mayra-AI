@@ -29,6 +29,9 @@ $requiredFiles = @(
     "app/src/test/java/ai/mayra/app/safety/MayraGlobalStopStoreTest.kt",
     "app/src/main/java/ai/mayra/app/action/MayraActionRuntime.kt",
     "app/src/main/java/ai/mayra/app/background/MayraBootReceiver.kt",
+    "app/src/main/java/ai/mayra/app/background/MayraNotificationListener.kt",
+    "app/src/main/java/ai/mayra/app/background/MayraNotificationSafetyPolicy.kt",
+    "app/src/test/java/ai/mayra/app/background/MayraNotificationSafetyPolicyTest.kt",
     "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt",
     "app/src/test/java/ai/mayra/app/memory/MayraMemoryBackupEngineTest.kt",
     "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt",
@@ -108,6 +111,12 @@ $results.Add((Write-Check "Persistent Global Stop" ($globalStopText -match 'mayr
 $results.Add((Write-Check "Action runtime obeys Global Stop" ($actionRuntimeText -match 'MayraGlobalStopStore' -and $actionRuntimeText -match 'store\.isStopped\(\)') 'Action engine restores persisted stop state'))
 $results.Add((Write-Check "Boot path obeys Global Stop" ($bootReceiverText -match 'MayraGlobalStopStore' -and $bootReceiverText -match 'if \(globallyStopped\)') 'Automation and floating companion remain stopped after reboot'))
 $results.Add((Write-Check "Reminders survive Global Stop" ($bootReceiverText -match 'MayraReminderRuntime\.rescheduleAll' -and $bootReceiverText.IndexOf('MayraReminderRuntime.rescheduleAll') -lt $bootReceiverText.IndexOf('if (globallyStopped)')) 'Owner-created reminder commitments remain scheduled'))
+
+$notificationListenerText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/background/MayraNotificationListener.kt") -Raw
+$notificationSafetyText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/background/MayraNotificationSafetyPolicy.kt") -Raw
+$results.Add((Write-Check "Notification pipeline obeys Global Stop" ($notificationListenerText -match 'MayraGlobalStopStore' -and $notificationListenerText -match 'globalStopActive = stopped') 'Reply and proactive notification actions stop across process restarts'))
+$results.Add((Write-Check "Sensitive notification store-only policy" ($notificationSafetyText -match 'sensitivity == NotificationSensitivity.NORMAL' -and $notificationSafetyText -match 'sensitivity != NotificationSensitivity.OTP') 'OTP and sensitive notifications cannot become proactive actions'))
+$results.Add((Write-Check "Conversation identity redaction" ($notificationSafetyText -match 'Protected conversation' -and $notificationSafetyText -match 'Private conversation') 'Sensitive conversation labels do not leak into summaries'))
 
 $backupText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt") -Raw
 $results.Add((Write-Check "Authenticated backup encryption" ($backupText -match 'AES/GCM/NoPadding') 'Backup uses AES-GCM'))
