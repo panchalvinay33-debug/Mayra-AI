@@ -74,6 +74,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item build/personal-alpha/source-preflight.json build/ci/source-preflight.json -Force
 
+      - name: Test artifact provenance controls
+        shell: pwsh
+        run: |
+          ./scripts/test-artifact-provenance.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Compile debug sources
         shell: bash
         run: |
@@ -145,6 +151,14 @@ jobs:
           )
           PY
           python3 -m json.tool build/ci/artifact-manifest.json >/dev/null
+
+      - name: Verify generated artifact manifest
+        shell: pwsh
+        run: |
+          ./scripts/verify-personal-alpha-artifact.ps1 `
+            -ApkPath "build/ci/Mayra-AI-personal-alpha-${{ github.sha }}.apk" `
+            -ManifestPath "build/ci/artifact-manifest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload personal alpha APK
         uses: actions/upload-artifact@v4
