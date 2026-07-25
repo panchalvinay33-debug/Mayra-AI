@@ -1,9 +1,15 @@
 package ai.mayra.app.workspace
 
 import ai.mayra.app.ui.theme.MayraAITheme
+import ai.mayra.app.voice.AndroidVoiceAssistant
+import ai.mayra.app.voice.MicrophonePermission
+import ai.mayra.app.voice.VoiceState
+import ai.mayra.app.voice.VoiceTransportState
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +21,8 @@ import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,13 +34,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -56,6 +68,45 @@ private fun MayraWorkspaceScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val session = state.session
     val active = session.tasks.firstOrNull { it.id == session.activeTaskId }
+    val context = LocalContext.current
+    var voiceState by remember { mutableStateOf(VoiceState()) }
+    val voiceAssistant = remember { AndroidVoiceAssistant(context) { voiceState = it } }
+    val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            voiceAssistant.setContinuousMode(false)
+            voiceAssistant.startListening()
+        } else {
+            voiceState = VoiceState(
+                transportState = VoiceTransportState.ERROR,
+                error = "Microphone permission is required for Workspace voice input."
+            )
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { voiceAssistant.release() }
+    }
+
+    LaunchedEffect(voiceState.partialTranscript, voiceState.isFinalTranscript) {
+        when {
+            !voiceState.isFinalTranscript && voiceState.partialTranscript.isNotBlank() -> {
+                viewModel.updateInput(voiceState.partialTranscript)
+            }
+            voiceState.isFinalTranscript && voiceState.transcript.isNotBlank() -> {
+                viewModel.updateInput(voiceState.transcript)
+                voiceAssistant.stopListening()
+            }
+        }
+    }
+
+    fun startVoiceInput() {
+        if (MicrophonePermission.isGranted(context)) {
+            voiceAssistant.setContinuousMode(false)
+            voiceAssistant.startListening()
+        } else {
+            microphoneLauncher.launch(MicrophonePermission.permission)
+        }
+    }
 
     Scaffold { padding ->
         Column(
@@ -71,6 +122,7 @@ private fun MayraWorkspaceScreen(
                     Text("Mayra Workspace", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
                         when {
+                            voiceState.isListening -> "Listening · review transcript before adding"
                             state.isSaving -> "Encrypted autosave…"
                             state.lastSavedAt > 0L -> "Encrypted autosave ready"
                             else -> "Private local session"
@@ -110,9 +162,7 @@ private fun MayraWorkspaceScreen(
                 session.table?.let { table -> item { WorkspaceTablePreview(table) } }
 
                 if (session.transcript.isNotEmpty()) {
-                    item {
-                        Text("Task history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    }
+                    item { Text("Task history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                 }
                 items(session.tasks.reversed(), key = { it.id }) { task -> WorkspaceTaskCard(task) }
             }
@@ -125,7 +175,7 @@ private fun MayraWorkspaceScreen(
                 placeholder = { Text("Mayra can organise task notes here.") }
             )
 
-            state.error?.let {
+            (state.error ?: voiceState.error)?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
@@ -156,11 +206,17 @@ private fun MayraWorkspaceScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { viewModel.submitInput() })
                 )
+                OutlinedButton(
+                    onClick = {
+                        if (voiceState.isListening) voiceAssistant.stopListening() else startVoiceInput()
+                    },
+                    shape = RoundedCornerShape(18.dp)
+                ) { Text(if (voiceState.isListening) "Stop" else "🎙") }
                 Button(
                     onClick = viewModel::submitInput,
                     enabled = state.input.isNotBlank(),
                     shape = RoundedCornerShape(18.dp)
-                ) { Text("Add task") }
+                ) { Text("Add") }
             }
 
             TextButton(onClick = viewModel::clearSession, modifier = Modifier.align(Alignment.End)) {
