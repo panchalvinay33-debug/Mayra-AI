@@ -71,6 +71,7 @@ fun MayraUnifiedChatSurface(
     onVoice: () -> Unit,
     onClear: () -> Unit,
     onOpenWorkspace: () -> Unit,
+    onOpenFiles: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevice: () -> Unit,
     onOpenRuntime: () -> Unit,
@@ -109,6 +110,7 @@ fun MayraUnifiedChatSurface(
                     onDismiss = { menuExpanded = false },
                     onClear = onClear,
                     onOpenWorkspace = onOpenWorkspace,
+                    onOpenFiles = onOpenFiles,
                     onOpenSettings = onOpenSettings,
                     onOpenDevice = onOpenDevice,
                     onOpenRuntime = onOpenRuntime
@@ -185,6 +187,7 @@ private fun UnifiedHeader(
     onDismiss: () -> Unit,
     onClear: () -> Unit,
     onOpenWorkspace: () -> Unit,
+    onOpenFiles: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevice: () -> Unit,
     onOpenRuntime: () -> Unit
@@ -204,6 +207,7 @@ private fun UnifiedHeader(
             }
             DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
                 DropdownMenuItem(text = { Text("Personal Workspace") }, onClick = { onDismiss(); onOpenWorkspace() })
+                DropdownMenuItem(text = { Text("File Intelligence") }, onClick = { onDismiss(); onOpenFiles() })
                 DropdownMenuItem(text = { Text("Device readiness") }, onClick = { onDismiss(); onOpenDevice() })
                 DropdownMenuItem(text = { Text("Runtime") }, onClick = { onDismiss(); onOpenRuntime() })
                 DropdownMenuItem(text = { Text("Settings") }, onClick = { onDismiss(); onOpenSettings() })
