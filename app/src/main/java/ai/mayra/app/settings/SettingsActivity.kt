@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,7 +60,6 @@ class SettingsActivity : ComponentActivity() {
             }
         }
     }
-
     companion object { const val EXTRA_ONBOARDING = "mayra.extra.ONBOARDING" }
 }
 
@@ -90,13 +90,11 @@ private fun MayraSettingsScreen(
                 Text("See what Mayra senses about this phone right now—battery, network, storage, memory, heat and available capabilities.")
                 OutlinedButton(onClick = onOpenPulse, modifier = Modifier.fillMaxWidth()) { Text("Open Mayra Pulse") }
             }
-
             SettingsSection("Notification intelligence") {
                 Text("Review locally captured unread notifications, protected summaries, per-app privacy and supported quick replies.")
                 Text("Notification Access is optional and can be revoked from Android settings at any time.", style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) { Text("Open Notification Center") }
             }
-
             SettingsSection("Your profile") {
                 OutlinedTextField(
                     value = settings.userName,
@@ -107,7 +105,6 @@ private fun MayraSettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-
             SettingsSection("Language") {
                 MayraLanguage.entries.forEach { language ->
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -116,32 +113,50 @@ private fun MayraSettingsScreen(
                     }
                 }
             }
-
-            SettingsSection("Voice") {
-                SettingsToggle("Speak Mayra's responses", "Read assistant replies aloud when voice mode is active.", settings.speakResponses) { settings = settings.copy(speakResponses = it) }
+            SettingsSection("Voice identity") {
+                SettingsToggle("Speak Mayra's responses", "Read assistant replies aloud.", settings.speakResponses) { settings = settings.copy(speakResponses = it) }
                 SettingsToggle("Start continuous voice by default", "Keep listening after Mayra finishes speaking.", settings.continuousVoiceByDefault) { settings = settings.copy(continuousVoiceByDefault = it) }
+                SettingsToggle("Prefer high-quality offline voice", "Automatically choose the best installed non-network voice for the selected language.", settings.preferHighQualityOfflineVoice) { settings = settings.copy(preferHighQualityOfflineVoice = it) }
+                Text("Voice style", fontWeight = FontWeight.Medium)
+                MayraVoiceStyle.entries.forEach { style ->
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = settings.voiceStyle == style,
+                            onClick = { settings = settings.copy(voiceStyle = style, voiceRate = style.defaultRate, voicePitch = style.defaultPitch) }
+                        )
+                        Column {
+                            Text(style.label)
+                            Text(style.description, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Text("Speaking speed: ${"%.2f".format(settings.voiceRate)}×")
+                Slider(
+                    value = settings.voiceRate,
+                    onValueChange = { settings = settings.copy(voiceRate = it) },
+                    valueRange = MayraSettings.MIN_VOICE_RATE..MayraSettings.MAX_VOICE_RATE
+                )
+                Text("Voice pitch: ${"%.2f".format(settings.voicePitch)}×")
+                Slider(
+                    value = settings.voicePitch,
+                    onValueChange = { settings = settings.copy(voicePitch = it) },
+                    valueRange = MayraSettings.MIN_VOICE_PITCH..MayraSettings.MAX_VOICE_PITCH
+                )
+                Text("Save settings, return to chat, and Mayra will use the new voice on her next reply.", style = MaterialTheme.typography.bodySmall)
             }
-
             SettingsSection("AI intelligence") {
                 aiProviderConfig = aiProviderStore.read()
                 Text(aiProviderConfig.status())
                 Text("Connect OpenAI for full conversation while Mayra keeps phone actions inside its local safety layer.", style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(onClick = onOpenAiProvider, modifier = Modifier.fillMaxWidth()) { Text("Configure AI provider") }
             }
-
             SettingsSection("Memory and personalization") {
-                SettingsToggle(
-                    "Memory", "Allow Mayra to remember useful preferences and context.", settings.memoryEnabled
-                ) { enabled -> settings = settings.copy(memoryEnabled = enabled, personalizationEnabled = settings.personalizationEnabled && enabled) }
-                SettingsToggle(
-                    "Personalization", "Use saved preferences to tailor answers and actions.", settings.personalizationEnabled,
-                    enabled = settings.memoryEnabled
-                ) { settings = settings.copy(personalizationEnabled = it) }
+                SettingsToggle("Memory", "Allow Mayra to remember useful preferences and context.", settings.memoryEnabled) { enabled -> settings = settings.copy(memoryEnabled = enabled, personalizationEnabled = settings.personalizationEnabled && enabled) }
+                SettingsToggle("Personalization", "Use saved preferences to tailor answers and actions.", settings.personalizationEnabled, enabled = settings.memoryEnabled) { settings = settings.copy(personalizationEnabled = it) }
             }
-
             SettingsSection("Privacy") {
                 SettingsToggle("Share anonymous diagnostics", "Off by default. No conversations are included by this setting.", settings.diagnosticsSharingEnabled) { settings = settings.copy(diagnosticsSharingEnabled = it) }
-                Text("Profile preferences stay in local app storage. The AI provider key is encrypted with Android Keystore and is never displayed after saving.", style = MaterialTheme.typography.bodySmall)
+                Text("Profile and voice preferences stay in local app storage. The AI provider key is encrypted with Android Keystore.", style = MaterialTheme.typography.bodySmall)
             }
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
