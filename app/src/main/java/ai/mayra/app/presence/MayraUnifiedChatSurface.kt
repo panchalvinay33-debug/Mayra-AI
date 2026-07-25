@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -114,10 +113,7 @@ fun MayraUnifiedChatSurface(
                     onOpenRuntime = onOpenRuntime
                 )
 
-                CompactMayraPresence(
-                    userName = userName,
-                    visualState = visualState
-                )
+                CompactMayraPresence(userName = userName, visualState = visualState)
 
                 LazyColumn(
                     state = listState,
@@ -125,9 +121,7 @@ fun MayraUnifiedChatSurface(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (messages.isEmpty()) {
-                        item {
-                            EmptyConversationPrompt(userName)
-                        }
+                        item { EmptyConversationPrompt(userName) }
                     }
                     items(messages, key = { it.timestamp }) { message ->
                         UnifiedMessageBubble(message)
@@ -232,14 +226,13 @@ private fun UnifiedHeader(
 
 @Composable
 private fun CompactMayraPresence(userName: String, visualState: UnifiedMayraVisualState) {
-    val presence = visualState.toPresenceState()
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         MayraCharacterPresence(
-            state = presence,
+            state = visualState.toPresenceState(),
             modifier = Modifier.fillMaxWidth().height(154.dp)
         )
         Surface(
@@ -349,11 +342,11 @@ private fun QuickPromptRow(onQuickPrompt: (String) -> Unit) {
 }
 
 private fun UnifiedMayraVisualState.toPresenceState(): MayraPresenceState = when (this) {
-    UnifiedMayraVisualState.READY -> MayraPresenceState.IDLE
-    UnifiedMayraVisualState.LISTENING -> MayraPresenceState.LISTENING
+    UnifiedMayraVisualState.READY,
+    UnifiedMayraVisualState.LISTENING,
+    UnifiedMayraVisualState.SPEAKING -> MayraPresenceState.IDLE
     UnifiedMayraVisualState.UNDERSTANDING,
     UnifiedMayraVisualState.THINKING -> MayraPresenceState.THINKING
-    UnifiedMayraVisualState.SPEAKING -> MayraPresenceState.SPEAKING
     UnifiedMayraVisualState.OFFLINE -> MayraPresenceState.OFFLINE
     UnifiedMayraVisualState.ERROR -> MayraPresenceState.NEEDS_ATTENTION
 }
