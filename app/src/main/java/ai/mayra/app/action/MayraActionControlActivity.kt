@@ -1,6 +1,11 @@
 package ai.mayra.app.action
 
+import ai.mayra.app.floating.FloatingMayraPreferences
+import ai.mayra.app.floating.FloatingMayraService
+import ai.mayra.app.safety.MayraGlobalStopStore
 import ai.mayra.app.ui.theme.MayraAITheme
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,9 +36,15 @@ class MayraActionControlActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val engine = MayraActionRuntime.install(applicationContext)
+        val stopStore = MayraGlobalStopStore(applicationContext)
         setContent {
             MayraAITheme {
-                MayraActionControlScreen(engine = engine, onClose = ::finish)
+                MayraActionControlScreen(
+                    context = applicationContext,
+                    engine = engine,
+                    stopStore = stopStore,
+                    onClose = ::finish
+                )
             }
         }
     }
@@ -41,11 +52,14 @@ class MayraActionControlActivity : ComponentActivity() {
 
 @Composable
 private fun MayraActionControlScreen(
+    context: Context,
     engine: MayraActionEngine,
+    stopStore: MayraGlobalStopStore,
     onClose: () -> Unit
 ) {
     var refresh by remember { mutableIntStateOf(0) }
-    val stopped = remember(refresh) { engine.isStopped() }
+    val stopSnapshot = remember(refresh) { stopStore.snapshot() }
+    val stopped = stopSnapshot.stopped || engine.isStopped()
     val events = remember(refresh) { engine.auditSnapshot().takeLast(50).reversed() }
 
     Scaffold { padding ->
@@ -57,30 +71,26 @@ private fun MayraActionControlScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                "Mayra Action Controls",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Mayra Action Controls", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(
                 if (stopped) {
-                    "All new phone actions are stopped. Chat and non-action features remain available."
+                    "Global Stop is active and survives app restart, phone reboot and app update. New phone actions and automatic Floating Mayra startup remain blocked."
                 } else {
                     "Phone actions are enabled and protected by capability, permission, risk and confirmation checks."
                 }
             )
 
             Card(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("Emergency kill switch", fontWeight = FontWeight.SemiBold)
-                    Text("Use this whenever you want Mayra to stop launching new phone actions immediately.")
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Persistent emergency kill switch", fontWeight = FontWeight.SemiBold)
+                    Text("Stop immediately disables new Mayra phone actions and prevents the floating companion from automatically returning after restart.")
+                    stopSnapshot.reason?.takeIf(String::isNotBlank)?.let {
+                        Text("Last change: $it", style = MaterialTheme.typography.bodySmall)
+                    }
                     if (stopped) {
                         Button(
                             onClick = {
-                                engine.resume()
+                                MayraActionRuntime.resume("Owner resumed Mayra from Action Controls.")
                                 refresh++
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -88,7 +98,9 @@ private fun MayraActionControlScreen(
                     } else {
                         OutlinedButton(
                             onClick = {
-                                engine.stopAll()
+                                MayraActionRuntime.stopAll("Owner activated Global Stop from Action Controls.")
+                                FloatingMayraPreferences(context).enabled = false
+                                context.stopService(Intent(context, FloatingMayraService::class.java))
                                 refresh++
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -98,14 +110,8 @@ private fun MayraActionControlScreen(
             }
 
             Card(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Visible action history", fontWeight = FontWeight.SemiBold)
                         Text("${events.size} shown")
                     }
@@ -114,7 +120,7 @@ private fun MayraActionControlScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                     if (events.isEmpty()) {
-                        Text("No actions have been processed by the new safety engine yet.")
+                        Text("No actions have been processed by the safety engine yet.")
                     } else {
                         events.forEach { event ->
                             Card(Modifier.fillMaxWidth()) {
@@ -143,9 +149,7 @@ private fun MayraActionControlScreen(
                 "Opening an app, dialer, message composer or reminder screen is a user-visible handoff—not proof that the final action completed.",
                 style = MaterialTheme.typography.bodySmall
             )
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                Text("Close")
-            }
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
         }
     }
 }
