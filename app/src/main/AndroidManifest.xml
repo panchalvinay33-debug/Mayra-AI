@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -22,6 +25,7 @@
     </queries>
 
     <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
+        <activity android:name=".floating.FloatingMayraActivity" android:exported="false" />
         <activity android:name=".testing.MayraDeviceTestActivity" android:exported="false" />
         <activity android:name=".calendar.MayraAgendaActivity" android:exported="false" />
         <activity android:name=".reminder.MayraReminderActivity" android:exported="false" />
@@ -37,6 +41,14 @@
         <activity android:name=".presence.MayraPresenceActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
+        <service
+            android:name=".floating.FloatingMayraService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-enabled floating Mayra companion overlay" />
+        </service>
         <service android:name=".background.MayraNotificationListener" android:exported="false" android:label="Mayra notification intelligence" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
             <meta-data android:name="android.service.notification.default_filter_types" android:value="conversations|alerting" />
