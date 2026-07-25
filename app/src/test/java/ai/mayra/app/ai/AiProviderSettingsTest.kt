@@ -41,16 +41,17 @@ class AiProviderSettingsTest {
     }
 
     @Test
-    fun `new key must use expected prefix`() {
+    fun `new key must use valid bounded format`() {
         val config = AiProviderConfig(
             provider = AiProviderKind.OPENAI,
             model = "gpt-5-mini"
         )
 
         assertEquals(
-            "OpenAI API keys normally start with sk-.",
+            "OpenAI API key format is not valid.",
             config.validationMessage("not-a-key")
         )
+        assertNull(config.validationMessage("sk-abcdefgh12345678"))
     }
 
     @Test
@@ -78,5 +79,18 @@ class AiProviderSettingsTest {
 
         assertEquals("Enter an OpenAI model name.", config.validationMessage(null))
         assertFalse(config.onlineEnabled)
+    }
+
+    @Test
+    fun `model with unsupported characters is rejected`() {
+        val config = AiProviderConfig(
+            provider = AiProviderKind.OPENAI,
+            model = "../unsafe model",
+            apiKeyConfigured = true
+        )
+
+        assertEquals("Model name contains unsupported characters.", config.validationMessage(null))
+        assertFalse(config.onlineEnabled)
+        assertEquals("Choose a valid OpenAI model", config.status())
     }
 }
