@@ -10,12 +10,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(application) {
     private val parser = MayraWorkspaceIntentParser()
     private val store = MayraWorkspaceSessionStore(application)
     private val globalStop = MayraGlobalStopStore(application)
+    private val saveMutex = Mutex()
     private val _uiState = MutableStateFlow(MayraWorkspaceUiState())
     val uiState: StateFlow<MayraWorkspaceUiState> = _uiState.asStateFlow()
 
@@ -23,7 +26,11 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         viewModelScope.launch {
             val restored = withContext(Dispatchers.IO) { store.load() }
             if (restored != null) {
-                _uiState.update { it.copy(session = restored, lastSavedAt = restored.updatedAt) }
+                _uiState.update { current ->
+                    if (current.session.revision == 0L && current.input.isBlank()) {
+                        current.copy(session = restored, lastSavedAt = restored.updatedAt)
+                    } else current
+                }
             }
         }
     }
@@ -37,9 +44,8 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         if (text.isBlank()) return
         val intent = parser.parse(text)
         val now = System.currentTimeMillis()
-        val stopped = globalStop.isStopped()
         val task = when {
-            stopped -> MayraWorkspaceTask(
+            globalStop.isStopped() -> MayraWorkspaceTask(
                 intent = intent,
                 state = MayraWorkspaceTaskState.FAILED,
                 statusMessage = "Global Stop is active. Resume Mayra actions before continuing.",
@@ -85,26 +91,26 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
                     revision = 1L
                 )
             } else existing.table
-            val nextSession = existing.copy(
-                transcript = (existing.transcript + text).takeLast(MAX_TRANSCRIPT_ENTRIES),
-                tasks = (existing.tasks + task).takeLast(MAX_TASKS),
-                table = nextTable,
-                activeTaskId = task.id,
-                revision = existing.revision + 1L,
-                updatedAt = now
+            current.copy(
+                session = existing.copy(
+                    transcript = (existing.transcript + text).takeLast(MAX_TRANSCRIPT_ENTRIES),
+                    tasks = (existing.tasks + task).takeLast(MAX_TASKS),
+                    table = nextTable,
+                    activeTaskId = task.id,
+                    revision = existing.revision + 1L,
+                    updatedAt = now
+                ),
+                input = "",
+                error = null
             )
-            current.copy(session = nextSession, input = "", error = null)
         }
         autosave()
     }
 
-    fun pauseActiveTask() = mutateActiveTask(
-        MayraWorkspaceTaskState.PAUSED,
-        "Paused by the owner."
-    )
+    fun pauseActiveTask() = mutateActiveTask(MayraWorkspaceTaskState.PAUSED, "Paused by the owner.")
 
     fun continueActiveTask() {
-        val task = activeTask() ?: return
+        val task = activeTask()?.takeUnless { it.state in TERMINAL_STATES } ?: return
         val target = if (task.intent.requiresConfirmation) {
             MayraWorkspaceTaskState.WAITING_FOR_CONFIRMATION
         } else {
@@ -113,10 +119,7 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         mutateActiveTask(target, waitingMessage(task.intent.action))
     }
 
-    fun cancelActiveTask() = mutateActiveTask(
-        MayraWorkspaceTaskState.CANCELLED,
-        "Cancelled by the owner."
-    )
+    fun cancelActiveTask() = mutateActiveTask(MayraWorkspaceTaskState.CANCELLED, "Cancelled by the owner.")
 
     fun updateNotes(value: String) {
         val now = System.currentTimeMillis()
@@ -133,23 +136,22 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun clearSession() {
-        val fresh = MayraWorkspaceSession()
-        _uiState.value = MayraWorkspaceUiState(session = fresh)
-        viewModelScope.launch(Dispatchers.IO) { store.clear() }
+        _uiState.value = MayraWorkspaceUiState(session = MayraWorkspaceSession())
+        viewModelScope.launch(Dispatchers.IO) { saveMutex.withLock { store.clear() } }
     }
 
     private fun mutateActiveTask(state: MayraWorkspaceTaskState, message: String) {
         val activeId = _uiState.value.session.activeTaskId ?: return
+        val currentTask = activeTask()?.takeUnless { it.state in TERMINAL_STATES } ?: return
         val now = System.currentTimeMillis()
         _uiState.update { current ->
-            val tasks = current.session.tasks.map { task ->
-                if (task.id == activeId && task.state !in TERMINAL_STATES) {
-                    task.copy(state = state, statusMessage = message, updatedAt = now)
-                } else task
-            }
             current.copy(
                 session = current.session.copy(
-                    tasks = tasks,
+                    tasks = current.session.tasks.map { task ->
+                        if (task.id == currentTask.id && task.id == activeId) {
+                            task.copy(state = state, statusMessage = message, updatedAt = now)
+                        } else task
+                    },
                     revision = current.session.revision + 1L,
                     updatedAt = now
                 )
@@ -167,20 +169,30 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         val snapshot = _uiState.value.session
         _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { store.save(snapshot) } }
-                .onSuccess {
-                    _uiState.update { it.copy(isSaving = false, lastSavedAt = snapshot.updatedAt, error = null) }
-                }
-                .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            isSaving = false,
-                            error = error.message ?: "Workspace autosave failed."
-                        )
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    saveMutex.withLock {
+                        if (snapshot.revision >= _uiState.value.lastSavedAtRevision()) {
+                            store.save(snapshot)
+                        }
                     }
                 }
+            }.onSuccess {
+                _uiState.update { current ->
+                    if (snapshot.revision >= current.session.revision) {
+                        current.copy(isSaving = false, lastSavedAt = snapshot.updatedAt, error = null)
+                    } else current.copy(isSaving = true)
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(isSaving = false, error = error.message ?: "Workspace autosave failed.")
+                }
+            }
         }
     }
+
+    private fun MayraWorkspaceUiState.lastSavedAtRevision(): Long =
+        if (lastSavedAt == session.updatedAt) session.revision else 0L
 
     private fun extractColumns(text: String): List<String> {
         val normalized = text.lowercase()
