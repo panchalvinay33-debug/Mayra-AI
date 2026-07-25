@@ -23,9 +23,7 @@ object MayraNotificationSafetyPolicy {
         }
 
         val safeConversation = sanitizeConversationKey(rawConversationKey, sensitivity, privacyMode)
-        val replyAllowed = !globalStopActive &&
-            allowReply &&
-            sensitivity != NotificationSensitivity.OTP
+        val replyAllowed = !globalStopActive && allowReply && sensitivity != NotificationSensitivity.OTP
         val proactiveAllowed = !globalStopActive &&
             proactiveSuggestionsEnabled &&
             sensitivity == NotificationSensitivity.NORMAL &&
@@ -55,6 +53,9 @@ object MayraNotificationSafetyPolicy {
         if (clean.isBlank()) return null
         if (privacyMode == NotificationPrivacyMode.REDACT_CONTENT) return "Private conversation"
         if (sensitivity != NotificationSensitivity.NORMAL) return "Protected conversation"
-        return NotificationContentGuard.redactSecrets(clean).take(120)
+        return clean
+            .replace(Regex("(?i)\\b(?:otp|password|passcode|pin|cvv|verification code)\\b"), "protected")
+            .replace(Regex("\\b\\d{4,16}\\b"), "••••")
+            .take(120)
     }
 }
