@@ -136,14 +136,15 @@ class DeviceActionSafetyGateReliabilityTest {
             val ready = assertIs<ActionGateDecision.Ready>(
                 gate.evaluate(request, PermissionSnapshot(granted = request.requiredPermissions))
             )
-            gate.recordFailed(ready.request, "Bearer sk-secret123456789 failed\nprivately")
+            val unsafeDetail = "Bearer sk-secret123456789 failed" + System.lineSeparator() + "privately"
+            gate.recordFailed(ready.request, unsafeDetail)
             now++
         }
 
         val audit = gate.snapshot().auditEntries
         assertEquals(20, audit.size)
         assertTrue(audit.none { it.detail.orEmpty().contains("sk-secret") })
-        assertTrue(audit.none { it.detail.orEmpty().contains('\n') })
+        assertTrue(audit.none { it.detail.orEmpty().contains(System.lineSeparator()) })
     }
 
     private fun request(
