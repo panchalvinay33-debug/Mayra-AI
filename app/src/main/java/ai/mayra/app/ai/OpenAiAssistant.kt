@@ -33,19 +33,27 @@ class HybridMayraAssistant(
             return localAssistant.reply(boundedMessage, conversation)
         }
 
-        val remote = runCatching { remoteFactory(config, key) }.getOrNull()
-            ?: return offlineFallback(boundedMessage, conversation)
+        val remote = runCatching { remoteFactory(config, key) }
+            .getOrElse { error -> return offlineFallback(boundedMessage, conversation, error) }
         return remote.reply(boundedMessage, conversation)
-            .recoverCatching {
-                offlineFallback(boundedMessage, conversation).getOrThrow()
+            .recoverCatching { error ->
+                offlineFallback(boundedMessage, conversation, error).getOrThrow()
             }
     }
 
     private suspend fun offlineFallback(
         message: String,
-        conversation: List<MayraMessage>
+        conversation: List<MayraMessage>,
+        cause: Throwable? = null
     ): Result<String> = localAssistant.reply(message, conversation).map { answer ->
-        "$answer\n\nOnline AI was unavailable, so I answered with Mayra's offline brain."
+        val reason = cause?.message
+            ?.let(AiProviderSafetyPolicy::sanitizeConnectionMessage)
+            ?.takeIf { it.isNotBlank() && it != "Connection test failed." }
+        buildString {
+            append(answer)
+            append("\n\nOnline AI was unavailable, so I answered with Mayra's offline brain.")
+            if (reason != null) append("\nReason: ").append(reason)
+        }
     }
 }
 
@@ -99,6 +107,7 @@ class OpenAiResponsesAssistant(
                     .put("model", model)
                     .put("input", input)
                     .put("max_output_tokens", MAX_OUTPUT_TOKENS)
+                    .put("store", false)
                     .toString()
                 require(payload.length <= MAX_REQUEST_CHARACTERS) { "Online AI request is too large." }
 
@@ -159,30 +168,21 @@ class OpenAiResponsesAssistant(
 }
 
 class AiProviderConnectionTester(
-    private val connectionFactory: (URL) -> HttpURLConnection = { url ->
-        url.openConnection() as HttpURLConnection
+    private val assistantFactory: (String, String) -> MayraAssistant = { apiKey, model ->
+        OpenAiResponsesAssistant(apiKey = apiKey, model = model)
     }
 ) {
-    suspend fun test(apiKey: String, model: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            val normalizedKey = AiProviderSafetyPolicy.normalizeApiKey(apiKey)
-            val normalizedModel = AiProviderSafetyPolicy.normalizeModel(model)
+    suspend fun test(apiKey: String, model: String): Result<String> {
+        val normalizedKey = AiProviderSafetyPolicy.normalizeApiKey(apiKey)
+        val normalizedModel = AiProviderSafetyPolicy.normalizeModel(model)
+        return runCatching {
             require(AiProviderSafetyPolicy.validateNewApiKey(normalizedKey) == null) { "API key is invalid." }
             require(AiProviderSafetyPolicy.validateModel(normalizedModel) == null) { "Model name is invalid." }
-            val target = "https://api.openai.com/v1/models/$normalizedModel"
-            AiProviderSafetyPolicy.requireHttpsEndpoint(target)
-            val connection = connectionFactory(URL(target)).apply {
-                requestMethod = "GET"
-                connectTimeout = 15_000
-                readTimeout = 30_000
-                instanceFollowRedirects = false
-                setRequestProperty("Authorization", "Bearer $normalizedKey")
-                setRequestProperty("Accept", "application/json")
-            }
-            val json = JSONObject(connection.useBoundedResponse())
-            val resolvedModel = AiProviderSafetyPolicy.normalizeModel(json.optString("id", normalizedModel))
-                .ifBlank { normalizedModel }
-            "Connected successfully · $resolvedModel"
+            val response = assistantFactory(normalizedKey, normalizedModel)
+                .reply("Reply with only the word OK.", emptyList())
+                .getOrThrow()
+            require(response.trim().isNotBlank()) { "OpenAI returned an empty response." }
+            "Connected successfully · $normalizedModel · generation verified"
         }.recoverCatching { error ->
             throw IllegalStateException(
                 AiProviderSafetyPolicy.sanitizeConnectionMessage(error.message),
