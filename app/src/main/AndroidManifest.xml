@@ -26,6 +26,7 @@
     </queries>
 
     <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
+        <activity android:name=".memory.MayraMemoryPrivacyActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryBackupActivity" android:exported="false" />
         <activity android:name=".document.MayraDocumentActivity" android:exported="false" />
         <activity android:name=".memory.MayraVoiceNotesActivity" android:exported="false" />
@@ -46,25 +47,12 @@
         <activity android:name=".presence.MayraPresenceActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
-        <service
-            android:name=".floating.FloatingMayraService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-enabled floating Mayra companion overlay" />
+        <service android:name=".floating.FloatingMayraService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled floating Mayra companion overlay" />
         </service>
-        <service
-            android:name=".assistive.MayraAssistiveService"
-            android:exported="false"
-            android:label="Mayra assistive context"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/mayra_accessibility_service" />
+        <service android:name=".assistive.MayraAssistiveService" android:exported="false" android:label="Mayra assistive context" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/mayra_accessibility_service" />
         </service>
         <service android:name=".background.MayraNotificationListener" android:exported="false" android:label="Mayra notification intelligence" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
