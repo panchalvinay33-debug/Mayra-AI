@@ -1,8 +1,10 @@
 package ai.mayra.app.file
 
 import ai.mayra.app.ui.theme.MayraAITheme
-import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 
 class MayraFileAccessActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,12 +51,24 @@ private fun MayraFileAccessScreen(onClose: () -> Unit) {
     val registry = remember { MayraFileGrantRegistry(context) }
     var snapshot by remember { mutableStateOf(store.read()) }
     var message by remember { mutableStateOf<String?>(null) }
+    var mediaPermissionGranted by remember { mutableStateOf(hasMediaPermission(context)) }
+
+    val mediaPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        mediaPermissionGranted = granted
+        message = if (granted) {
+            MayraFileInventoryWorker.enqueue(context)
+            "Media access granted. Inventory queued."
+        } else {
+            "Media permission skipped. Selected SAF folders will still work."
+        }
+    }
 
     val treeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
             runCatching {
                 registry.register(uri, uri.lastPathSegment.orEmpty())
                 MayraFileInventoryWorker.enqueue(context)
+                MayraFileInventoryWorker.schedulePeriodic(context)
                 snapshot = store.read()
                 message = "Folder access saved. Background inventory queued."
             }.onFailure { message = it.message ?: "Could not save folder access." }
@@ -77,14 +92,27 @@ private fun MayraFileAccessScreen(onClose: () -> Unit) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("Index status", fontWeight = FontWeight.SemiBold)
                     Text("${snapshot.files.size} files · ${snapshot.grants.count { it.enabled }} folders · generation ${snapshot.generation}")
+                    Text(
+                        if (mediaPermissionGranted) "Pictures access enabled."
+                        else "Pictures access not granted; SAF-selected folders still work.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Text("PDF text and OCR are not active yet; this stage indexes permitted metadata honestly.", style = MaterialTheme.typography.bodySmall)
                 }
+            }
+
+            if (!mediaPermissionGranted) {
+                OutlinedButton(
+                    onClick = { mediaPermissionLauncher.launch(mediaPermissionName()) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Allow picture inventory") }
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { treeLauncher.launch(null) }, modifier = Modifier.weight(1f)) { Text("Add folder") }
                 OutlinedButton(onClick = {
                     MayraFileInventoryWorker.enqueue(context)
+                    if (registry.list().isNotEmpty()) MayraFileInventoryWorker.schedulePeriodic(context)
                     message = "Inventory queued."
                 }, modifier = Modifier.weight(1f)) { Text("Scan now") }
                 OutlinedButton(onClick = { snapshot = store.read() }, modifier = Modifier.weight(1f)) { Text("Refresh") }
@@ -99,7 +127,10 @@ private fun MayraFileAccessScreen(onClose: () -> Unit) {
                         Card(shape = RoundedCornerShape(14.dp)) {
                             Column(Modifier.padding(12.dp)) {
                                 Text(grant.label, fontWeight = FontWeight.SemiBold)
-                                Text(if (registry.hasPersistedReadAccess(grant.treeUri)) "Access active" else "Access lost", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    if (registry.hasPersistedReadAccess(grant.treeUri)) "Access active" else "Access lost",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                                 TextButton(onClick = {
                                     registry.remove(grant.treeUri)
                                     snapshot = store.read()
@@ -122,3 +153,12 @@ private fun MayraFileAccessScreen(onClose: () -> Unit) {
         }
     }
 }
+
+private fun mediaPermissionName(): String = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    Manifest.permission.READ_MEDIA_IMAGES
+} else {
+    Manifest.permission.READ_EXTERNAL_STORAGE
+}
+
+private fun hasMediaPermission(context: android.content.Context): Boolean =
+    ContextCompat.checkSelfPermission(context, mediaPermissionName()) == PackageManager.PERMISSION_GRANTED
