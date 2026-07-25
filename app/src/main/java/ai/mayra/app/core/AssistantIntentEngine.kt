@@ -29,7 +29,8 @@ class AssistantIntentEngine(
                 normalized,
                 CALL_COMMANDS,
                 "Who should I call?",
-                AssistantIntent::CallContact
+                AssistantIntent::CallContact,
+                communicationTarget = true
             )
             normalized.findCommand(OPEN_COMMANDS) != null -> parseTargetIntent(
                 normalized,
@@ -45,16 +46,18 @@ class AssistantIntentEngine(
         normalized: String,
         commands: List<String>,
         emptyMessage: String,
-        factory: (String) -> AssistantIntent
+        factory: (String) -> AssistantIntent,
+        communicationTarget: Boolean = false
     ): AssistantIntent {
         val match = normalized.findCommand(commands) ?: return AssistantIntent.Invalid(emptyMessage)
         val after = normalized.substring(match.index + match.keyword.length).cleanCommandSide()
         val before = normalized.substring(0, match.index).cleanCommandSide()
-        val target = when {
+        val rawTarget = when {
             after.isUsefulTarget() -> after
             before.isUsefulTarget() -> before
             else -> ""
         }
+        val target = if (communicationTarget) rawTarget.cleanCommunicationTarget() else rawTarget
         return if (target.isBlank()) AssistantIntent.Invalid(emptyMessage) else factory(target)
     }
 
@@ -62,12 +65,13 @@ class AssistantIntentEngine(
         val match = normalized.findCommand(MESSAGE_COMMANDS)
             ?: return AssistantIntent.Invalid("Who should I message?")
 
-        val before = normalized.substring(0, match.index).cleanCommandSide()
+        val before = normalized.substring(0, match.index).cleanCommandSide().cleanCommunicationTarget()
         val beforeOriginal = original.substring(0, match.index)
             .trim()
             .removeLeadingWordsIgnoreCase(COMMAND_FILLER_WORDS)
             .removeTrailingWordsIgnoreCase(COMMAND_TRAILING_WORDS)
             .cleanTarget()
+            .cleanCommunicationTarget()
         val afterNormalized = normalized.substring(match.index + match.keyword.length)
             .trim().removeLeadingWords(MESSAGE_ACTION_WORDS)
         val afterOriginal = original.substringAfterKeyword(match.keyword)
@@ -84,10 +88,10 @@ class AssistantIntentEngine(
             .minByOrNull { it.second }
 
         if (separator == null) {
-            return AssistantIntent.ComposeMessage(afterOriginal.cleanTarget(), null)
+            return AssistantIntent.ComposeMessage(afterOriginal.cleanTarget().cleanCommunicationTarget(), null)
         }
 
-        val recipient = afterOriginal.substring(0, separator.second).cleanTarget()
+        val recipient = afterOriginal.substring(0, separator.second).cleanTarget().cleanCommunicationTarget()
         val bodyStart = separator.second + separator.first.length
         val body = afterOriginal.substring(bodyStart.coerceAtMost(afterOriginal.length))
             .trim().trimStart(':').trim().ifBlank { null }
@@ -154,6 +158,17 @@ class AssistantIntentEngine(
     private fun String.cleanCommandSide(): String = trim()
         .removeLeadingWords(COMMAND_FILLER_WORDS)
         .removeTrailingWords(COMMAND_TRAILING_WORDS)
+        .cleanTarget()
+
+    private fun String.cleanCommunicationTarget(): String = trim()
+        .replace(
+            Regex("(?i)^\\b(?:contact|contacts|phonebook)\\b\\s*(?:(?:mein|me)\\s*)?(?:(?:search|find|dhundo|dhoondo)\\s*)?(?:(?:karo|kar|do)\\s*)?"),
+            " "
+        )
+        .replace(Regex("(?i)\\b(?:ke\\s+)?number\\s+(?:par|per|pe)\\b"), " ")
+        .replace(Regex("(?i)\\b(?:aur|and)\\b\\s*$"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
         .cleanTarget()
 
     private fun String.isUsefulTarget(): Boolean =
