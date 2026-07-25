@@ -27,6 +27,8 @@ $requiredFiles = @(
     "app/src/main/AndroidManifest.xml",
     ".github/workflows/android-ci.yml",
     "app/src/main/java/ai/mayra/app/MayraApplication.kt",
+    "app/src/main/java/ai/mayra/app/presence/MayraCompanionActivity.kt",
+    "app/src/main/java/ai/mayra/app/presence/MayraUnifiedChatSurface.kt",
     "app/src/main/java/ai/mayra/app/diagnostics/MayraStartupHealth.kt",
     "app/src/main/java/ai/mayra/app/diagnostics/MayraStartupDiagnosticsActivity.kt",
     "app/src/test/java/ai/mayra/app/diagnostics/MayraStartupHealthTest.kt",
@@ -118,7 +120,11 @@ $results.Add((Write-Check "Full backup disabled" ($manifest -match 'android:full
 $results.Add((Write-Check "Cleartext traffic disabled" ($manifest -match 'android:usesCleartextTraffic="false"') 'Network providers require encryption'))
 $results.Add((Write-Check "Startup diagnostics private" ($manifest -match 'MayraStartupDiagnosticsActivity" android:exported="false"') 'Startup health is owner-only'))
 $exportedActivities = [regex]::Matches($manifest, '<activity[^>]+android:exported="true"').Count
-$results.Add((Write-Check "Only launcher exported" ($exportedActivities -eq 1 -and $manifest -match 'MayraPresenceActivity" android:exported="true"') "Found $exportedActivities exported activity"))
+$results.Add((Write-Check "Only launcher exported" ($exportedActivities -eq 1 -and $manifest -match 'MayraCompanionActivity" android:exported="true"') "Found $exportedActivities exported activity"))
+$companionText = Read-Text "app/src/main/java/ai/mayra/app/presence/MayraCompanionActivity.kt"
+$unifiedUiText = Read-Text "app/src/main/java/ai/mayra/app/presence/MayraUnifiedChatSurface.kt"
+$results.Add((Write-Check "Unified companion launcher" ($companionText -match 'MayraUnifiedChatSurface' -and $companionText -match 'ChatViewModel') 'Launcher keeps Mayra and chat on one screen'))
+$results.Add((Write-Check "Unified voice state" ($unifiedUiText -match 'UnifiedMayraVisualState' -and $unifiedUiText -match 'Ready to listen') 'Presence reflects ready, listening, thinking and speaking states'))
 
 $applicationText = Read-Text "app/src/main/java/ai/mayra/app/MayraApplication.kt"
 $results.Add((Write-Check "Startup health begins" ($applicationText -match 'startupHealth\.begin\(\)') 'Interrupted starts can be detected'))
