@@ -39,7 +39,7 @@ class ActionDispatcherTest {
         val executor = FakeExecutor(confirmResult = ActionExecutionResult.Success)
         val dispatcher = ActionDispatcher(executor)
 
-        assertEquals("Action completed.", dispatcher.dispatch(AssistantIntent.Chat("haan")))
+        assertEquals("Action handed to Android.", dispatcher.dispatch(AssistantIntent.Chat("haan")))
         assertEquals(1, executor.confirmCalls)
     }
 
