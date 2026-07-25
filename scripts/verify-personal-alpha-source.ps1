@@ -28,6 +28,13 @@ $requiredFiles = @(
     "app/src/main/java/ai/mayra/app/safety/MayraGlobalStop.kt",
     "app/src/test/java/ai/mayra/app/safety/MayraGlobalStopStoreTest.kt",
     "app/src/main/java/ai/mayra/app/action/MayraActionRuntime.kt",
+    "app/src/main/java/ai/mayra/app/core/actions/DeviceActionSafety.kt",
+    "app/src/main/java/ai/mayra/app/core/actions/AndroidDeviceActionSpec.kt",
+    "app/src/main/java/ai/mayra/app/platform/device/AndroidActionExecutor.kt",
+    "app/src/main/java/ai/mayra/app/platform/device/MayraSafeActionExecutor.kt",
+    "app/src/main/java/ai/mayra/app/identity/MayraContactIdentity.kt",
+    "app/src/test/java/ai/mayra/app/core/actions/DeviceActionSafetyGateReliabilityTest.kt",
+    "app/src/test/java/ai/mayra/app/identity/MayraContactIdentityTest.kt",
     "app/src/main/java/ai/mayra/app/background/MayraBootReceiver.kt",
     "app/src/main/java/ai/mayra/app/background/MayraNotificationListener.kt",
     "app/src/main/java/ai/mayra/app/background/MayraNotificationSafetyPolicy.kt",
@@ -101,6 +108,10 @@ $manifest = Get-Content (Join-Path $repoRoot "app/src/main/AndroidManifest.xml")
 $results.Add((Write-Check "Launcher declared" ($manifest -match 'android\.intent\.category\.LAUNCHER') 'Launcher entry exists'))
 $results.Add((Write-Check "Internet permission" ($manifest -match 'android\.permission\.INTERNET') 'Optional online AI networking declared'))
 $results.Add((Write-Check "Notification permission" ($manifest -match 'android\.permission\.POST_NOTIFICATIONS') 'Android 13+ alerts declared'))
+$results.Add((Write-Check "No direct call permission" (-not ($manifest -match 'android\.permission\.CALL_PHONE')) 'Calls remain owner-visible dialer handoffs'))
+$results.Add((Write-Check "No direct SMS permission" (-not ($manifest -match 'android\.permission\.SEND_SMS')) 'Messages remain owner-reviewed composer handoffs'))
+$results.Add((Write-Check "Dialer handoff query" ($manifest -match 'android\.intent\.action\.DIAL') 'Android dialer can be resolved without direct call access'))
+$results.Add((Write-Check "Message composer query" ($manifest -match 'android\.intent\.action\.SENDTO' -and $manifest -match 'android:scheme="smsto"') 'Android message composer can be resolved'))
 $results.Add((Write-Check "Android auto backup disabled" ($manifest -match 'android:allowBackup="false"') 'Sensitive state uses explicit Mayra backup only'))
 $results.Add((Write-Check "Full backup disabled" ($manifest -match 'android:fullBackupContent="false"') 'No implicit cloud extraction of Mayra data'))
 $results.Add((Write-Check "Cleartext traffic disabled" ($manifest -match 'android:usesCleartextTraffic="false"') 'Network providers must use encrypted transport'))
@@ -120,6 +131,19 @@ $results.Add((Write-Check "Persistent Global Stop" ($globalStopText -match 'mayr
 $results.Add((Write-Check "Action runtime obeys Global Stop" ($actionRuntimeText -match 'MayraGlobalStopStore' -and $actionRuntimeText -match 'store\.isStopped\(\)') 'Action engine restores persisted stop state'))
 $results.Add((Write-Check "Boot path obeys Global Stop" ($bootReceiverText -match 'MayraGlobalStopStore' -and $bootReceiverText -match 'if \(globallyStopped\)') 'Automation and floating companion remain stopped after reboot'))
 $results.Add((Write-Check "Reminders survive Global Stop" ($bootReceiverText -match 'MayraReminderRuntime\.rescheduleAll' -and $bootReceiverText.IndexOf('MayraReminderRuntime.rescheduleAll') -lt $bootReceiverText.IndexOf('if (globallyStopped)')) 'Owner-created reminder commitments remain scheduled'))
+
+$actionSafetyText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/core/actions/DeviceActionSafety.kt") -Raw
+$actionSpecText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/core/actions/AndroidDeviceActionSpec.kt") -Raw
+$androidExecutorText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/platform/device/AndroidActionExecutor.kt") -Raw
+$safeExecutorText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/platform/device/MayraSafeActionExecutor.kt") -Raw
+$identityText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/identity/MayraContactIdentity.kt") -Raw
+$results.Add((Write-Check "Review-first call handoff" ($actionSpecText -match 'ACTION_DIAL' -and -not ($actionSpecText -match 'ACTION_CALL')) 'Mayra opens the dialer but cannot silently place the call'))
+$results.Add((Write-Check "Review-first permission model" ($actionSafetyText -match 'CALL_CONTACT,\s*DeviceActionType\.SEND_MESSAGE -> setOf\(DevicePermission\.READ_CONTACTS\)') 'Call and message actions do not require direct phone/SMS permissions'))
+$results.Add((Write-Check "Duplicate action fingerprint" ($actionSafetyText -match 'safetyFingerprint' -and $actionSafetyText -match 'DUPLICATE_BLOCKED') 'Pending and recently executed identical actions are suppressed'))
+$results.Add((Write-Check "Stale action rejection" ($actionSafetyText -match 'Action request is stale' -and $actionSafetyText -match 'MAX_REQUEST_AGE_MILLIS') 'Old intents cannot be confirmed later'))
+$results.Add((Write-Check "One pending high-risk action" ($androidExecutorText -match 'Another call or message is waiting for confirmation' -and $safeExecutorText -match 'Another call or message is waiting for confirmation') 'Executors cannot orphan an earlier confirmation token'))
+$results.Add((Write-Check "Owner identity integration" ($androidExecutorText -match 'identityMatch' -and $safeExecutorText -match 'MayraContactIdentityStore') 'Owner aliases resolve before Android contact lookup'))
+$results.Add((Write-Check "Conservative contact matching" ($identityText -match 'MIN_PARTIAL_LENGTH = 4' -and $identityText -match 'MIN_SCORE_MARGIN') 'Short or tied partial contact names are never guessed'))
 
 $notificationListenerText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/background/MayraNotificationListener.kt") -Raw
 $notificationSafetyText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/background/MayraNotificationSafetyPolicy.kt") -Raw
