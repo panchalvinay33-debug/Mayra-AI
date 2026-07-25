@@ -3,17 +3,26 @@ name: Android CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, phase-5-testing-foundation]
+    branches:
+      - main
+      - batch-12-runtime-control-center
+      - stabilize/living-companion-v0.1
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - batch-12-runtime-control-center
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -25,10 +34,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Environment diagnostics
         shell: bash
@@ -36,6 +46,9 @@ jobs:
           set -euxo pipefail
           mkdir -p build/ci
           {
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Ref: $GITHUB_REF"
+            echo "SHA: $GITHUB_SHA"
             echo "Runner: $RUNNER_NAME"
             echo "OS: $RUNNER_OS"
             echo "Architecture: $RUNNER_ARCH"
@@ -76,7 +89,7 @@ jobs:
           set -o pipefail
           gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-runtime.log
 
-      - name: Run unit tests
+      - name: Run complete unit tests
         shell: bash
         run: |
           set -o pipefail
@@ -95,15 +108,23 @@ jobs:
           gradle --no-daemon --max-workers=2 :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-debug.log
           test -f app/build/outputs/apk/debug/app-debug.apk
           sha256sum app/build/outputs/apk/debug/app-debug.apk | tee build/ci/app-debug.sha256
-          cp app/build/outputs/apk/debug/app-debug.apk build/ci/Mayra-AI-personal-alpha-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "build/ci/Mayra-AI-personal-alpha-${GITHUB_SHA}.apk"
+          {
+            echo "source_sha=$GITHUB_SHA"
+            echo "source_ref=$GITHUB_REF"
+            echo "gradle=8.9"
+            echo "jdk=17"
+            echo "compile_sdk=35"
+          } > build/ci/build-metadata.txt
 
       - name: Upload personal alpha APK
         uses: actions/upload-artifact@v4
         with:
           name: mayra-personal-alpha-debug-${{ github.run_number }}
           path: |
-            build/ci/Mayra-AI-personal-alpha-debug.apk
+            build/ci/Mayra-AI-personal-alpha-${{ github.sha }}.apk
             build/ci/app-debug.sha256
+            build/ci/build-metadata.txt
           if-no-files-found: error
           retention-days: 14
 
