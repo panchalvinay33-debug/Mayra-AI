@@ -66,17 +66,29 @@ private fun AiProviderScreen(
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    fun refreshConfig() {
+        config = runCatching { store.read() }.getOrElse {
+            notice = "AI provider settings could not be read. Mayra will stay in local mode."
+            AiProviderConfig()
+        }
+    }
+
     fun saveConfig(): Boolean {
         val validation = config.validationMessage(apiKeyInput)
         if (validation != null) {
             notice = validation
             return false
         }
-        store.save(config, apiKeyInput.takeIf(String::isNotBlank))
-        config = store.read()
-        apiKeyInput = ""
-        notice = "AI provider settings saved."
-        return true
+        return runCatching {
+            store.save(config, apiKeyInput.takeIf(String::isNotBlank))
+            refreshConfig()
+            apiKeyInput = ""
+            notice = "AI provider settings saved."
+            true
+        }.getOrElse { error ->
+            notice = AiProviderSafetyPolicy.sanitizeConnectionMessage(error.message)
+            false
+        }
     }
 
     Scaffold { padding ->
@@ -136,7 +148,11 @@ private fun AiProviderScreen(
                         HorizontalDivider()
                         OutlinedTextField(
                             value = config.model,
-                            onValueChange = { config = config.copy(model = it.trimStart()) },
+                            onValueChange = {
+                                config = config.copy(
+                                    model = it.trimStart().take(AiProviderSafetyPolicy.MAX_MODEL_LENGTH)
+                                )
+                            },
                             label = { Text("Model") },
                             supportingText = { Text("Default: ${AiProviderConfig.DEFAULT_OPENAI_MODEL}") },
                             singleLine = true,
@@ -145,14 +161,16 @@ private fun AiProviderScreen(
                         )
                         OutlinedTextField(
                             value = apiKeyInput,
-                            onValueChange = { apiKeyInput = it.trim() },
+                            onValueChange = {
+                                apiKeyInput = it.trim().take(AiProviderSafetyPolicy.MAX_API_KEY_LENGTH)
+                            },
                             label = {
                                 Text(if (config.apiKeyConfigured) "Replace API key (optional)" else "OpenAI API key")
                             },
                             supportingText = {
                                 Text(
                                     if (config.apiKeyConfigured) {
-                                        "A key is encrypted in Android Keystore. Leave blank to keep it."
+                                        "A readable key is encrypted in Android Keystore. Leave blank to keep it."
                                     } else {
                                         "The key is encrypted before local storage and is never displayed again."
                                     }
@@ -174,9 +192,10 @@ private fun AiProviderScreen(
                             OutlinedButton(
                                 onClick = {
                                     if (!saveConfig()) return@OutlinedButton
-                                    val key = store.apiKey()
+                                    val key = runCatching { store.apiKey() }.getOrNull()
                                     if (key.isNullOrBlank()) {
-                                        notice = "Save an API key before testing."
+                                        refreshConfig()
+                                        notice = "The encrypted API key is unavailable. Enter and save it again."
                                         return@OutlinedButton
                                     }
                                     busy = true
@@ -184,14 +203,15 @@ private fun AiProviderScreen(
                                     scope.launch {
                                         tester.test(key, store.read().model)
                                             .onSuccess { message ->
-                                                store.recordConnection(true, message)
-                                                config = store.read()
-                                                notice = message
+                                                val safeMessage = AiProviderSafetyPolicy.sanitizeConnectionMessage(message)
+                                                store.recordConnection(true, safeMessage)
+                                                refreshConfig()
+                                                notice = safeMessage
                                             }
                                             .onFailure { error ->
-                                                val message = error.message ?: "Connection test failed."
+                                                val message = AiProviderSafetyPolicy.sanitizeConnectionMessage(error.message)
                                                 store.recordConnection(false, message)
-                                                config = store.read()
+                                                refreshConfig()
                                                 notice = message
                                             }
                                         busy = false
@@ -205,10 +225,15 @@ private fun AiProviderScreen(
                         if (config.apiKeyConfigured) {
                             TextButton(
                                 onClick = {
-                                    store.clearApiKey()
-                                    config = store.read()
-                                    apiKeyInput = ""
-                                    notice = "OpenAI API key removed."
+                                    runCatching { store.clearApiKey() }
+                                        .onSuccess {
+                                            refreshConfig()
+                                            apiKeyInput = ""
+                                            notice = "OpenAI API key removed."
+                                        }
+                                        .onFailure {
+                                            notice = "The API key could not be removed from local storage."
+                                        }
                                 },
                                 enabled = !busy,
                                 modifier = Modifier.fillMaxWidth()
@@ -232,7 +257,12 @@ private fun AiProviderScreen(
             notice?.let {
                 Text(
                     it,
-                    color = if (it.contains("failed", ignoreCase = true) || it.contains("required", ignoreCase = true)) {
+                    color = if (
+                        it.contains("failed", ignoreCase = true) ||
+                        it.contains("required", ignoreCase = true) ||
+                        it.contains("invalid", ignoreCase = true) ||
+                        it.contains("could not", ignoreCase = true)
+                    ) {
                         MaterialTheme.colorScheme.error
                     } else {
                         MaterialTheme.colorScheme.onSurface
@@ -243,14 +273,16 @@ private fun AiProviderScreen(
             if (config.provider == AiProviderKind.LOCAL_ONLY) {
                 Button(
                     onClick = {
-                        store.save(config)
-                        notice = "Local assistant mode saved."
+                        if (saveConfig()) notice = "Local assistant mode saved."
                     },
+                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Use local assistant") }
             }
 
-            TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+            TextButton(onClick = onClose, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text("Close")
+            }
         }
     }
 }
