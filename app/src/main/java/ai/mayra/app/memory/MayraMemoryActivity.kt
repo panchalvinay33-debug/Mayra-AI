@@ -1,5 +1,6 @@
 package ai.mayra.app.memory
 
+import ai.mayra.app.document.MayraDocumentActivity
 import ai.mayra.app.knowledge.ChecklistItem
 import ai.mayra.app.knowledge.MayraMemoryPrivacyGuard
 import ai.mayra.app.knowledge.MayraMemoryRecall
@@ -7,6 +8,7 @@ import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.knowledge.PersonalNote
 import ai.mayra.app.knowledge.PersonalNoteType
 import ai.mayra.app.ui.theme.MayraAITheme
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -86,6 +88,22 @@ private fun MayraMemoryScreen(onClose: () -> Unit) {
         ) {
             Text("Mayra Memory", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Owner-visible personal memory stored on this phone. Passwords, OTPs, card-like numbers and secret keys are blocked from normal memory.")
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Capture & library", fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { context.startActivity(Intent(context, MayraVoiceNotesActivity::class.java)) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Voice note") }
+                        OutlinedButton(
+                            onClick = { context.startActivity(Intent(context, MayraDocumentActivity::class.java)) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Documents") }
+                    }
+                }
+            }
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
