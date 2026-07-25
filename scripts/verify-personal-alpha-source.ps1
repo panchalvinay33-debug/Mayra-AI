@@ -37,6 +37,10 @@ $requiredFiles = @(
     "app/src/main/java/ai/mayra/app/reminder/ReminderRecoveryPolicy.kt",
     "app/src/test/java/ai/mayra/app/reminder/MayraReminderEngineTest.kt",
     "app/src/test/java/ai/mayra/app/reminder/ReminderRecoveryPolicyTest.kt",
+    "app/src/main/java/ai/mayra/app/ai/AiProviderSettings.kt",
+    "app/src/main/java/ai/mayra/app/ai/AiProviderSafetyPolicy.kt",
+    "app/src/main/java/ai/mayra/app/ai/OpenAiAssistant.kt",
+    "app/src/test/java/ai/mayra/app/ai/AiProviderSafetyPolicyTest.kt",
     "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt",
     "app/src/test/java/ai/mayra/app/memory/MayraMemoryBackupEngineTest.kt",
     "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt",
@@ -131,6 +135,16 @@ $results.Add((Write-Check "Stale reminder worker protection" ($reminderRuntimeTe
 $results.Add((Write-Check "Stale reminder action protection" ($reminderRuntimeText -match 'EXTRA_REVISION' -and $reminderRuntimeText -match 'current\.revision != expectedRevision') 'Old notification buttons cannot mutate a newer reminder state'))
 $results.Add((Write-Check "Reminder reboot recovery policy" ($reminderRecoveryText -match 'LEAVE_MISSED' -and $reminderRecoveryText -match 'MARK_MISSED_AND_NOTIFY') 'Already-missed reminders remain quiet after reboot'))
 $results.Add((Write-Check "Terminal reminder protection" ($reminderEngineText -match 'canComplete' -and $reminderEngineText -match 'canSnooze' -and $reminderEngineText -match 'return@update null') 'Completed and cancelled reminders cannot be revived by stale actions'))
+
+$providerSettingsText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/ai/AiProviderSettings.kt") -Raw
+$providerSafetyText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/ai/AiProviderSafetyPolicy.kt") -Raw
+$onlineAssistantText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/ai/OpenAiAssistant.kt") -Raw
+$results.Add((Write-Check "API key encrypted with Android Keystore" ($providerSettingsText -match 'AndroidKeyStore' -and $providerSettingsText -match 'AES/GCM/NoPadding') 'Online provider key is not stored as plaintext'))
+$results.Add((Write-Check "Corrupted provider secret recovery" ($providerSettingsText -match 'hasReadableSecret' -and $providerSettingsText -match 'clearCorrupted') 'Unreadable encrypted keys are removed instead of reported as configured'))
+$results.Add((Write-Check "Provider diagnostic secret redaction" ($providerSafetyText -match 'Bearer \[redacted\]' -and $providerSafetyText -match '\[redacted-key\]') 'Connection messages cannot persist key material'))
+$results.Add((Write-Check "Online AI HTTPS enforcement" ($onlineAssistantText -match 'requireHttpsEndpoint' -and $onlineAssistantText -match 'instanceFollowRedirects = false') 'Provider requests cannot downgrade or silently follow redirects'))
+$results.Add((Write-Check "Online AI bounded transport" ($onlineAssistantText -match 'MAX_REQUEST_CHARACTERS' -and $onlineAssistantText -match 'MAX_RESPONSE_CHARACTERS' -and $onlineAssistantText -match 'readAtMost') 'Large requests and responses are rejected safely'))
+$results.Add((Write-Check "Offline AI fallback retained" ($onlineAssistantText -match 'offlineFallback' -and $onlineAssistantText -match 'offline brain') 'Online provider failure does not remove local Mayra'))
 
 $backupText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt") -Raw
 $results.Add((Write-Check "Authenticated backup encryption" ($backupText -match 'AES/GCM/NoPadding') 'Backup uses AES-GCM'))
