@@ -1,5 +1,6 @@
 package ai.mayra.app.background
 
+import ai.mayra.app.file.MayraFileInventoryWorker
 import ai.mayra.app.floating.FloatingMayraPreferences
 import ai.mayra.app.floating.FloatingMayraService
 import ai.mayra.app.reminder.MayraReminderRuntime
@@ -24,6 +25,7 @@ class MayraBootReceiver : BroadcastReceiver() {
         runCatching { MayraReminderRuntime.rescheduleAll(appContext) }
 
         if (globallyStopped) {
+            runCatching { MayraFileInventoryWorker.cancel(appContext) }
             FloatingMayraPreferences(appContext).enabled = false
             appContext.stopService(Intent(appContext, FloatingMayraService::class.java))
             return
@@ -31,6 +33,7 @@ class MayraBootReceiver : BroadcastReceiver() {
 
         runCatching { MayraBackgroundRuntime.initialize(appContext) }
         runCatching { RuntimeAttentionScheduler.sync(appContext) }
+        runCatching { MayraFileInventoryWorker.schedulePeriodic(appContext) }
 
         val floatingPreferences = FloatingMayraPreferences(appContext)
         if (floatingPreferences.enabled && Settings.canDrawOverlays(appContext)) {
