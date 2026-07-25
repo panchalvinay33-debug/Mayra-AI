@@ -2,6 +2,7 @@ package ai.mayra.app.presence
 
 import ai.mayra.app.chat.ChatViewModel
 import ai.mayra.app.core.MayraMessage
+import ai.mayra.app.file.MayraFileAccessActivity
 import ai.mayra.app.runtime.RuntimeControlActivity
 import ai.mayra.app.settings.MayraSettingsStore
 import ai.mayra.app.settings.SettingsActivity
@@ -44,6 +45,7 @@ class MayraCompanionActivity : ComponentActivity() {
             MayraAITheme {
                 MayraCompanionScreen(
                     onOpenWorkspace = { startActivity(Intent(this, MayraWorkspaceActivity::class.java)) },
+                    onOpenFiles = { startActivity(Intent(this, MayraFileAccessActivity::class.java)) },
                     onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                     onOpenDevice = { startActivity(Intent(this, MayraDeviceTestActivity::class.java)) },
                     onOpenRuntime = { startActivity(Intent(this, RuntimeControlActivity::class.java)) }
@@ -56,6 +58,7 @@ class MayraCompanionActivity : ComponentActivity() {
 @Composable
 private fun MayraCompanionScreen(
     onOpenWorkspace: () -> Unit,
+    onOpenFiles: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevice: () -> Unit,
     onOpenRuntime: () -> Unit,
@@ -191,6 +194,7 @@ private fun MayraCompanionScreen(
             chatViewModel.clearConversation()
         },
         onOpenWorkspace = onOpenWorkspace,
+        onOpenFiles = onOpenFiles,
         onOpenSettings = onOpenSettings,
         onOpenDevice = onOpenDevice,
         onOpenRuntime = onOpenRuntime,
