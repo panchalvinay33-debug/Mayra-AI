@@ -29,6 +29,7 @@ class MayraContactIdentityEngineTest {
         val resolved = assertIs<MayraIdentityResolution.Resolved>(result)
         assertEquals("Sunita Panchal", resolved.identity.canonicalContactName)
         assertTrue(resolved.exact)
+        assertEquals(MayraIdentityMatchConfidence.EXACT, resolved.confidence)
     }
 
     @Test
@@ -39,12 +40,43 @@ class MayraContactIdentityEngineTest {
     }
 
     @Test
-    fun `partial unique identity can resolve`() {
+    fun `strong partial relationship can resolve`() {
         val doctor = MayraContactIdentity(canonicalContactName = "Dr Rajesh Sharma", relationship = "Family Doctor")
 
         val result = MayraContactIdentityEngine { listOf(doctor) }.resolve("family")
 
-        assertEquals("Dr Rajesh Sharma", assertIs<MayraIdentityResolution.Resolved>(result).identity.canonicalContactName)
+        val resolved = assertIs<MayraIdentityResolution.Resolved>(result)
+        assertEquals("Dr Rajesh Sharma", resolved.identity.canonicalContactName)
+        assertFalse(resolved.exact)
+        assertEquals(MayraIdentityMatchConfidence.STRONG_PARTIAL, resolved.confidence)
+    }
+
+    @Test
+    fun `short partial query is never guessed`() {
+        val rajan = MayraContactIdentity(canonicalContactName = "Rajan Panchal")
+
+        assertIs<MayraIdentityResolution.Unmapped>(
+            MayraContactIdentityEngine { listOf(rajan) }.resolve("Raj")
+        )
+    }
+
+    @Test
+    fun `numeric-only query is never treated as identity`() {
+        val contact = MayraContactIdentity(canonicalContactName = "Office 1234")
+
+        assertIs<MayraIdentityResolution.Unmapped>(
+            MayraContactIdentityEngine { listOf(contact) }.resolve("1234")
+        )
+    }
+
+    @Test
+    fun `equal confidence partial matches remain ambiguous`() {
+        val first = MayraContactIdentity(canonicalContactName = "Rahul Verma", relationship = "Office Rahul")
+        val second = MayraContactIdentity(canonicalContactName = "Rahul Sharma", relationship = "Office Rakesh")
+
+        val result = MayraContactIdentityEngine { listOf(first, second) }.resolve("office")
+
+        assertEquals(2, assertIs<MayraIdentityResolution.Ambiguous>(result).candidates.size)
     }
 
     @Test
@@ -113,5 +145,26 @@ class MayraContactIdentityStoreTest {
         val stored = store.all().single()
         assertEquals("Dr B", stored.canonicalContactName)
         assertEquals(setOf("Family Doctor"), stored.aliases)
+    }
+
+    @Test
+    fun `canonical duplicate alias is removed and control characters are sanitized`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = MayraContactIdentityStore(context)
+        store.clear()
+        store.upsert(
+            MayraContactIdentity(
+                id = "safe",
+                canonicalContactName = "  Amit   Shah  ",
+                aliases = setOf("Amit Shah", "Friend\nAmit"),
+                notes = "Private\towner\nnotes"
+            )
+        )
+
+        val stored = store.all().single()
+        assertEquals("Amit Shah", stored.canonicalContactName)
+        assertFalse(stored.aliases.contains("Amit Shah"))
+        assertFalse(stored.notes.orEmpty().contains('\n'))
+        assertFalse(stored.notes.orEmpty().contains('\t'))
     }
 }
