@@ -20,13 +20,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  personal-alpha:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -46,76 +49,102 @@ jobs:
           set -euxo pipefail
           mkdir -p build/ci
           {
-            echo "Repository: $GITHUB_REPOSITORY"
-            echo "Ref: $GITHUB_REF"
-            echo "SHA: $GITHUB_SHA"
-            echo "Runner: $RUNNER_NAME"
-            echo "OS: $RUNNER_OS"
-            echo "Architecture: $RUNNER_ARCH"
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "ref=$GITHUB_REF"
+            echo "sha=$GITHUB_SHA"
+            echo "event=$GITHUB_EVENT_NAME"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "runner=$RUNNER_NAME"
+            echo "os=$RUNNER_OS"
+            echo "architecture=$RUNNER_ARCH"
             java -version
             gradle --version
             echo "ANDROID_HOME=$ANDROID_HOME"
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
             test -d "$ANDROID_HOME/platforms/android-35"
+            test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+            test -z "$(git status --porcelain)"
           } 2>&1 | tee build/ci/environment.log
+
+      - name: Strict source preflight
+        shell: pwsh
+        run: |
+          ./scripts/verify-personal-alpha-source.ps1 -Strict
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item build/personal-alpha/source-preflight.json build/ci/source-preflight.json -Force
 
       - name: Compile debug sources
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
-
-      - name: Test device action safety
-        shell: bash
-        run: |
-          set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionSafetyTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-safety.log
-
-      - name: Test device action coordinator
-        shell: bash
-        run: |
-          set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.DeviceActionCoordinatorTest' --stacktrace --console=plain 2>&1 | tee build/ci/device-action-coordinator.log
-
-      - name: Test Android action specifications
-        shell: bash
-        run: |
-          set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionSpecTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-specifications.log
-
-      - name: Test Android action runtime
-        shell: bash
-        run: |
-          set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'ai.mayra.app.core.actions.AndroidDeviceActionRunnerTest' --stacktrace --console=plain 2>&1 | tee build/ci/android-action-runtime.log
+          gradle --no-daemon --max-workers=1 :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
 
       - name: Run complete unit tests
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee build/ci/unit-tests.log
+          gradle --no-daemon --max-workers=1 :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee build/ci/unit-tests.log
 
       - name: Run Android lint
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon --max-workers=2 :app:lintDebug --stacktrace --console=plain 2>&1 | tee build/ci/lint-debug.log
+          gradle --no-daemon --max-workers=1 :app:lintDebug --stacktrace --console=plain 2>&1 | tee build/ci/lint-debug.log
 
-      - name: Build personal alpha APK
+      - name: Build and describe personal alpha APK
         shell: bash
         run: |
           set -euxo pipefail
-          gradle --no-daemon --max-workers=2 :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-debug.log
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee build/ci/app-debug.sha256
-          cp app/build/outputs/apk/debug/app-debug.apk "build/ci/Mayra-AI-personal-alpha-${GITHUB_SHA}.apk"
-          {
-            echo "source_sha=$GITHUB_SHA"
-            echo "source_ref=$GITHUB_REF"
-            echo "gradle=8.9"
-            echo "jdk=17"
-            echo "compile_sdk=35"
-          } > build/ci/build-metadata.txt
+          gradle --no-daemon --max-workers=1 :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-debug.log
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$apk"
+          artifact="build/ci/Mayra-AI-personal-alpha-${GITHUB_SHA}.apk"
+          cp "$apk" "$artifact"
+          sha256sum "$artifact" | tee build/ci/app-debug.sha256
+          apk_sha="$(sha256sum "$artifact" | awk '{print $1}')"
+          apk_size="$(stat -c%s "$artifact")"
+          preflight_sha="$(sha256sum build/ci/source-preflight.json | awk '{print $1}')"
+          python3 - <<PY
+          import json
+          from pathlib import Path
+          data = {
+              "schema": "mayra.personal-alpha.artifact.v1",
+              "source": {
+                  "repository": "${GITHUB_REPOSITORY}",
+                  "ref": "${GITHUB_REF}",
+                  "sha": "${GITHUB_SHA}",
+                  "event": "${GITHUB_EVENT_NAME}",
+                  "runId": "${GITHUB_RUN_ID}",
+                  "runAttempt": "${GITHUB_RUN_ATTEMPT}"
+              },
+              "toolchain": {
+                  "jdk": 17,
+                  "gradle": "8.9",
+                  "compileSdk": 35,
+                  "targetSdk": 35,
+                  "maxWorkers": 1
+              },
+              "gates": {
+                  "sourcePreflight": True,
+                  "compileDebugKotlin": True,
+                  "testDebugUnitTest": True,
+                  "lintDebug": True,
+                  "assembleDebug": True
+              },
+              "artifact": {
+                  "fileName": "Mayra-AI-personal-alpha-${GITHUB_SHA}.apk",
+                  "sha256": "${apk_sha}",
+                  "sizeBytes": int("${apk_size}")
+              },
+              "sourcePreflightSha256": "${preflight_sha}"
+          }
+          Path("build/ci/artifact-manifest.json").write_text(
+              json.dumps(data, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8"
+          )
+          PY
+          python3 -m json.tool build/ci/artifact-manifest.json >/dev/null
 
       - name: Upload personal alpha APK
         uses: actions/upload-artifact@v4
@@ -124,7 +153,8 @@ jobs:
           path: |
             build/ci/Mayra-AI-personal-alpha-${{ github.sha }}.apk
             build/ci/app-debug.sha256
-            build/ci/build-metadata.txt
+            build/ci/artifact-manifest.json
+            build/ci/source-preflight.json
           if-no-files-found: error
           retention-days: 14
 
@@ -135,6 +165,7 @@ jobs:
           name: android-reports-${{ github.run_number }}
           path: |
             build/ci/
+            build/personal-alpha/source-preflight.json
             app/build/reports/lint-results-debug.html
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
