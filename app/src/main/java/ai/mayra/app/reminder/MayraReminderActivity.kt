@@ -80,6 +80,9 @@ private fun ReminderCenter(focusId: String?, onClose: () -> Unit) {
         }
     }
 
+    fun transitionNotice(updated: MayraReminder?, success: String): String =
+        if (updated != null) success else "This reminder changed before the action completed. The latest state is shown below."
+
     Scaffold { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
@@ -113,16 +116,28 @@ private fun ReminderCenter(focusId: String?, onClose: () -> Unit) {
                         if (focused) Text("Opened from reminder notification", fontWeight = FontWeight.Medium)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Button(
-                                onClick = { MayraReminderRuntime.complete(context, reminder.id); notice = "Completed: ${reminder.title}"; refresh++ },
+                                onClick = {
+                                    val updated = MayraReminderRuntime.complete(context, reminder.id)
+                                    notice = transitionNotice(updated, "Completed: ${reminder.title}")
+                                    refresh++
+                                },
                                 modifier = Modifier.weight(1f)
                             ) { Text("Complete") }
                             OutlinedButton(
-                                onClick = { MayraReminderRuntime.snooze(context, reminder.id, Duration.ofMinutes(10)); notice = "Snoozed 10 minutes."; refresh++ },
+                                onClick = {
+                                    val updated = MayraReminderRuntime.snooze(context, reminder.id, Duration.ofMinutes(10))
+                                    notice = transitionNotice(updated, "Snoozed 10 minutes.")
+                                    refresh++
+                                },
                                 modifier = Modifier.weight(1f)
                             ) { Text("Snooze") }
                         }
                         OutlinedButton(
-                            onClick = { MayraReminderRuntime.cancel(context, reminder.id); notice = "Cancelled: ${reminder.title}"; refresh++ },
+                            onClick = {
+                                val updated = MayraReminderRuntime.cancel(context, reminder.id)
+                                notice = transitionNotice(updated, "Cancelled: ${reminder.title}")
+                                refresh++
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("Cancel") }
                     }
@@ -138,14 +153,23 @@ private fun ReminderCenter(focusId: String?, onClose: () -> Unit) {
                             Text(reminder.title, fontWeight = FontWeight.Medium)
                             Text(reminder.state.name.lowercase(), style = MaterialTheme.typography.bodySmall)
                         }
-                        OutlinedButton(onClick = { store.delete(reminder.id); refresh++ }) { Text("Delete") }
+                        OutlinedButton(
+                            onClick = {
+                                notice = if (store.delete(reminder.id)) "Deleted: ${reminder.title}" else "Reminder was already removed."
+                                refresh++
+                            }
+                        ) { Text("Delete") }
                     }
                 }
             }
 
-            OutlinedButton(onClick = { MayraReminderRuntime.rescheduleAll(context); notice = "Reminder schedule refreshed." }, modifier = Modifier.fillMaxWidth()) {
-                Text("Refresh reminder schedule")
-            }
+            OutlinedButton(
+                onClick = {
+                    MayraReminderRuntime.rescheduleAll(context)
+                    notice = "Active reminder schedule checked and refreshed. Already-missed reminders were not alerted again."
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Refresh reminder schedule") }
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
         }
     }
