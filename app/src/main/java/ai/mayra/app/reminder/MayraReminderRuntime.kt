@@ -105,13 +105,15 @@ object MayraReminderRuntime {
     fun rescheduleAll(context: Context, now: Long = System.currentTimeMillis()) {
         val store = MayraReminderStore(context)
         store.active(now).forEach { reminder ->
-            when {
-                reminder.state == ReminderState.DUE -> scheduleFollowUp(context, reminder)
-                reminder.dueAt < now -> {
-                    val normalized = store.markMissed(reminder.id, now) ?: reminder
-                    schedule(context, normalized, now)
+            when (ReminderRecoveryPolicy.decide(reminder, now)) {
+                ReminderRecoveryAction.SCHEDULE -> schedule(context, reminder, now)
+                ReminderRecoveryAction.SCHEDULE_FOLLOW_UP -> scheduleFollowUp(context, reminder)
+                ReminderRecoveryAction.MARK_MISSED_AND_NOTIFY -> {
+                    val missed = store.markMissed(reminder.id, now) ?: return@forEach
+                    schedule(context, missed, now)
                 }
-                else -> schedule(context, reminder, now)
+                ReminderRecoveryAction.LEAVE_MISSED,
+                ReminderRecoveryAction.IGNORE -> Unit
             }
         }
     }
