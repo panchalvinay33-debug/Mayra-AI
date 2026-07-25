@@ -3,6 +3,8 @@ package ai.mayra.app.document
 import android.content.Context
 import android.net.Uri
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.InputStreamReader
 
 /**
@@ -19,7 +21,7 @@ class MayraDocumentTextReader(private val context: Context) {
 
         return runCatching {
             context.contentResolver.openInputStream(uri)?.use { stream ->
-                val limited = stream.readNBytes(maxBytes + 1)
+                val limited = readBounded(stream, maxBytes + 1)
                 val truncatedByBytes = limited.size > maxBytes
                 val readable = if (truncatedByBytes) limited.copyOf(maxBytes) else limited
                 val text = BufferedReader(InputStreamReader(readable.inputStream(), Charsets.UTF_8))
@@ -41,6 +43,19 @@ class MayraDocumentTextReader(private val context: Context) {
             if (!line.contains(term, ignoreCase = true)) null
             else DocumentTextMatch(lineNumber = index + 1, preview = line.trim().take(240))
         }.take(maxMatches).toList()
+    }
+
+    private fun readBounded(input: InputStream, limit: Int): ByteArray {
+        val output = ByteArrayOutputStream(minOf(limit, 16_384))
+        val buffer = ByteArray(8_192)
+        var remaining = limit
+        while (remaining > 0) {
+            val count = input.read(buffer, 0, minOf(buffer.size, remaining))
+            if (count < 0) break
+            output.write(buffer, 0, count)
+            remaining -= count
+        }
+        return output.toByteArray()
     }
 
     companion object {
