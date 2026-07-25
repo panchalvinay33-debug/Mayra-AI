@@ -53,7 +53,7 @@ class MayraStartupHealthTest {
         assertTrue(snapshot.degraded)
         assertEquals(listOf("phone pulse warmup"), snapshot.failedSteps)
         assertEquals("IllegalStateException", snapshot.lastErrorType)
-        assertTrue(snapshot.ownerSummary().contains("degraded mode"))
+        assertTrue(snapshot.ownerSummary().contains("did not finish"))
     }
 
     @Test
