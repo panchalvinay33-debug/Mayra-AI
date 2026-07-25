@@ -7,6 +7,8 @@ import ai.mayra.app.background.MayraNotificationCenterActivity
 import ai.mayra.app.calendar.MayraAgendaActivity
 import ai.mayra.app.floating.FloatingMayraActivity
 import ai.mayra.app.identity.MayraIdentityActivity
+import ai.mayra.app.knowledge.MayraPersonalBriefing
+import ai.mayra.app.memory.MayraMemoryActivity
 import ai.mayra.app.owner.MayraOwnerModeStore
 import ai.mayra.app.owner.MayraOwnerSetupActivity
 import ai.mayra.app.owner.ownerModeSafetySummary
@@ -74,8 +76,9 @@ class MayraPresenceActivity : ComponentActivity() {
         setContent {
             MayraAITheme {
                 MayraPresenceHome(
-                    userName = remember { mutableStateOf(settingsStore.read().normalizedName) }.value,
-                    ownerSummary = remember { MayraOwnerModeStore(this).read() }.let(::ownerModeSafetySummary),
+                    userName = settingsStore.read().normalizedName,
+                    ownerSummary = ownerModeSafetySummary(MayraOwnerModeStore(this).read()),
+                    briefingProvider = { MayraPersonalBriefing(this).compose() },
                     onChat = { startActivity(Intent(this, MainActivity::class.java)) },
                     onRuntime = { startActivity(Intent(this, RuntimeControlActivity::class.java)) },
                     onPulse = { startActivity(Intent(this, MayraPulseActivity::class.java)) },
@@ -83,6 +86,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
                     onOwnerSetup = { startActivity(Intent(this, MayraOwnerSetupActivity::class.java)) },
                     onFloatingMayra = { startActivity(Intent(this, FloatingMayraActivity::class.java)) },
+                    onMemory = { startActivity(Intent(this, MayraMemoryActivity::class.java)) },
                     onPeople = { startActivity(Intent(this, MayraIdentityActivity::class.java)) },
                     onReminders = { startActivity(Intent(this, MayraReminderActivity::class.java)) },
                     onAgenda = { startActivity(Intent(this, MayraAgendaActivity::class.java)) },
@@ -98,6 +102,7 @@ class MayraPresenceActivity : ComponentActivity() {
 private fun MayraPresenceHome(
     userName: String,
     ownerSummary: String,
+    briefingProvider: () -> ai.mayra.app.knowledge.PersonalBriefing,
     onChat: () -> Unit,
     onRuntime: () -> Unit,
     onPulse: () -> Unit,
@@ -105,6 +110,7 @@ private fun MayraPresenceHome(
     onActionControls: () -> Unit,
     onOwnerSetup: () -> Unit,
     onFloatingMayra: () -> Unit,
+    onMemory: () -> Unit,
     onPeople: () -> Unit,
     onReminders: () -> Unit,
     onAgenda: () -> Unit,
@@ -113,12 +119,14 @@ private fun MayraPresenceHome(
 ) {
     var pulse by remember { mutableStateOf(buildMayraPulseState(MayraRuntime.deviceRuntime.latest())) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var briefing by remember { mutableStateOf(briefingProvider()) }
     val state = pulse.toPresenceState()
     val greeting = proactiveGreeting(userName, Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
 
     LaunchedEffect(Unit) {
         MayraRuntime.deviceRuntime.capture(force = true)
         pulse = buildMayraPulseState(MayraRuntime.deviceRuntime.latest())
+        briefing = briefingProvider()
         while (true) {
             delay(15_000)
             MayraRuntime.deviceRuntime.capture(force = false)
@@ -128,34 +136,29 @@ private fun MayraPresenceHome(
 
     Scaffold { padding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.background,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.055f),
-                            MaterialTheme.colorScheme.background
-                        )
+            Modifier.fillMaxSize().padding(padding).background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.055f),
+                        MaterialTheme.colorScheme.background
                     )
                 )
+            )
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 LivingHomeHeader(
-                    onMenu = { menuExpanded = true },
-                    menuExpanded = menuExpanded,
-                    onDismissMenu = { menuExpanded = false },
+                    expanded = menuExpanded,
+                    onExpand = { menuExpanded = true },
+                    onDismiss = { menuExpanded = false },
                     onAgenda = onAgenda,
                     onReminders = onReminders,
                     onNotifications = onNotifications,
+                    onMemory = onMemory,
                     onPeople = onPeople,
                     onPulse = onPulse,
                     onRuntime = onRuntime,
@@ -165,52 +168,35 @@ private fun MayraPresenceHome(
                     onFloatingMayra = onFloatingMayra,
                     onSettings = onSettings
                 )
-
                 Spacer(Modifier.height(2.dp))
-                MayraCharacterPresence(
-                    state = state,
-                    modifier = Modifier.clickable(onClick = onChat)
-                )
+                MayraCharacterPresence(state = state, modifier = Modifier.clickable(onClick = onChat))
                 Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(greeting, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                Text(
-                    state.prompt,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Button(
-                    onClick = onChat,
-                    modifier = Modifier.fillMaxWidth().height(58.dp),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
+                Text(state.prompt, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(58.dp), shape = RoundedCornerShape(20.dp)) {
                     Text("Talk to Mayra", fontWeight = FontWeight.SemiBold)
                 }
-
-                CompactAccessCard(ownerSummary = ownerSummary, onOpen = onOwnerSetup)
-
+                CompactAccessCard(ownerSummary, onOwnerSetup)
                 LivingInfoCard(
-                    eyebrow = "TODAY",
-                    title = pulse.message.ifBlank { "Your day is ready" },
-                    detail = pulse.healthScore?.let { score ->
-                        "Phone health $score / 100 · ${pulse.batteryText} battery · ${pulse.networkText}"
-                    } ?: "Open your agenda for reminders, events and follow-ups.",
-                    actionLabel = "Open my day",
-                    onAction = onAgenda
+                    eyebrow = "MY DAY",
+                    title = briefing.title,
+                    detail = buildString {
+                        append(briefing.summary)
+                        briefing.highlights.firstOrNull()?.let { append("\n$it") }
+                    },
+                    actionLabel = "Open memory",
+                    onAction = onMemory
                 )
-
-                val insight = pulse.suggestions.firstOrNull()
                 LivingInfoCard(
-                    eyebrow = "MAYRA NOTICED",
-                    title = insight?.title ?: "Everything looks calm",
-                    detail = insight?.message ?: "I’ll surface something here only when it can genuinely help.",
-                    actionLabel = "Phone pulse",
+                    eyebrow = "PHONE PULSE",
+                    title = pulse.message.ifBlank { "Your phone looks calm" },
+                    detail = pulse.healthScore?.let { "Phone health $it / 100 · ${pulse.batteryText} battery · ${pulse.networkText}" }
+                        ?: "Open Phone Pulse for current device health.",
+                    actionLabel = "View pulse",
                     onAction = onPulse
                 )
-
                 Text(
-                    "Mayra stays useful offline, respects Android boundaries and never reports an action as complete unless it can verify it.",
+                    "Mayra recalls only owner-visible, non-sensitive memory and never reports an action as complete unless it can verify it.",
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -223,12 +209,13 @@ private fun MayraPresenceHome(
 
 @Composable
 private fun LivingHomeHeader(
-    onMenu: () -> Unit,
-    menuExpanded: Boolean,
-    onDismissMenu: () -> Unit,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onDismiss: () -> Unit,
     onAgenda: () -> Unit,
     onReminders: () -> Unit,
     onNotifications: () -> Unit,
+    onMemory: () -> Unit,
     onPeople: () -> Unit,
     onPulse: () -> Unit,
     onRuntime: () -> Unit,
@@ -238,40 +225,33 @@ private fun LivingHomeHeader(
     onFloatingMayra: () -> Unit,
     onSettings: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Column {
             Text("MAYRA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
             Text("Living companion", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box {
-            Surface(
-                modifier = Modifier.clickable(onClick = onMenu),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-            ) {
+            Surface(modifier = Modifier.clickable(onClick = onExpand), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)) {
                 Text("⋮", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp))
             }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = onDismissMenu) {
+            DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
                 MenuLabel("MY DAY")
-                MenuItem("Personal agenda", onAgenda, onDismissMenu)
-                MenuItem("Reminders & follow-ups", onReminders, onDismissMenu)
-                MenuItem("Notification intelligence", onNotifications, onDismissMenu)
-                MenuLabel("MY PEOPLE")
-                MenuItem("People & relationships", onPeople, onDismissMenu)
+                MenuItem("Personal agenda", onAgenda, onDismiss)
+                MenuItem("Reminders & follow-ups", onReminders, onDismiss)
+                MenuItem("Notification intelligence", onNotifications, onDismiss)
+                MenuLabel("MEMORY")
+                MenuItem("Memory & notes", onMemory, onDismiss)
+                MenuItem("People & relationships", onPeople, onDismiss)
                 MenuLabel("PHONE CONTROL")
-                MenuItem("Phone pulse", onPulse, onDismissMenu)
-                MenuItem("Live activity", onRuntime, onDismissMenu)
-                MenuItem("Action safety", onActionControls, onDismissMenu)
-                MenuItem("Personal device check", onDeviceTest, onDismissMenu)
+                MenuItem("Phone pulse", onPulse, onDismiss)
+                MenuItem("Live activity", onRuntime, onDismiss)
+                MenuItem("Action safety", onActionControls, onDismiss)
+                MenuItem("Personal device check", onDeviceTest, onDismiss)
                 MenuLabel("MAYRA ACCESS")
-                MenuItem("Permissions & owner setup", onOwnerSetup, onDismissMenu)
-                MenuItem("Floating Mayra", onFloatingMayra, onDismissMenu)
+                MenuItem("Permissions & owner setup", onOwnerSetup, onDismiss)
+                MenuItem("Floating Mayra", onFloatingMayra, onDismiss)
                 MenuLabel("SETTINGS")
-                MenuItem("Language, voice, AI & privacy", onSettings, onDismissMenu)
+                MenuItem("Language, voice, AI & privacy", onSettings, onDismiss)
             }
         }
     }
@@ -279,38 +259,22 @@ private fun LivingHomeHeader(
 
 @Composable
 private fun MenuLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
+    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 }
 
 @Composable
 private fun MenuItem(label: String, action: () -> Unit, dismiss: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label) },
-        onClick = {
-            dismiss()
-            action()
-        }
-    )
+    DropdownMenuItem(text = { Text(label) }, onClick = { dismiss(); action() })
 }
 
 @Composable
 private fun CompactAccessCard(ownerSummary: String, onOpen: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
         shape = RoundedCornerShape(22.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold)
                 Text(ownerSummary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
@@ -321,15 +285,9 @@ private fun CompactAccessCard(ownerSummary: String, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun LivingInfoCard(
-    eyebrow: String,
-    title: String,
-    detail: String,
-    actionLabel: String,
-    onAction: () -> Unit
-) {
+private fun LivingInfoCard(eyebrow: String, title: String, detail: String, actionLabel: String, onAction: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
