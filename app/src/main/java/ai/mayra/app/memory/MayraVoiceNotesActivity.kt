@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,8 +27,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +54,10 @@ private fun VoiceNotesScreen(onClose: () -> Unit) {
     var title by remember { mutableStateOf("") }
     var transcript by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf<String?>(null) }
+    var refresh by remember { mutableIntStateOf(0) }
+    val saved = remember(refresh) {
+        memory.notes().filter { it.type == PersonalNoteType.VOICE_TRANSCRIPT }
+    }
 
     val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK) {
@@ -112,6 +119,7 @@ private fun VoiceNotesScreen(onClose: () -> Unit) {
                                 )
                                 title = ""
                                 transcript = ""
+                                refresh++
                                 notice = "Voice note saved to Mayra Memory."
                             }
                         },
@@ -121,6 +129,28 @@ private fun VoiceNotesScreen(onClose: () -> Unit) {
             }
 
             notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+
+            Text("Saved voice notes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            if (saved.isEmpty()) Text("No saved voice notes yet.")
+            saved.forEach { note ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(note.title, fontWeight = FontWeight.SemiBold)
+                        Text(note.body)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = {
+                                memory.saveNote(note.copy(pinned = !note.pinned), addTimeline = false)
+                                refresh++
+                            }) { Text(if (note.pinned) "Unpin" else "Pin") }
+                            TextButton(onClick = {
+                                memory.archiveNote(note.id)
+                                refresh++
+                            }) { Text("Archive") }
+                        }
+                    }
+                }
+            }
+
             Text(
                 "Do not dictate passwords, OTPs, payment-card details or secret keys. Voice recognition quality depends on the service installed on the phone.",
                 style = MaterialTheme.typography.bodySmall
