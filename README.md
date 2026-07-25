@@ -1,31 +1,37 @@
 # Mayra AI
 
-Mayra AI is a voice-first, memory-enabled, context-aware **Living Personal Intelligence System and Digital Companion for Android**, built with Kotlin and Jetpack Compose.
+Mayra AI is a voice-first, memory-enabled, context-aware **Living Personal Intelligence System and Digital Companion**, beginning on Android and designed to extend later to smart displays, home devices, vehicles, wearables and spatial or holographic presence surfaces.
 
-## Locked product reference
+## Locked product references
 
-The single product and engineering source of truth is:
+The permanent product and engineering references are:
 
-- [`docs/MAYRA_AI_MASTER_BLUEPRINT.md`](docs/MAYRA_AI_MASTER_BLUEPRINT.md)
+- [`docs/MAYRA_AI_MASTER_BLUEPRINT.md`](docs/MAYRA_AI_MASTER_BLUEPRINT.md) — Master Blueprint V2 and current Android Living Companion architecture.
+- [`docs/MAYRA_LIVING_INTELLIGENCE_VISION.md`](docs/MAYRA_LIVING_INTELLIGENCE_VISION.md) — one-brain/many-bodies future vision for smart devices and holographic presence.
+- [`docs/MAYRA_SOURCE_OF_TRUTH_AND_BACKUP_MAP.md`](docs/MAYRA_SOURCE_OF_TRUTH_AND_BACKUP_MAP.md) — source-of-truth, branch, recovery and backup rules.
+- [`docs/PERSONAL_ALPHA_STABILIZATION_STATUS.md`](docs/PERSONAL_ALPHA_STABILIZATION_STATUS.md) — current V0.1 evidence, blockers and acceptance gate.
 
-This file is the **Mayra AI Master Blueprint V2 — Living Companion System**. All future architecture, home-screen design, floating-assistant behaviour, permissions, Accessibility work, phone actions, tests and release decisions must follow it unless the owner explicitly changes the product direction.
+All future architecture, user experience, permissions, actions, tests and releases must preserve these references unless the owner explicitly changes the product direction.
 
-The V2 blueprint preserves the original intelligence, memory, voice, reminders, agenda, people, notification and Action Safety concepts, and officially adds:
+## Product identity
 
-- minimal animated Living Home;
-- organized three-dot navigation;
-- guided Mayra Access Journey;
-- floating assistive Mayra ball over other apps;
-- context-aware cross-app quick actions;
-- optional transparent Accessibility Assist Mode;
-- owner-first personal build strategy;
-- later Play Store hardening profile.
+Mayra is not intended to remain a chatbot. Android is the first body. The reusable Mayra intelligence, memory, skills, safety and presence contracts should support future device bodies without duplicating the brain or losing identity.
+
+The Android product currently centres on:
+
+- a minimal animated Living Home;
+- Floating Mayra over other apps;
+- Hindi, Hinglish and English text/voice interaction;
+- reminders, agenda, people, notes, memory and notification intelligence;
+- safe app, call and message handoffs;
+- Phone Pulse and proactive attention;
+- optional online AI with local/offline continuity;
+- visible permissions, audit and a global stop switch.
 
 ## Current implemented foundations
 
 - Local and OpenAI hybrid assistant boundary
-- Text chat and continuous voice conversation
-- Hindi, Hinglish and English-ready settings
+- Text chat and continuous voice foundations
 - Animated Mayra presence and Phone Pulse
 - Personal Owner Mode and access-readiness foundations
 - Contact identities and relationships
@@ -35,29 +41,47 @@ The V2 blueprint preserves the original intelligence, memory, voice, reminders, 
 - Agent, autonomy, workflow and plugin foundations
 - Android device-action specifications and safe execution boundaries
 - Vision/image understanding foundations
-- Privacy center and encrypted provider secrets
+- Privacy centre and encrypted provider secrets
 - Execution control plane, supervisor, adaptive scheduler and recovery
 - Runtime dashboard, approvals, workflow history and diagnostics
-- Personal Device Test Center and Windows personal-alpha build scripts
+- Floating Mayra and optional assistive-context foundations
+- Personal Device Test Center and Windows personal-alpha tooling
 
-## Current implementation priority
+## Current development priority
 
-1. Redesign the Living Home and move secondary tools into a three-dot menu.
-2. Build the guided Access Journey.
-3. Implement Floating Mayra V1 with overlay permission and foreground service.
-4. Connect the floating surface to voice, reminders, notifications, identities and Action Safety.
-5. Add optional Accessibility context assistance after the transparent floating layer is stable.
+The active goal is **Mayra Living Companion Personal Alpha V0.1**. Unrelated major feature work is frozen until the stabilization gate is accepted.
+
+1. Preserve the integration head and rollback path.
+2. Obtain a reproducible JDK 17 / SDK 35 / Gradle 8.9 build.
+3. Pass compile, complete unit tests and Android lint.
+4. Assemble and hash the personal-alpha APK.
+5. Install on the owner's physical phone.
+6. Validate Living Home, voice, Floating Mayra, reminders, agenda, identities, notifications and global stop.
+7. Fix real-device failures before broader intelligence expansion.
+8. Add encrypted Backup & Restore before personal beta.
 
 ## Important platform boundaries
 
-Mayra never guarantees unsupported third-party app automation. Official Android intents/APIs and app-provided integrations are preferred. Accessibility use must be explicitly enabled, visible and deterministic. Full incoming-call control is conditional on default-dialer/InCallService requirements. Sensitive actions require confirmation, and opening a compose screen is never reported as a delivered message.
+Mayra never guarantees unsupported third-party app automation. Official Android APIs and app-provided integrations are preferred. Accessibility must be explicitly enabled, visible and deterministic. Sensitive actions require protection. Opening a compose screen is never reported as a delivered message, and handing an action to another app is never reported as verified completion.
 
 ## Personal alpha build
 
-1. Use branch `batch-12-runtime-control-center`.
-2. Use JDK 17 and Android SDK 35.
-3. Run `scripts/build-personal-alpha.ps1` on Windows, or build the debug APK from Android Studio.
-4. Install with `scripts/install-personal-alpha.ps1`.
-5. Use the in-app Personal Device Test Center to record real phone results.
+Use branch `stabilize/living-companion-v0.1` for stabilization work.
 
-Physical-device validation remains required for OEM-specific voice, overlays, notifications, Accessibility, Telecom, media and background behaviour.
+```powershell
+.\scripts\verify-personal-alpha-source.ps1 -Strict
+.\scripts\build-personal-alpha.ps1 -Clean
+.\scripts\install-personal-alpha.ps1
+```
+
+Build requirements and behaviour:
+
+- Windows with PowerShell;
+- Android Studio embedded JDK 17 or another JDK 17;
+- Android SDK Platform 35;
+- Gradle 8.9, automatically bootstrapped and SHA-256 verified when needed;
+- one Gradle worker and bounded memory for the owner's 4 GB PC;
+- generated source/environment reports and APK SHA-256;
+- physical-device validation through the in-app Personal Device Test Center.
+
+GitHub Actions currently has an external runner/account condition where jobs can fail before Checkout with no steps or logs. A local Windows build is therefore the primary evidence path until runner execution resumes.
