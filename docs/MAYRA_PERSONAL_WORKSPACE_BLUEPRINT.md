@@ -82,6 +82,10 @@ The existing `.mayrabackup` encrypted envelope remains authoritative. A future b
 
 Sensitive-folder exclusions, selective restore, schema migration, duplicate protection and rollback remain mandatory. External source files are referenced, not silently copied. Before Room schema migration, export the schema and create a dated immutable-style backup branch recorded in the backup map.
 
+### Current recovery point
+
+`backup/personal-workspace-foundation-2026-07-26` is an immutable-style snapshot at commit `25cf278f2a0afb8f739a9d1ab33084f51c461812`. It includes the locked Workspace documents, typed intent/task/session models, encrypted autosave, Workspace UI, reviewed microphone input, unified-chat navigation and the existing safety/provenance foundation. Do not force-update this backup branch.
+
 ## Milestones
 
 A. Workspace screen, voice/text input, typed intents, live task state, encrypted autosave.  
