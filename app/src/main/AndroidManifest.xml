@@ -25,7 +25,13 @@
         <intent><action android:name="android.speech.action.RECOGNIZE_SPEECH" /></intent>
     </queries>
 
-    <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
+    <application
+        android:name=".MayraApplication"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="false"
+        android:label="Mayra AI"
+        android:theme="@style/Theme.MayraAI">
         <activity android:name=".document.MayraDocumentReaderActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryPrivacyActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryBackupActivity" android:exported="false" />
