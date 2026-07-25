@@ -2,6 +2,7 @@ package ai.mayra.app.memory
 
 import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.ui.theme.MayraAITheme
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,22 +47,15 @@ private fun MemoryBackupScreen(onClose: () -> Unit) {
     val memory = remember(context) { MayraPersonalMemory(context) }
     var notice by remember { mutableStateOf<String?>(null) }
     val exportText = remember { MayraMemoryBackupFormatter.format(memory) }
-    val filename = remember {
-        "mayra-memory-${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.txt"
-    }
+    val filename = remember { "mayra-memory-${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.txt" }
 
-    val createDocument = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri ->
+    val createDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri, "w")?.bufferedWriter()?.use { it.write(exportText) }
                     ?: error("No writable stream")
-            }.onSuccess {
-                notice = "Memory backup saved. Sensitive-marked items were excluded."
-            }.onFailure {
-                notice = "Mayra could not save this backup."
-            }
+            }.onSuccess { notice = "Memory backup saved. Sensitive-marked items were excluded." }
+                .onFailure { notice = "Mayra could not save this backup." }
         }
     }
 
@@ -74,7 +68,6 @@ private fun MemoryBackupScreen(onClose: () -> Unit) {
         ) {
             Text("Memory Backup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Create an owner-controlled plain-text backup of normal Mayra notes, checklists and timeline entries.")
-
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("Export scope", fontWeight = FontWeight.SemiBold)
@@ -82,23 +75,18 @@ private fun MemoryBackupScreen(onClose: () -> Unit) {
                     Text("Sensitive-marked items and credentials rejected by Memory V2 are not included.", style = MaterialTheme.typography.bodySmall)
                 }
             }
-
-            Button(onClick = { createDocument.launch(filename) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Save memory backup")
-            }
-
+            Button(onClick = { createDocument.launch(filename) }, modifier = Modifier.fillMaxWidth()) { Text("Save memory backup") }
+            OutlinedButton(
+                onClick = { context.startActivity(Intent(context, MayraMemoryPrivacyActivity::class.java)) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Privacy & forget controls") }
             notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Privacy note", fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "The exported file is outside Mayra after you choose its location. Protect it using your phone storage, cloud-drive or device-lock settings.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text("The exported file is outside Mayra after you choose its location. Protect it using your phone storage, cloud-drive or device-lock settings.", style = MaterialTheme.typography.bodySmall)
                 }
             }
-
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
         }
     }
