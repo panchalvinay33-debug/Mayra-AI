@@ -21,6 +21,12 @@ $requiredFiles = @(
     "gradle.properties",
     "app/build.gradle.kts",
     "app/src/main/AndroidManifest.xml",
+    "app/src/main/java/ai/mayra/app/MayraApplication.kt",
+    "app/src/main/java/ai/mayra/app/diagnostics/MayraStartupHealth.kt",
+    "app/src/main/java/ai/mayra/app/diagnostics/MayraStartupDiagnosticsActivity.kt",
+    "app/src/test/java/ai/mayra/app/diagnostics/MayraStartupHealthTest.kt",
+    "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt",
+    "app/src/test/java/ai/mayra/app/memory/MayraMemoryBackupEngineTest.kt",
     "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt",
     "app/src/test/java/ai/mayra/app/testing/MayraDeviceTestCenterTest.kt",
     "docs/MAYRA_AI_MASTER_BLUEPRINT.md",
@@ -82,7 +88,19 @@ $results.Add((Write-Check "Notification permission" ($manifest -match 'android\.
 $results.Add((Write-Check "Android auto backup disabled" ($manifest -match 'android:allowBackup="false"') 'Sensitive state uses explicit Mayra backup only'))
 $results.Add((Write-Check "Full backup disabled" ($manifest -match 'android:fullBackupContent="false"') 'No implicit cloud extraction of Mayra data'))
 $results.Add((Write-Check "Cleartext traffic disabled" ($manifest -match 'android:usesCleartextTraffic="false"') 'Network providers must use encrypted transport'))
+$results.Add((Write-Check "Startup diagnostics private" ($manifest -match 'MayraStartupDiagnosticsActivity" android:exported="false"') 'Startup health is owner-only'))
 $results.Add((Write-Check "Internal components protected" (-not ($manifest -match '<activity[^>]+android:exported="true"[^>]*>' -and $manifest -notmatch 'MayraPresenceActivity')) 'Only the launcher is externally exported'))
+
+$applicationText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/MayraApplication.kt") -Raw
+$results.Add((Write-Check "Startup health begins" ($applicationText -match 'startupHealth\.begin\(\)') 'Interrupted starts can be detected'))
+$results.Add((Write-Check "Startup health completes" ($applicationText -match 'startupHealth\.complete\(\)') 'Successful starts are marked complete'))
+$safeStartupSteps = [regex]::Matches($applicationText, 'startupHealth\.safeStep\(').Count
+$results.Add((Write-Check "Non-critical startup containment" ($safeStartupSteps -ge 10) "Found $safeStartupSteps guarded startup steps"))
+
+$backupText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt") -Raw
+$results.Add((Write-Check "Authenticated backup encryption" ($backupText -match 'AES/GCM/NoPadding') 'Backup uses AES-GCM'))
+$results.Add((Write-Check "Password key derivation" ($backupText -match 'PBKDF2WithHmacSHA256') 'Backup key uses PBKDF2-HMAC-SHA256'))
+$results.Add((Write-Check "Versioned backup envelope" ($backupText -match 'MAYRA_ENCRYPTED_BACKUP_V1') 'Restore can reject unsupported formats'))
 
 $deviceTestText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt") -Raw
 $deviceIds = [regex]::Matches($deviceTestText, 'DeviceTestDefinition\(DeviceTestId\.')
