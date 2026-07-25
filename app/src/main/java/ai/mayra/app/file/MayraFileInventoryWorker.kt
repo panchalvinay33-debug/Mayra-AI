@@ -3,6 +3,7 @@ package ai.mayra.app.file
 import ai.mayra.app.safety.MayraGlobalStopStore
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -30,15 +31,22 @@ class MayraFileInventoryWorker(
             val mediaFiles = scanner.scanMediaStore()
             val grants = registry.list()
             val treeFiles = grants.flatMap { grant ->
-                if (registry.hasPersistedReadAccess(grant.treeUri)) {
-                    scanner.scanTree(Uri.parse(grant.treeUri))
-                } else emptyList()
+                if (registry.hasPersistedReadAccess(grant.treeUri)) scanner.scanTree(Uri.parse(grant.treeUri)) else emptyList()
             }
             val now = System.currentTimeMillis()
             val refreshedGrants = grants.map { grant ->
                 grant.copy(lastScanAt = now, enabled = registry.hasPersistedReadAccess(grant.treeUri))
             }
-            val snapshot = store.merge(mediaFiles + treeFiles, refreshedGrants)
+            val authoritativeKinds = buildSet {
+                add(MayraIndexedSourceKind.MEDIASTORE_IMAGE)
+                add(MayraIndexedSourceKind.SAF_TREE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(MayraIndexedSourceKind.MEDIASTORE_DOWNLOAD)
+            }
+            val snapshot = store.replaceInventory(
+                files = mediaFiles + treeFiles,
+                authoritativeKinds = authoritativeKinds,
+                grants = refreshedGrants
+            )
             Result.success(outputData(
                 FILE_COUNT_KEY to snapshot.files.size,
                 GRANT_COUNT_KEY to snapshot.grants.count { it.enabled },
