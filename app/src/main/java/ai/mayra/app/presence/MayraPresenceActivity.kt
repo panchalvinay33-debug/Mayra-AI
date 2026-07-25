@@ -5,6 +5,7 @@ import ai.mayra.app.MayraRuntime
 import ai.mayra.app.action.MayraActionControlActivity
 import ai.mayra.app.background.MayraNotificationCenterActivity
 import ai.mayra.app.calendar.MayraAgendaActivity
+import ai.mayra.app.floating.FloatingMayraActivity
 import ai.mayra.app.identity.MayraIdentityActivity
 import ai.mayra.app.owner.MayraOwnerModeStore
 import ai.mayra.app.owner.MayraOwnerSetupActivity
@@ -57,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -82,6 +82,7 @@ class MayraPresenceActivity : ComponentActivity() {
                     onNotifications = { startActivity(Intent(this, MayraNotificationCenterActivity::class.java)) },
                     onActionControls = { startActivity(Intent(this, MayraActionControlActivity::class.java)) },
                     onOwnerSetup = { startActivity(Intent(this, MayraOwnerSetupActivity::class.java)) },
+                    onFloatingMayra = { startActivity(Intent(this, FloatingMayraActivity::class.java)) },
                     onPeople = { startActivity(Intent(this, MayraIdentityActivity::class.java)) },
                     onReminders = { startActivity(Intent(this, MayraReminderActivity::class.java)) },
                     onAgenda = { startActivity(Intent(this, MayraAgendaActivity::class.java)) },
@@ -103,6 +104,7 @@ private fun MayraPresenceHome(
     onNotifications: () -> Unit,
     onActionControls: () -> Unit,
     onOwnerSetup: () -> Unit,
+    onFloatingMayra: () -> Unit,
     onPeople: () -> Unit,
     onReminders: () -> Unit,
     onAgenda: () -> Unit,
@@ -160,6 +162,7 @@ private fun MayraPresenceHome(
                     onActionControls = onActionControls,
                     onDeviceTest = onDeviceTest,
                     onOwnerSetup = onOwnerSetup,
+                    onFloatingMayra = onFloatingMayra,
                     onSettings = onSettings
                 )
 
@@ -168,16 +171,8 @@ private fun MayraPresenceHome(
                     state = state,
                     modifier = Modifier.clickable(onClick = onChat)
                 )
-                Text(
-                    state.label,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    greeting,
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center
-                )
+                Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(greeting, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                 Text(
                     state.prompt,
                     style = MaterialTheme.typography.bodyMedium,
@@ -240,6 +235,7 @@ private fun LivingHomeHeader(
     onActionControls: () -> Unit,
     onDeviceTest: () -> Unit,
     onOwnerSetup: () -> Unit,
+    onFloatingMayra: () -> Unit,
     onSettings: () -> Unit
 ) {
     Row(
@@ -273,6 +269,7 @@ private fun LivingHomeHeader(
                 MenuItem("Personal device check", onDeviceTest, onDismissMenu)
                 MenuLabel("MAYRA ACCESS")
                 MenuItem("Permissions & owner setup", onOwnerSetup, onDismissMenu)
+                MenuItem("Floating Mayra", onFloatingMayra, onDismissMenu)
                 MenuLabel("SETTINGS")
                 MenuItem("Language, voice, AI & privacy", onSettings, onDismissMenu)
             }
