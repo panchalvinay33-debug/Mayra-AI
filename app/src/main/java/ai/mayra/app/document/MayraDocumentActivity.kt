@@ -49,14 +49,13 @@ class MayraDocumentActivity : ComponentActivity() {
 private fun DocumentLibraryScreen(onClose: () -> Unit) {
     val context = LocalContext.current
     val store = remember(context) { MayraDocumentStore(context) }
-    val reader = remember(context) { MayraDocumentTextReader(context) }
     var refresh by remember { mutableIntStateOf(0) }
     var search by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf<String?>(null) }
-    var previewTitle by remember { mutableStateOf<String?>(null) }
-    var previewText by remember { mutableStateOf<String?>(null) }
     val documents = remember(refresh, search) {
-        store.list().filter { search.isBlank() || it.name.contains(search, ignoreCase = true) || it.mimeType.contains(search, ignoreCase = true) }
+        store.list().filter {
+            search.isBlank() || it.name.contains(search, ignoreCase = true) || it.mimeType.contains(search, ignoreCase = true)
+        }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -79,7 +78,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Document Library", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Choose documents for a local metadata library. Supported text-like files can be previewed with strict size limits.")
+            Text("Choose documents for a local metadata library. Supported text-like files can be searched and reviewed with strict size limits.")
 
             Button(
                 onClick = { picker.launch(arrayOf("application/pdf", "text/*", "application/json", "application/xml", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
@@ -89,16 +88,6 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
             OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), label = { Text("Search documents") }, singleLine = true)
             notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
-            previewTitle?.let { title ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text("Preview · $title", fontWeight = FontWeight.SemiBold)
-                        Text(previewText.orEmpty(), style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { previewTitle = null; previewText = null }) { Text("Close preview") }
-                    }
-                }
-            }
-
             if (documents.isEmpty()) {
                 Text("No matching documents yet.")
             } else {
@@ -106,18 +95,16 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                     DocumentCard(
                         document = document,
                         previewSupported = MayraDocumentTextReader.isSupportedTextType(document.mimeType, document.name),
-                        onPreview = {
-                            when (val result = reader.preview(Uri.parse(document.uri), document.mimeType)) {
-                                is DocumentTextPreview.Ready -> {
-                                    previewTitle = document.name
-                                    previewText = result.text + if (result.truncated) "\n\n[Preview truncated for safety]" else ""
-                                    store.markOpened(document.uri)
-                                    refresh++
+                        onRead = {
+                            store.markOpened(document.uri)
+                            refresh++
+                            context.startActivity(
+                                Intent(context, MayraDocumentReaderActivity::class.java).apply {
+                                    putExtra(MayraDocumentReaderActivity.EXTRA_URI, document.uri)
+                                    putExtra(MayraDocumentReaderActivity.EXTRA_NAME, document.name)
+                                    putExtra(MayraDocumentReaderActivity.EXTRA_MIME_TYPE, document.mimeType)
                                 }
-                                is DocumentTextPreview.Unsupported -> notice = result.reason
-                                is DocumentTextPreview.Error -> notice = result.reason
-                                DocumentTextPreview.Empty -> notice = "This document has no readable text."
-                            }
+                            )
                         },
                         onOpen = {
                             runCatching {
@@ -132,7 +119,6 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                         },
                         onRemove = {
                             store.remove(document.uri)
-                            if (previewTitle == document.name) { previewTitle = null; previewText = null }
                             refresh++
                         }
                     )
@@ -142,7 +128,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Document intelligence status", fontWeight = FontWeight.SemiBold)
-                    Text("Metadata library, persistent access, search, system open and bounded text preview are implemented. PDF page extraction, DOC parsing and AI summaries are not claimed yet.", style = MaterialTheme.typography.bodySmall)
+                    Text("Metadata library, persistent access, search, system open, bounded text reading and reviewed excerpt capture are implemented. PDF page extraction, DOC parsing and automatic AI summaries are not claimed yet.", style = MaterialTheme.typography.bodySmall)
                 }
             }
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
@@ -154,7 +140,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
 private fun DocumentCard(
     document: MayraDocument,
     previewSupported: Boolean,
-    onPreview: () -> Unit,
+    onRead: () -> Unit,
     onOpen: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -165,7 +151,7 @@ private fun DocumentCard(
             if (document.sizeBytes >= 0) Text("${document.sizeBytes} bytes", style = MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onRemove) { Text("Remove") }
-                if (previewSupported) TextButton(onClick = onPreview) { Text("Preview") }
+                if (previewSupported) TextButton(onClick = onRead) { Text("Read") }
                 TextButton(onClick = onOpen) { Text("Open") }
             }
         }
