@@ -8,6 +8,10 @@ import ai.mayra.app.core.actions.DeviceActionRequest
 import ai.mayra.app.core.actions.DeviceActionType
 import ai.mayra.app.core.actions.DevicePermission
 import ai.mayra.app.core.actions.PermissionSnapshot
+import ai.mayra.app.identity.MayraContactIdentityEngine
+import ai.mayra.app.identity.MayraContactIdentityStore
+import ai.mayra.app.identity.MayraContactTrust
+import ai.mayra.app.identity.MayraIdentityResolution
 import ai.mayra.app.owner.MayraOwnerActionPolicy
 import ai.mayra.app.owner.StoredMayraOwnerActionPolicy
 import android.content.Context
@@ -15,9 +19,9 @@ import android.content.Context
 /**
  * Production command bridge backed by the single shared [MayraActionRuntime].
  *
- * Contact/app resolution stays outside the action engine because it can require provider reads and
- * disambiguation. Once a concrete target exists, every action goes through capability, permission,
- * confirmation, kill-switch, verification, fallback and audit layers.
+ * Owner-defined identities resolve before Android contacts. Once a concrete phone number exists,
+ * every action goes through capability, permission, confirmation, kill-switch, duplicate,
+ * verification, fallback and audit layers. Only one high-risk confirmation may be pending at a time.
  */
 class MayraSafeActionExecutor(
     private val permissionSnapshot: () -> PermissionSnapshot,
@@ -25,6 +29,7 @@ class MayraSafeActionExecutor(
     private val installedAppResolver: InstalledAppResolver,
     private val engineProvider: () -> ai.mayra.app.action.MayraActionEngine,
     private val ownerPolicy: MayraOwnerActionPolicy = MayraOwnerActionPolicy { _, _ -> false },
+    private val identityEngine: MayraContactIdentityEngine? = null,
     private val clock: () -> Long = System::currentTimeMillis
 ) : ActionExecutor {
 
@@ -37,7 +42,8 @@ class MayraSafeActionExecutor(
         contactResolver = ContactResolver(AndroidContactPhoneDataSource(context.applicationContext)),
         installedAppResolver = InstalledAppResolver(AndroidInstalledAppDataSource(context.applicationContext)),
         engineProvider = { MayraActionRuntime.install(context.applicationContext) },
-        ownerPolicy = StoredMayraOwnerActionPolicy(context.applicationContext)
+        ownerPolicy = StoredMayraOwnerActionPolicy(context.applicationContext),
+        identityEngine = MayraContactIdentityStore(context.applicationContext).engine()
     )
 
     private var pendingConfirmationToken: String? = null
@@ -69,17 +75,22 @@ class MayraSafeActionExecutor(
         if (DevicePermission.READ_CONTACTS !in permissions.granted) {
             return submit(request(DeviceActionType.CALL_CONTACT, name), permissions)
         }
+        val identity = resolveIdentity(name) ?: return ambiguousIdentityResult(name)
 
-        return when (val resolution = contactResolver.resolve(name)) {
+        return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
-                request(DeviceActionType.CALL_CONTACT, resolution.contact.normalizedPhoneNumber),
+                request(
+                    DeviceActionType.CALL_CONTACT,
+                    resolution.contact.normalizedPhoneNumber,
+                    metadata = identity.metadata
+                ),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
-                "I found multiple contacts: ${resolution.candidates.joinToString { it.displayName }}. Please say the full name."
+                "I found multiple Android contacts for ${identity.contactName}: ${resolution.candidates.joinToString { it.displayName }}. Please use the exact saved name."
             )
             ContactResolution.NotFound -> ActionExecutionResult.NotSupported(
-                "I couldn't find a contact named ${name.trim()}."
+                "${identity.displayName} maps to ${identity.contactName}, but that Android contact was not found. Update People & Relationships or Contacts."
             )
         }
     }
@@ -89,21 +100,23 @@ class MayraSafeActionExecutor(
         if (DevicePermission.READ_CONTACTS !in permissions.granted) {
             return submit(request(DeviceActionType.SEND_MESSAGE, recipient, message), permissions)
         }
+        val identity = resolveIdentity(recipient) ?: return ambiguousIdentityResult(recipient)
 
-        return when (val resolution = contactResolver.resolve(recipient)) {
+        return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
                 request(
                     DeviceActionType.SEND_MESSAGE,
                     resolution.contact.normalizedPhoneNumber,
-                    message
+                    message,
+                    identity.metadata
                 ),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
-                "I found multiple contacts: ${resolution.candidates.joinToString { it.displayName }}. Please say the full name."
+                "I found multiple Android contacts for ${identity.contactName}: ${resolution.candidates.joinToString { it.displayName }}. Please use the exact saved name."
             )
             ContactResolution.NotFound -> ActionExecutionResult.NotSupported(
-                "I couldn't find a contact named ${recipient.trim()}."
+                "${identity.displayName} maps to ${identity.contactName}, but that Android contact was not found. Update People & Relationships or Contacts."
             )
         }
     }
@@ -132,6 +145,12 @@ class MayraSafeActionExecutor(
         request: DeviceActionRequest,
         permissions: PermissionSnapshot = permissionSnapshot()
     ): ActionExecutionResult {
+        if (request.requiresConfirmation && pendingConfirmationToken != null) {
+            return ActionExecutionResult.NotSupported(
+                "Another call or message is waiting for confirmation. Confirm or cancel it before starting a new one."
+            )
+        }
+
         val engine = engineProvider()
         val first = engine.submit(request, permissions)
         val resolved = if (
@@ -143,6 +162,37 @@ class MayraSafeActionExecutor(
             first
         }
         return resolved.toActionResult()
+    }
+
+    private fun resolveIdentity(query: String): IdentityTarget? {
+        val engine = identityEngine ?: return IdentityTarget(query.trim(), query.trim(), emptyMap())
+        return when (val result = engine.resolve(query)) {
+            is MayraIdentityResolution.Resolved -> IdentityTarget(
+                contactName = result.identity.canonicalContactName,
+                displayName = result.identity.relationship ?: result.identity.canonicalContactName,
+                metadata = buildMap {
+                    put("identityId", result.identity.id)
+                    put("relationship", result.identity.relationship.orEmpty())
+                    put("identityTrust", result.identity.trust.name)
+                    put("identityMatch", result.confidence.name)
+                    put("preferredChannel", result.identity.preferredChannel.name)
+                    if (result.identity.trust == MayraContactTrust.TRUSTED) put("trustedContact", "true")
+                    if (result.identity.trust == MayraContactTrust.SENSITIVE) put("sensitive", "true")
+                }
+            )
+            is MayraIdentityResolution.Ambiguous -> null
+            is MayraIdentityResolution.Unmapped -> IdentityTarget(query.trim(), query.trim(), emptyMap())
+        }
+    }
+
+    private fun ambiguousIdentityResult(query: String): ActionExecutionResult.NotSupported {
+        val candidates = (identityEngine?.resolve(query) as? MayraIdentityResolution.Ambiguous)
+            ?.candidates.orEmpty()
+            .joinToString { it.relationship ?: it.canonicalContactName }
+        return ActionExecutionResult.NotSupported(
+            if (candidates.isBlank()) "I could not safely resolve ${query.trim().take(120)}."
+            else "I found multiple people for ${query.trim().take(120)}: $candidates. Please say the exact relationship or contact name."
+        )
     }
 
     private fun MayraActionResult.toActionResult(): ActionExecutionResult = when (this) {
@@ -181,12 +231,14 @@ class MayraSafeActionExecutor(
     private fun request(
         type: DeviceActionType,
         target: String,
-        payload: String? = null
+        payload: String? = null,
+        metadata: Map<String, String> = emptyMap()
     ) = DeviceActionRequest(
         type = type,
-        target = target.trim(),
-        payload = payload?.trim()?.takeIf(String::isNotBlank),
-        createdAt = clock()
+        target = target.trim().take(500),
+        payload = payload?.trim()?.take(8_000)?.takeIf(String::isNotBlank),
+        createdAt = clock(),
+        metadata = metadata
     )
 
     private fun DevicePermission.userFacingName(): String = when (this) {
@@ -197,4 +249,10 @@ class MayraSafeActionExecutor(
         DevicePermission.POST_NOTIFICATIONS -> "notifications"
         DevicePermission.SCHEDULE_EXACT_ALARM -> "exact reminders"
     }
+
+    private data class IdentityTarget(
+        val contactName: String,
+        val displayName: String,
+        val metadata: Map<String, String>
+    )
 }
