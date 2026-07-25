@@ -210,9 +210,9 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
 }
 
 internal fun ownerModeSafetySummary(preferences: MayraOwnerPreferences): String = when {
-    !preferences.enabled -> "Owner Mode is off. Mayra uses standard confirmation behavior."
-    preferences.trustedDirectHandoffs -> "Owner Mode is active with trusted direct call/message handoffs. Sensitive, destructive, financial, legal and critical actions remain protected."
-    preferences.directMediumRiskActions -> "Owner Mode is active: low and medium risk actions may run directly; high and critical actions still require confirmation."
-    preferences.directLowRiskActions -> "Owner Mode is active: low risk actions may run directly; medium, high and critical actions still require confirmation."
-    else -> "Owner Mode is active with confirmations preserved for all actions."
+    !preferences.enabled -> "Owner Mode is off. Mayra keeps standard confirmation behavior."
+    preferences.trustedDirectHandoffs -> "Trusted review-first call and message handoffs are enabled. Android still shows the final dialer or message composer before anything is sent."
+    preferences.directMediumRiskActions -> "Low and medium-risk Mayra actions may run directly. Calls, messages, sensitive and critical actions remain review-first."
+    preferences.directLowRiskActions -> "Low-risk Mayra actions may run directly. Medium, high, sensitive and critical actions still require review."
+    else -> "Owner Mode is active with confirmation preserved for every action."
 }
