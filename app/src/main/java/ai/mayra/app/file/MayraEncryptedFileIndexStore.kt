@@ -28,6 +28,7 @@ class MayraEncryptedFileIndexStore(context: Context) {
             val iv = Base64.decode(envelope.getString("iv"), Base64.NO_WRAP)
             require(iv.size == 12) { "Invalid file index IV." }
             val ciphertext = Base64.decode(envelope.getString("ciphertext"), Base64.NO_WRAP)
+            require(ciphertext.isNotEmpty()) { "File index ciphertext is empty." }
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
             val plain = cipher.doFinal(ciphertext)
@@ -67,18 +68,29 @@ class MayraEncryptedFileIndexStore(context: Context) {
     }
 
     @Synchronized
-    fun merge(files: List<MayraIndexedFile>, grants: List<MayraFileGrant>? = null): MayraFileIndexSnapshot {
+    fun replaceInventory(
+        files: List<MayraIndexedFile>,
+        authoritativeKinds: Set<MayraIndexedSourceKind>,
+        grants: List<MayraFileGrant>? = null
+    ): MayraFileIndexSnapshot {
+        val current = read()
+        val next = current.copy(
+            files = MayraFileIndexReconciler.reconcile(current.files, files, authoritativeKinds),
+            grants = grants ?: current.grants,
+            generation = current.generation + 1,
+            updatedAt = System.currentTimeMillis()
+        )
+        write(next)
+        return next
+    }
+
+    @Synchronized
+    fun upsert(files: List<MayraIndexedFile>): MayraFileIndexSnapshot {
         val current = read()
         val merged = current.files.associateBy { it.uri }.toMutableMap()
-        files.forEach { candidate ->
-            val old = merged[candidate.uri]
-            if (old == null || old.fingerprint != candidate.fingerprint || candidate.indexedAt >= old.indexedAt) {
-                merged[candidate.uri] = candidate
-            }
-        }
+        files.forEach { candidate -> merged[candidate.uri] = candidate }
         val next = current.copy(
             files = merged.values.toList(),
-            grants = grants ?: current.grants,
             generation = current.generation + 1,
             updatedAt = System.currentTimeMillis()
         )
@@ -108,6 +120,7 @@ class MayraEncryptedFileIndexStore(context: Context) {
             .put("uri", file.uri).put("displayName", file.displayName).put("mimeType", file.mimeType)
             .put("sizeBytes", file.sizeBytes).put("modifiedAt", file.modifiedAt)
             .put("sourceKind", file.sourceKind.name).put("relativeLocation", file.relativeLocation)
+            .put("grantRootUri", file.grantRootUri)
             .put("fingerprint", file.fingerprint).put("state", file.state.name)
             .put("extractedText", file.extractedText).put("indexedAt", file.indexedAt)
             .put("failure", file.failure)) } })
@@ -119,7 +132,9 @@ class MayraEncryptedFileIndexStore(context: Context) {
                 mimeType = item.nullable("mimeType"), sizeBytes = item.optLong("sizeBytes"),
                 modifiedAt = item.optLong("modifiedAt"),
                 sourceKind = enumOr(item.optString("sourceKind"), MayraIndexedSourceKind.SAF_DOCUMENT),
-                relativeLocation = item.nullable("relativeLocation"), fingerprint = item.getString("fingerprint"),
+                relativeLocation = item.nullable("relativeLocation"),
+                grantRootUri = item.nullable("grantRootUri"),
+                fingerprint = item.getString("fingerprint"),
                 state = enumOr(item.optString("state"), MayraIndexState.METADATA_ONLY),
                 extractedText = item.nullable("extractedText"), indexedAt = item.optLong("indexedAt"),
                 failure = item.nullable("failure")
