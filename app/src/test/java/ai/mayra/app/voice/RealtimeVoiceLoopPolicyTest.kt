@@ -64,6 +64,17 @@ class RealtimeVoiceLoopPolicyTest {
     }
 
     @Test
+    fun `clock rollback does not bypass duplicate suppression`() {
+        val policy = RealtimeVoiceLoopPolicy()
+        val voice = VoiceState(transcript = "Mayra suno", isFinalTranscript = true)
+
+        policy.onVoiceState(voice, assistantBusy = false, now = 9_000L)
+        val rollback = policy.onVoiceState(voice, assistantBusy = false, now = 1_000L)
+
+        assertEquals("duplicate_transcript", rollback.ignoreReason)
+    }
+
+    @Test
     fun `assistant busy blocks transcript submission`() {
         val policy = RealtimeVoiceLoopPolicy()
         val decision = policy.onVoiceState(
@@ -77,6 +88,20 @@ class RealtimeVoiceLoopPolicyTest {
     }
 
     @Test
+    fun `oversized transcript is rejected and listening stops`() {
+        val policy = RealtimeVoiceLoopPolicy(maximumTranscriptLength = 20)
+        val decision = policy.onVoiceState(
+            VoiceState(transcript = "a".repeat(21), isFinalTranscript = true),
+            assistantBusy = false,
+            now = 1_000L
+        )
+
+        assertNull(decision.submitTranscript)
+        assertTrue(decision.stopListening)
+        assertEquals("transcript_too_long", decision.ignoreReason)
+    }
+
+    @Test
     fun `response is spoken once and continues listening`() {
         val policy = RealtimeVoiceLoopPolicy()
 
@@ -87,6 +112,26 @@ class RealtimeVoiceLoopPolicyTest {
         assertTrue(first.listenAfterSpeech)
         assertNull(duplicate.speakResponse)
         assertEquals("response_already_spoken", duplicate.ignoreReason)
+    }
+
+    @Test
+    fun `blank response key falls back to normalized text dedupe`() {
+        val policy = RealtimeVoiceLoopPolicy()
+
+        val first = policy.onAssistantResponse("Theek hai!", "", continuousMode = true)
+        val duplicate = policy.onAssistantResponse(" theek  hai ", " ", continuousMode = true)
+
+        assertEquals("Theek hai!", first.speakResponse)
+        assertEquals("response_already_spoken", duplicate.ignoreReason)
+    }
+
+    @Test
+    fun `oversized response is not sent to text to speech`() {
+        val policy = RealtimeVoiceLoopPolicy(maximumResponseLength = 10)
+        val decision = policy.onAssistantResponse("x".repeat(11), "long", continuousMode = true)
+
+        assertNull(decision.speakResponse)
+        assertEquals("response_too_long", decision.ignoreReason)
     }
 
     @Test
@@ -117,5 +162,10 @@ class RealtimeVoiceLoopPolicyTest {
 
         assertEquals("Hello Mayra", policy.onVoiceState(voice, false, 2_000L).submitTranscript)
         assertEquals("Hello", policy.onAssistantResponse("Hello", "one", true).speakResponse)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `invalid policy limits are rejected`() {
+        RealtimeVoiceLoopPolicy(minimumTranscriptLength = 5, maximumTranscriptLength = 4)
     }
 }
