@@ -5,6 +5,7 @@ import ai.mayra.app.knowledge.MayraPersonalMemory
 import ai.mayra.app.knowledge.PersonalNote
 import ai.mayra.app.knowledge.PersonalNoteType
 import ai.mayra.app.ui.theme.MayraAITheme
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
@@ -60,16 +61,22 @@ private fun VoiceNotesScreen(onClose: () -> Unit) {
     }
 
     val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == ComponentActivity.RESULT_OK) {
-            val heard = result.data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                ?.firstOrNull()
-                .orEmpty()
-            if (heard.isNotBlank()) {
-                transcript = heard
-                if (title.isBlank()) title = heard.take(42).trim().ifBlank { "Voice note" }
-                notice = "Transcript ready. Review it before saving."
+        when (result.resultCode) {
+            Activity.RESULT_OK -> {
+                val heard = result.data
+                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    ?.firstOrNull()
+                    .orEmpty()
+                if (heard.isBlank()) {
+                    notice = "No speech transcript was returned. Please try again."
+                } else {
+                    transcript = heard
+                    if (title.isBlank()) title = heard.take(42).trim().ifBlank { "Voice note" }
+                    notice = "Transcript ready. Review it before saving."
+                }
             }
+            Activity.RESULT_CANCELED -> notice = "Voice-note capture was cancelled. Nothing was saved."
+            else -> notice = "Speech recognition did not return a usable transcript."
         }
     }
 
@@ -78,9 +85,15 @@ private fun VoiceNotesScreen(onClose: () -> Unit) {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your Mayra voice note")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+        if (intent.resolveActivity(context.packageManager) == null) {
+            notice = "Speech recognition is not available on this phone."
+            return
         }
         runCatching { recognizer.launch(intent) }
-            .onFailure { notice = "Speech recognition is not available on this phone." }
+            .onFailure { notice = "Speech recognition could not be opened."
+            }
     }
 
     Scaffold { padding ->
@@ -94,26 +107,29 @@ private fun VoiceNotesScreen(onClose: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = ::startCapture, modifier = Modifier.fillMaxWidth()) { Text("Record a voice note") }
-                    OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text("Title") }, singleLine = true)
+                    OutlinedTextField(title, { title = it.take(180) }, Modifier.fillMaxWidth(), label = { Text("Title") }, singleLine = true)
                     OutlinedTextField(
                         transcript,
-                        { transcript = it },
+                        { transcript = it.take(8_000) },
                         Modifier.fillMaxWidth(),
                         label = { Text("Review transcript") },
-                        minLines = 5
+                        minLines = 5,
+                        supportingText = { Text("${transcript.length}/8000 characters") }
                     )
                     Button(
                         enabled = title.isNotBlank() && transcript.isNotBlank(),
                         onClick = {
-                            val combined = "$title $transcript"
+                            val cleanTitle = title.trim()
+                            val cleanTranscript = transcript.trim()
+                            val combined = "$cleanTitle $cleanTranscript"
                             if (MayraMemoryPrivacyGuard.looksSensitive(combined)) {
                                 notice = "Not saved: passwords, OTPs, card-like numbers and secret keys are blocked."
                             } else {
                                 memory.saveNote(
                                     PersonalNote(
                                         type = PersonalNoteType.VOICE_TRANSCRIPT,
-                                        title = title.trim(),
-                                        body = transcript.trim(),
+                                        title = cleanTitle,
+                                        body = cleanTranscript,
                                         tags = setOf("voice-note")
                                     )
                                 )
