@@ -32,6 +32,7 @@ import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.device.MayraDeviceRuntime
 import ai.mayra.app.device.androidDeviceRuntime
+import ai.mayra.app.diagnostics.MayraStartupHealth
 import ai.mayra.app.execution.AndroidExecutionCheckpointStore
 import ai.mayra.app.execution.MayraExecutionControlPlane
 import ai.mayra.app.execution.MayraExecutionCoordinator
@@ -53,6 +54,8 @@ import java.util.Calendar
 class MayraApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        val startupHealth = MayraStartupHealth(applicationContext)
+        startupHealth.begin()
 
         val actionExecutor = AndroidActionExecutor(applicationContext)
         val localAssistant = LocalMayraAssistant(
@@ -144,17 +147,24 @@ class MayraApplication : Application() {
             executionCoordinator = executionCoordinator
         )
 
-        contextMemory.prune()
-        planStore.prune()
-        pendingActions.expireDue()
-        pendingActions.prune()
-        autonomy.maintenance()
-        personalIntelligence.prune()
-        deviceRuntime.capture(force = true)
-        executionCoordinator.restore()
-        MayraBackgroundRuntime.initialize(applicationContext)
-        MayraBriefingScheduler.sync(applicationContext)
-        RuntimeAttentionNotifier.scanAndNotify(applicationContext, controlCenter.snapshot())
+        startupHealth.safeStep("context memory prune") { contextMemory.prune() }
+        startupHealth.safeStep("plan store prune") { planStore.prune() }
+        startupHealth.safeStep("pending action expiry") { pendingActions.expireDue() }
+        startupHealth.safeStep("pending action prune") { pendingActions.prune() }
+        startupHealth.safeStep("autonomy maintenance") { autonomy.maintenance() }
+        startupHealth.safeStep("personal intelligence prune") { personalIntelligence.prune() }
+        startupHealth.safeStep("device snapshot warmup") { deviceRuntime.capture(force = true) }
+        startupHealth.safeStep("execution restore") { executionCoordinator.restore() }
+        startupHealth.safeStep("background runtime initialization") {
+            MayraBackgroundRuntime.initialize(applicationContext)
+        }
+        startupHealth.safeStep("briefing scheduler sync") {
+            MayraBriefingScheduler.sync(applicationContext)
+        }
+        startupHealth.safeStep("runtime attention scan") {
+            RuntimeAttentionNotifier.scanAndNotify(applicationContext, controlCenter.snapshot())
+        }
+        startupHealth.complete()
     }
 
     private fun defaultAgentToolPlaceholders() = listOf(
