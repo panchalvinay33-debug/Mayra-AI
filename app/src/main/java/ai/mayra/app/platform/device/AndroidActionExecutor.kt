@@ -60,12 +60,14 @@ class AndroidActionExecutor(
         val clean = packageOrName.trim()
         if (clean.isBlank()) return ActionExecutionResult.Failure("App name cannot be blank")
         return when (val resolution = installedAppResolver.resolve(clean)) {
-            is AppResolution.Resolved -> submit(DeviceActionRequest(
-                type = DeviceActionType.OPEN_APP,
-                target = resolution.app.label,
-                createdAt = clock(),
-                metadata = mapOf("packageName" to resolution.app.packageName)
-            ))
+            is AppResolution.Resolved -> submit(
+                DeviceActionRequest(
+                    type = DeviceActionType.OPEN_APP,
+                    target = resolution.app.label,
+                    createdAt = clock(),
+                    metadata = mapOf("packageName" to resolution.app.packageName)
+                )
+            )
             is AppResolution.Ambiguous -> ActionExecutionResult.NotSupported(
                 "I found multiple apps: ${resolution.candidates.joinToString { it.label }}. Please use the full app name."
             )
@@ -81,7 +83,11 @@ class AndroidActionExecutor(
         val identity = resolveIdentity(name) ?: return ambiguousIdentityResult(name)
         return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
-                request(DeviceActionType.CALL_CONTACT, resolution.contact.normalizedPhoneNumber, metadata = identity.metadata),
+                request(
+                    DeviceActionType.CALL_CONTACT,
+                    resolution.contact.normalizedPhoneNumber,
+                    metadata = identity.metadata
+                ),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
@@ -101,7 +107,12 @@ class AndroidActionExecutor(
         val identity = resolveIdentity(recipient) ?: return ambiguousIdentityResult(recipient)
         return when (val resolution = contactResolver.resolve(identity.contactName)) {
             is ContactResolution.Resolved -> submit(
-                request(DeviceActionType.SEND_MESSAGE, resolution.contact.normalizedPhoneNumber, message, identity.metadata),
+                request(
+                    DeviceActionType.SEND_MESSAGE,
+                    resolution.contact.normalizedPhoneNumber,
+                    message,
+                    identity.metadata
+                ),
                 permissions
             )
             is ContactResolution.Ambiguous -> ActionExecutionResult.NotSupported(
@@ -154,6 +165,7 @@ class AndroidActionExecutor(
                     put("identityId", result.identity.id)
                     put("relationship", result.identity.relationship.orEmpty())
                     put("identityTrust", result.identity.trust.name)
+                    put("identityMatch", result.confidence.name)
                     put("preferredChannel", result.identity.preferredChannel.name)
                     if (result.identity.trust == MayraContactTrust.TRUSTED) put("trustedContact", "true")
                     if (result.identity.trust == MayraContactTrust.SENSITIVE) put("sensitive", "true")
@@ -168,16 +180,23 @@ class AndroidActionExecutor(
         val candidates = (identityEngine?.resolve(query) as? MayraIdentityResolution.Ambiguous)
             ?.candidates.orEmpty().joinToString { it.relationship ?: it.canonicalContactName }
         return ActionExecutionResult.NotSupported(
-            if (candidates.isBlank()) "I could not safely resolve ${query.trim()}."
-            else "I found multiple people for ${query.trim()}: $candidates. Please say the exact relationship or contact name."
+            if (candidates.isBlank()) "I could not safely resolve ${query.trim().take(120)}."
+            else "I found multiple people for ${query.trim().take(120)}: $candidates. Please say the exact relationship or contact name."
         )
     }
 
     private suspend fun submit(
         request: DeviceActionRequest,
         permissions: PermissionSnapshot = permissionSnapshot()
-    ): ActionExecutionResult = sharedEngine?.submit(request, permissions)?.toActionResult()
-        ?: coordinator.submit(request, permissions).toActionResult()
+    ): ActionExecutionResult {
+        if (request.requiresConfirmation && pendingConfirmationToken != null) {
+            return ActionExecutionResult.NotSupported(
+                "Another call or message is waiting for confirmation. Confirm or cancel it before starting a new one."
+            )
+        }
+        return sharedEngine?.submit(request, permissions)?.toActionResult()
+            ?: coordinator.submit(request, permissions).toActionResult()
+    }
 
     private fun MayraActionResult.toActionResult(): ActionExecutionResult = when (this) {
         is MayraActionResult.Completed -> ActionExecutionResult.Success
@@ -231,8 +250,8 @@ class AndroidActionExecutor(
         metadata: Map<String, String> = emptyMap()
     ) = DeviceActionRequest(
         type = type,
-        target = target.trim(),
-        payload = payload?.trim()?.takeIf(String::isNotBlank),
+        target = target.trim().take(500),
+        payload = payload?.trim()?.take(8_000)?.takeIf(String::isNotBlank),
         createdAt = clock(),
         metadata = metadata
     )
