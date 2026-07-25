@@ -15,8 +15,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 class MayraWorkspaceSessionStore(context: Context) {
-    private val appContext = context.applicationContext
-    private val atomicFile = AtomicFile(File(appContext.filesDir, FILE_NAME))
+    private val atomicFile = AtomicFile(File(context.applicationContext.filesDir, FILE_NAME))
 
     fun save(session: MayraWorkspaceSession) {
         val plain = session.toJson().toString().toByteArray(Charsets.UTF_8)
@@ -46,7 +45,7 @@ class MayraWorkspaceSessionStore(context: Context) {
     fun load(): MayraWorkspaceSession? {
         if (!atomicFile.baseFile.exists()) return null
         return runCatching {
-            val bytes = atomicFile.openRead().use { input -> input.readBytes() }
+            val bytes = atomicFile.openRead().use { it.readBytes() }
             require(bytes.size <= MAX_ENVELOPE_BYTES) { "Workspace autosave envelope is too large." }
             val envelope = JSONObject(String(bytes, Charsets.UTF_8))
             require(envelope.optString("schema") == SCHEMA) { "Unsupported workspace autosave schema." }
@@ -58,21 +57,17 @@ class MayraWorkspaceSessionStore(context: Context) {
             cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, iv))
             val plain = cipher.doFinal(ciphertext)
             try {
-                MayraWorkspaceSession.fromJson(JSONObject(String(plain, Charsets.UTF_8)))
+                workspaceSessionFromJson(JSONObject(String(plain, Charsets.UTF_8)))
             } finally {
                 plain.fill(0)
             }
         }.getOrElse {
-            clearCorrupted()
+            clear()
             null
         }
     }
 
     fun clear() {
-        atomicFile.delete()
-    }
-
-    private fun clearCorrupted() {
         runCatching { atomicFile.delete() }
     }
 
@@ -110,8 +105,8 @@ private fun MayraWorkspaceSession.toJson(): JSONObject = JSONObject()
     .put("transcript", JSONArray(transcript))
     .put("tasks", JSONArray().apply { tasks.forEach { put(it.toJson()) } })
     .put("notes", notes)
-    .put("table", table?.toJson())
-    .put("activeTaskId", activeTaskId)
+    .put("table", table?.toJson() ?: JSONObject.NULL)
+    .put("activeTaskId", activeTaskId ?: JSONObject.NULL)
     .put("revision", revision)
     .put("createdAt", createdAt)
     .put("updatedAt", updatedAt)
@@ -123,7 +118,7 @@ private fun MayraWorkspaceTask.toJson(): JSONObject = JSONObject()
     .put("progress", progress)
     .put("statusMessage", statusMessage)
     .put("sources", JSONArray().apply { sources.forEach { put(it.toJson()) } })
-    .put("resultSummary", resultSummary)
+    .put("resultSummary", resultSummary ?: JSONObject.NULL)
     .put("verified", verified)
     .put("updatedAt", updatedAt)
 
@@ -139,9 +134,9 @@ private fun MayraWorkspaceIntent.toJson(): JSONObject = JSONObject()
 private fun MayraSourceReference.toJson(): JSONObject = JSONObject()
     .put("uri", uri)
     .put("displayName", displayName)
-    .put("page", page)
-    .put("confidence", confidence)
-    .put("excerpt", excerpt)
+    .put("page", page ?: JSONObject.NULL)
+    .put("confidence", confidence ?: JSONObject.NULL)
+    .put("excerpt", excerpt ?: JSONObject.NULL)
 
 private fun MayraWorkspaceTable.toJson(): JSONObject = JSONObject()
     .put("id", id)
@@ -150,32 +145,32 @@ private fun MayraWorkspaceTable.toJson(): JSONObject = JSONObject()
     .put("rows", JSONArray().apply { rows.forEach { put(JSONArray(it)) } })
     .put("revision", revision)
 
-private fun MayraWorkspaceSession.Companion.fromJson(json: JSONObject): MayraWorkspaceSession = MayraWorkspaceSession(
+private fun workspaceSessionFromJson(json: JSONObject): MayraWorkspaceSession = MayraWorkspaceSession(
     id = json.getString("id"),
     title = json.optString("title", "Mayra Workspace"),
     transcript = json.optJSONArray("transcript").toStringList(),
-    tasks = json.optJSONArray("tasks").toObjectList { MayraWorkspaceTask.fromJson(it) },
+    tasks = json.optJSONArray("tasks").toObjectList(::workspaceTaskFromJson),
     notes = json.optString("notes", ""),
-    table = json.optJSONObject("table")?.let(MayraWorkspaceTable::fromJson),
-    activeTaskId = json.optString("activeTaskId").takeIf(String::isNotBlank),
+    table = json.optJSONObject("table")?.let(::workspaceTableFromJson),
+    activeTaskId = json.optNullableString("activeTaskId"),
     revision = json.optLong("revision", 0L),
     createdAt = json.optLong("createdAt", System.currentTimeMillis()),
     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
 )
 
-private fun MayraWorkspaceTask.Companion.fromJson(json: JSONObject): MayraWorkspaceTask = MayraWorkspaceTask(
+private fun workspaceTaskFromJson(json: JSONObject): MayraWorkspaceTask = MayraWorkspaceTask(
     id = json.getString("id"),
-    intent = MayraWorkspaceIntent.fromJson(json.getJSONObject("intent")),
+    intent = workspaceIntentFromJson(json.getJSONObject("intent")),
     state = enumValueOrDefault(json.optString("state"), MayraWorkspaceTaskState.DRAFT),
     progress = json.optInt("progress", 0).coerceIn(0, 100),
     statusMessage = json.optString("statusMessage", "Draft"),
-    sources = json.optJSONArray("sources").toObjectList { MayraSourceReference.fromJson(it) },
-    resultSummary = json.optString("resultSummary").takeIf(String::isNotBlank),
+    sources = json.optJSONArray("sources").toObjectList(::sourceReferenceFromJson),
+    resultSummary = json.optNullableString("resultSummary"),
     verified = json.optBoolean("verified", false),
     updatedAt = json.optLong("updatedAt", System.currentTimeMillis())
 )
 
-private fun MayraWorkspaceIntent.Companion.fromJson(json: JSONObject): MayraWorkspaceIntent = MayraWorkspaceIntent(
+private fun workspaceIntentFromJson(json: JSONObject): MayraWorkspaceIntent = MayraWorkspaceIntent(
     id = json.getString("id"),
     rawText = json.getString("rawText"),
     action = enumValueOrDefault(json.optString("action"), MayraWorkspaceActionType.UNKNOWN),
@@ -185,15 +180,15 @@ private fun MayraWorkspaceIntent.Companion.fromJson(json: JSONObject): MayraWork
     createdAt = json.optLong("createdAt", System.currentTimeMillis())
 )
 
-private fun MayraSourceReference.Companion.fromJson(json: JSONObject): MayraSourceReference = MayraSourceReference(
+private fun sourceReferenceFromJson(json: JSONObject): MayraSourceReference = MayraSourceReference(
     uri = json.getString("uri"),
     displayName = json.optString("displayName", "Source"),
     page = json.optInt("page").takeIf { json.has("page") && !json.isNull("page") },
     confidence = json.optDouble("confidence").takeIf { json.has("confidence") && !json.isNull("confidence") },
-    excerpt = json.optString("excerpt").takeIf(String::isNotBlank)
+    excerpt = json.optNullableString("excerpt")
 )
 
-private fun MayraWorkspaceTable.Companion.fromJson(json: JSONObject): MayraWorkspaceTable = MayraWorkspaceTable(
+private fun workspaceTableFromJson(json: JSONObject): MayraWorkspaceTable = MayraWorkspaceTable(
     id = json.getString("id"),
     title = json.optString("title", "Untitled table"),
     columns = json.optJSONArray("columns").toStringList(),
@@ -213,16 +208,8 @@ private fun JSONObject?.toStringMap(): Map<String, String> = if (this == null) e
     keys().forEach { key -> put(key, optString(key)) }
 }
 
+private fun JSONObject.optNullableString(key: String): String? =
+    takeUnless { !has(key) || isNull(key) }?.optString(key)?.takeIf(String::isNotBlank)
+
 private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String, default: T): T =
     runCatching { enumValueOf<T>(value) }.getOrDefault(default)
-
-private val MayraWorkspaceSession.Companion: MayraWorkspaceSession
-    get() = MayraWorkspaceSession()
-private val MayraWorkspaceTask.Companion: MayraWorkspaceTask
-    get() = MayraWorkspaceTask(MayraWorkspaceIntent(rawText = "", action = MayraWorkspaceActionType.UNKNOWN))
-private val MayraWorkspaceIntent.Companion: MayraWorkspaceIntent
-    get() = MayraWorkspaceIntent(rawText = "", action = MayraWorkspaceActionType.UNKNOWN)
-private val MayraSourceReference.Companion: MayraSourceReference
-    get() = MayraSourceReference(uri = "", displayName = "")
-private val MayraWorkspaceTable.Companion: MayraWorkspaceTable
-    get() = MayraWorkspaceTable()
