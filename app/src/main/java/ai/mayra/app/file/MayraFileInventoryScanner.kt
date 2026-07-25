@@ -25,40 +25,50 @@ class MayraFileInventoryScanner(context: Context) {
         val output = ArrayList<MayraIndexedFile>()
         val queue = ArrayDeque<Pair<DocumentFile, String>>()
         queue.add(root to root.name.orEmpty())
-        while (queue.isNotEmpty() && output.size < maxFiles.coerceIn(1, MAX_TREE_FILES)) {
+        val boundedLimit = maxFiles.coerceIn(1, MAX_TREE_FILES)
+        while (queue.isNotEmpty() && output.size < boundedLimit) {
             val (node, path) = queue.removeFirst()
-            node.listFiles().forEach { child ->
-                if (output.size >= maxFiles) return@forEach
+            val children = runCatching { node.listFiles().toList() }.getOrDefault(emptyList())
+            children.forEach { child ->
+                if (output.size >= boundedLimit) return@forEach
                 val nextPath = listOf(path, child.name).filter(String::isNotBlank).joinToString("/")
-                if (child.isDirectory) {
-                    queue.add(child to nextPath)
-                } else {
-                    toIndexedFile(child.uri, MayraIndexedSourceKind.SAF_TREE, nextPath)?.let(output::add)
-                }
+                if (child.isDirectory) queue.add(child to nextPath)
+                else toIndexedFile(child.uri, MayraIndexedSourceKind.SAF_TREE, nextPath)?.let(output::add)
             }
         }
         return output
     }
 
-    fun inspectDocument(uri: Uri): MayraIndexedFile? = toIndexedFile(uri, MayraIndexedSourceKind.SAF_DOCUMENT, null)
+    fun inspectDocument(uri: Uri): MayraIndexedFile? =
+        toIndexedFile(uri, MayraIndexedSourceKind.SAF_DOCUMENT, null)
 
     private fun scanCollection(collection: Uri, kind: MayraIndexedSourceKind): List<MayraIndexedFile> {
-        val projection = arrayOf(
+        val baseProjection = mutableListOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.MIME_TYPE,
             MediaStore.MediaColumns.SIZE,
-            MediaStore.MediaColumns.DATE_MODIFIED,
-            MediaStore.MediaColumns.RELATIVE_PATH
+            MediaStore.MediaColumns.DATE_MODIFIED
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            baseProjection += MediaStore.MediaColumns.RELATIVE_PATH
+        }
         return runCatching {
-            resolver.query(collection, projection, null, null, "${MediaStore.MediaColumns.DATE_MODIFIED} DESC")?.use { cursor ->
+            resolver.query(
+                collection,
+                baseProjection.toTypedArray(),
+                null,
+                null,
+                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+            )?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val typeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
                 val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
-                val pathColumn = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                val pathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                } else -1
                 buildList {
                     while (cursor.moveToNext() && size < MAX_MEDIASTORE_FILES) {
                         val uri = Uri.withAppendedPath(collection, cursor.getLong(idColumn).toString())
@@ -79,8 +89,10 @@ class MayraFileInventoryScanner(context: Context) {
     private fun toIndexedFile(uri: Uri, kind: MayraIndexedSourceKind, relative: String?): MayraIndexedFile? = runCatching {
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
-            val name = cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)).orEmpty().ifBlank { "Unnamed file" }
-            val size = cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE)).coerceAtLeast(0L)
+            val nameColumn = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val sizeColumn = cursor.getColumnIndex(OpenableColumns.SIZE)
+            val name = nameColumn.takeIf { it >= 0 }?.let(cursor::getString).orEmpty().ifBlank { "Unnamed file" }
+            val size = sizeColumn.takeIf { it >= 0 }?.let(cursor::getLong)?.coerceAtLeast(0L) ?: 0L
             val mime = resolver.getType(uri)
             if (!MayraFilePrivacyPolicy.isAllowed(name, relative, mime)) return@use null
             buildFile(uri, name, mime, size, 0L, kind, relative)
