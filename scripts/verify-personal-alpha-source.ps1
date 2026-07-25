@@ -32,6 +32,11 @@ $requiredFiles = @(
     "app/src/main/java/ai/mayra/app/background/MayraNotificationListener.kt",
     "app/src/main/java/ai/mayra/app/background/MayraNotificationSafetyPolicy.kt",
     "app/src/test/java/ai/mayra/app/background/MayraNotificationSafetyPolicyTest.kt",
+    "app/src/main/java/ai/mayra/app/reminder/MayraReminderEngine.kt",
+    "app/src/main/java/ai/mayra/app/reminder/MayraReminderRuntime.kt",
+    "app/src/main/java/ai/mayra/app/reminder/ReminderRecoveryPolicy.kt",
+    "app/src/test/java/ai/mayra/app/reminder/MayraReminderEngineTest.kt",
+    "app/src/test/java/ai/mayra/app/reminder/ReminderRecoveryPolicyTest.kt",
     "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt",
     "app/src/test/java/ai/mayra/app/memory/MayraMemoryBackupEngineTest.kt",
     "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt",
@@ -117,6 +122,15 @@ $notificationSafetyText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai
 $results.Add((Write-Check "Notification pipeline obeys Global Stop" ($notificationListenerText -match 'MayraGlobalStopStore' -and $notificationListenerText -match 'globalStopActive = stopped') 'Reply and proactive notification actions stop across process restarts'))
 $results.Add((Write-Check "Sensitive notification store-only policy" ($notificationSafetyText -match 'sensitivity == NotificationSensitivity.NORMAL' -and $notificationSafetyText -match 'sensitivity != NotificationSensitivity.OTP') 'OTP and sensitive notifications cannot become proactive actions'))
 $results.Add((Write-Check "Conversation identity redaction" ($notificationSafetyText -match 'Protected conversation' -and $notificationSafetyText -match 'Private conversation') 'Sensitive conversation labels do not leak into summaries'))
+
+$reminderEngineText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/reminder/MayraReminderEngine.kt") -Raw
+$reminderRuntimeText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/reminder/MayraReminderRuntime.kt") -Raw
+$reminderRecoveryText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/reminder/ReminderRecoveryPolicy.kt") -Raw
+$results.Add((Write-Check "Reminder revision persistence" ($reminderEngineText -match 'val revision: Long' -and $reminderEngineText -match 'put\("revision", revision\)') 'Reminder mutations carry a monotonic persisted revision'))
+$results.Add((Write-Check "Stale reminder worker protection" ($reminderRuntimeText -match 'KEY_REVISION' -and $reminderRuntimeText -match 'reminder\.revision != expectedRevision' -and $reminderRuntimeText -match 'reminder\.dueAt != expectedDueAt') 'Old workers cannot fire a snoozed or changed reminder'))
+$results.Add((Write-Check "Stale reminder action protection" ($reminderRuntimeText -match 'EXTRA_REVISION' -and $reminderRuntimeText -match 'current\.revision != expectedRevision') 'Old notification buttons cannot mutate a newer reminder state'))
+$results.Add((Write-Check "Reminder reboot recovery policy" ($reminderRecoveryText -match 'LEAVE_MISSED' -and $reminderRecoveryText -match 'MARK_MISSED_AND_NOTIFY') 'Already-missed reminders remain quiet after reboot'))
+$results.Add((Write-Check "Terminal reminder protection" ($reminderEngineText -match 'canComplete' -and $reminderEngineText -match 'canSnooze' -and $reminderEngineText -match 'return@update null') 'Completed and cancelled reminders cannot be revived by stale actions'))
 
 $backupText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt") -Raw
 $results.Add((Write-Check "Authenticated backup encryption" ($backupText -match 'AES/GCM/NoPadding') 'Backup uses AES-GCM'))
