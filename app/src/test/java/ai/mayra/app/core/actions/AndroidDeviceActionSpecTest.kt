@@ -21,12 +21,12 @@ class AndroidDeviceActionSpecTest {
     }
 
     @Test
-    fun `call spec uses tel uri`() {
+    fun `call spec opens review first dialer with tel uri`() {
         val spec = AndroidDeviceActionSpecFactory.create(
             request(DeviceActionType.CALL_CONTACT, "+91 98765 43210")
         )
 
-        assertEquals(AndroidDeviceActionSpecFactory.ACTION_CALL, spec.action)
+        assertEquals(AndroidDeviceActionSpecFactory.ACTION_DIAL, spec.action)
         assertEquals("tel:+91 98765 43210", spec.data)
     }
 
