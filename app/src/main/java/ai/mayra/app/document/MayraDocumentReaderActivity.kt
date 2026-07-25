@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,12 +84,30 @@ private fun DocumentReaderScreen(uri: String, name: String, mimeType: String, on
 
             when (preview) {
                 is DocumentTextPreview.Ready -> {
-                    OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text("Search inside preview") }, singleLine = true)
+                    OutlinedTextField(
+                        query,
+                        { query = it.take(200) },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Search inside preview") },
+                        singleLine = true
+                    )
                     if (query.length >= 2) {
                         Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("${matches.size} matches", fontWeight = FontWeight.SemiBold)
-                                matches.forEach { match -> Text("Line ${match.lineNumber}: ${match.preview}", style = MaterialTheme.typography.bodySmall) }
+                                matches.forEach { match ->
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(
+                                            "Line ${match.lineNumber}: ${match.preview}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        TextButton(onClick = {
+                                            selectedText = appendExcerpt(selectedText, match.preview)
+                                            notice = "Line ${match.lineNumber} added to the reviewed excerpt."
+                                        }) { Text("Use") }
+                                    }
+                                }
                                 if (matches.isEmpty()) Text("No match in the bounded preview.", style = MaterialTheme.typography.bodySmall)
                             }
                         }
@@ -104,19 +124,35 @@ private fun DocumentReaderScreen(uri: String, name: String, mimeType: String, on
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Save an excerpt to Mayra Memory", fontWeight = FontWeight.SemiBold)
-                            OutlinedTextField(noteTitle, { noteTitle = it }, Modifier.fillMaxWidth(), label = { Text("Memory title") }, singleLine = true)
-                            OutlinedTextField(selectedText, { selectedText = it }, Modifier.fillMaxWidth(), label = { Text("Paste or type the useful excerpt") }, minLines = 4)
+                            Text("Select a search result with Use, or paste and edit an excerpt. Nothing is saved automatically.", style = MaterialTheme.typography.bodySmall)
+                            OutlinedTextField(
+                                noteTitle,
+                                { noteTitle = it.take(180) },
+                                Modifier.fillMaxWidth(),
+                                label = { Text("Memory title") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                selectedText,
+                                { selectedText = it.take(MAX_EXCERPT_CHARACTERS) },
+                                Modifier.fillMaxWidth(),
+                                label = { Text("Reviewed useful excerpt") },
+                                minLines = 4,
+                                supportingText = { Text("${selectedText.length}/$MAX_EXCERPT_CHARACTERS characters") }
+                            )
                             Button(
                                 enabled = noteTitle.isNotBlank() && selectedText.isNotBlank(),
                                 onClick = {
-                                    if (MayraMemoryPrivacyGuard.looksSensitive("$noteTitle $selectedText")) {
+                                    val cleanTitle = noteTitle.trim()
+                                    val cleanExcerpt = selectedText.trim()
+                                    if (MayraMemoryPrivacyGuard.looksSensitive("$cleanTitle $cleanExcerpt")) {
                                         notice = "Not saved: credential-like or financial-secret content is blocked."
                                     } else {
                                         memory.saveNote(
                                             PersonalNote(
                                                 type = PersonalNoteType.PROJECT_NOTE,
-                                                title = noteTitle.trim(),
-                                                body = selectedText.trim().take(8_000),
+                                                title = cleanTitle,
+                                                body = cleanExcerpt,
                                                 tags = setOf("document", name.take(80)),
                                                 sensitive = false
                                             )
@@ -141,3 +177,13 @@ private fun DocumentReaderScreen(uri: String, name: String, mimeType: String, on
         }
     }
 }
+
+internal fun appendExcerpt(current: String, line: String, maxCharacters: Int = MAX_EXCERPT_CHARACTERS): String {
+    require(maxCharacters > 0)
+    val cleanLine = line.trim()
+    if (cleanLine.isBlank()) return current.take(maxCharacters)
+    val combined = if (current.isBlank()) cleanLine else "${current.trimEnd()}\n$cleanLine"
+    return combined.take(maxCharacters)
+}
+
+internal const val MAX_EXCERPT_CHARACTERS = 8_000
