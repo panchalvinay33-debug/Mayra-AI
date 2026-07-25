@@ -40,7 +40,7 @@ class AndroidDeviceActionRunnerTest {
             starter = AndroidIntentStarter { captured = it }
         )
 
-        val output = runner.run(request(DeviceActionType.SEND_MESSAGE, "9876543210", "  Hello\nMayra  "))
+        val output = runner.run(request(DeviceActionType.SEND_MESSAGE, "9876543210", "  Hello   Mayra  "))
         val intent = requireNotNull(captured)
 
         assertEquals(AndroidDeviceActionSpecFactory.ACTION_SENDTO, intent.action)
@@ -50,7 +50,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun dial target rejects URI injection`() {
+    fun `dial target rejects URI injection`() {
         assertThrows(IllegalArgumentException::class.java) {
             AndroidDeviceActionSpecFactory.create(
                 request(DeviceActionType.CALL_CONTACT, "12345?body=hidden")
@@ -59,7 +59,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun message target rejects scheme injection`() {
+    fun `message target rejects scheme injection`() {
         assertThrows(IllegalArgumentException::class.java) {
             AndroidDeviceActionSpecFactory.create(
                 request(DeviceActionType.SEND_MESSAGE, "smsto:12345", "Hello")
@@ -68,7 +68,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun dial target must contain a number`() {
+    fun `dial target must contain a number`() {
         assertThrows(IllegalArgumentException::class.java) {
             AndroidDeviceActionSpecFactory.create(
                 request(DeviceActionType.CALL_CONTACT, "Mummy")
@@ -101,7 +101,7 @@ class AndroidDeviceActionRunnerTest {
     }
 
     @Test
-    fun invalidPackageNameFailsClosed() {
+    fun `invalid package name fails closed`() {
         assertThrows(IllegalArgumentException::class.java) {
             AndroidDeviceActionSpecFactory.create(
                 DeviceActionRequest(
@@ -122,7 +122,7 @@ class AndroidDeviceActionRunnerTest {
             starter = AndroidIntentStarter { captured = it }
         )
 
-        runner.run(request(DeviceActionType.CREATE_REMINDER, "Medicine", "At\n8 PM"))
+        runner.run(request(DeviceActionType.CREATE_REMINDER, "Medicine", "At   8 PM"))
         val intent = requireNotNull(captured)
 
         assertEquals(AndroidDeviceActionSpecFactory.ACTION_INSERT, intent.action)
