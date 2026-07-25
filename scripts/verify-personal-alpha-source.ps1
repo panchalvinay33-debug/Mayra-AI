@@ -49,8 +49,8 @@ $results.Add((Write-Check "Parallel Gradle disabled" ($properties -match 'org\.g
 
 $trackedSecretPatterns = @(
     '(?i)sk-[a-z0-9_-]{20,}',
-    '(?i)api[_-]?key\s*[=:]\s*["''][^"'']{12,}',
-    '(?i)client[_-]?secret\s*[=:]\s*["''][^"'']{12,}',
+    '(?i)api[_-]?key\s*[=:]\s*[^\s]{16,}',
+    '(?i)client[_-]?secret\s*[=:]\s*[^\s]{16,}',
     '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
 )
 $scanExtensions = @("*.kt", "*.kts", "*.java", "*.xml", "*.json", "*.md", "*.yml", "*.yaml", "*.properties", "*.ps1")
@@ -85,7 +85,8 @@ if ($gitAvailable) {
     $branch = (& git branch --show-current 2>$null).Trim()
     $commit = (& git rev-parse HEAD 2>$null).Trim()
     $dirty = [bool]((& git status --porcelain 2>$null) | Select-Object -First 1)
-    $results.Add((Write-Check "Git working tree" (-not $dirty) (if ($dirty) { "Uncommitted changes exist" } else { "Clean" })))
+    $dirtyDetail = if ($dirty) { "Uncommitted changes exist" } else { "Clean" }
+    $results.Add((Write-Check "Git working tree" (-not $dirty) $dirtyDetail))
 }
 
 $reportDir = Join-Path $repoRoot "build/personal-alpha"
