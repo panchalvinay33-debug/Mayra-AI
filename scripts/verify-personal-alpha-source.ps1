@@ -21,9 +21,12 @@ $requiredFiles = @(
     "gradle.properties",
     "app/build.gradle.kts",
     "app/src/main/AndroidManifest.xml",
+    "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt",
+    "app/src/test/java/ai/mayra/app/testing/MayraDeviceTestCenterTest.kt",
     "docs/MAYRA_AI_MASTER_BLUEPRINT.md",
     "docs/MAYRA_LIVING_INTELLIGENCE_VISION.md",
     "docs/MAYRA_SOURCE_OF_TRUTH_AND_BACKUP_MAP.md",
+    "docs/PERSONAL_ALPHA_STABILIZATION_STATUS.md",
     "scripts/build-personal-alpha.ps1",
     "scripts/install-personal-alpha.ps1"
 )
@@ -57,7 +60,7 @@ $scanExtensions = @("*.kt", "*.kts", "*.java", "*.xml", "*.json", "*.md", "*.yml
 $secretHits = New-Object System.Collections.Generic.List[string]
 foreach ($extension in $scanExtensions) {
     Get-ChildItem -Path $repoRoot -Recurse -File -Filter $extension -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch '[\\/](build|\.gradle|\.git)[\\/]' } |
+        Where-Object { $_.FullName -notmatch '[\\/](build|\.gradle|\.git|\.tools)[\\/]' } |
         ForEach-Object {
             $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
             foreach ($pattern in $trackedSecretPatterns) {
@@ -76,6 +79,16 @@ $manifest = Get-Content (Join-Path $repoRoot "app/src/main/AndroidManifest.xml")
 $results.Add((Write-Check "Launcher declared" ($manifest -match 'android\.intent\.category\.LAUNCHER') 'Launcher entry exists'))
 $results.Add((Write-Check "Internet permission" ($manifest -match 'android\.permission\.INTERNET') 'Optional online AI networking declared'))
 $results.Add((Write-Check "Notification permission" ($manifest -match 'android\.permission\.POST_NOTIFICATIONS') 'Android 13+ alerts declared'))
+$results.Add((Write-Check "Android auto backup disabled" ($manifest -match 'android:allowBackup="false"') 'Sensitive state uses explicit Mayra backup only'))
+$results.Add((Write-Check "Full backup disabled" ($manifest -match 'android:fullBackupContent="false"') 'No implicit cloud extraction of Mayra data'))
+$results.Add((Write-Check "Cleartext traffic disabled" ($manifest -match 'android:usesCleartextTraffic="false"') 'Network providers must use encrypted transport'))
+$results.Add((Write-Check "Internal components protected" (-not ($manifest -match '<activity[^>]+android:exported="true"[^>]*>' -and $manifest -notmatch 'MayraPresenceActivity')) 'Only the launcher is externally exported'))
+
+$deviceTestText = Get-Content (Join-Path $repoRoot "app/src/main/java/ai/mayra/app/testing/MayraDeviceTestCenter.kt") -Raw
+$deviceIds = [regex]::Matches($deviceTestText, 'DeviceTestDefinition\(DeviceTestId\.')
+$results.Add((Write-Check "Twenty physical alpha checks" ($deviceIds.Count -eq 20) "Found $($deviceIds.Count) DeviceTestDefinition entries"))
+$results.Add((Write-Check "Floating Mayra acceptance" ($deviceTestText -match 'DeviceTestId\.FLOATING_MAYRA') 'Overlay lifecycle is physically tested'))
+$results.Add((Write-Check "Backup restore acceptance" ($deviceTestText -match 'DeviceTestId\.MEMORY_BACKUP_RESTORE') 'Encrypted backup and restore are physically tested'))
 
 $gitAvailable = Get-Command git -ErrorAction SilentlyContinue
 $branch = "unknown"
