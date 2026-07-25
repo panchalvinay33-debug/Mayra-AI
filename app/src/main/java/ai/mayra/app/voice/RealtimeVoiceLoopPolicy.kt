@@ -15,8 +15,17 @@ data class VoiceLoopDecision(
 
 class RealtimeVoiceLoopPolicy(
     private val duplicateWindowMs: Long = DEFAULT_DUPLICATE_WINDOW_MS,
-    private val minimumTranscriptLength: Int = DEFAULT_MIN_TRANSCRIPT_LENGTH
+    private val minimumTranscriptLength: Int = DEFAULT_MIN_TRANSCRIPT_LENGTH,
+    private val maximumTranscriptLength: Int = DEFAULT_MAX_TRANSCRIPT_LENGTH,
+    private val maximumResponseLength: Int = DEFAULT_MAX_RESPONSE_LENGTH
 ) {
+    init {
+        require(duplicateWindowMs >= 0L)
+        require(minimumTranscriptLength > 0)
+        require(maximumTranscriptLength >= minimumTranscriptLength)
+        require(maximumResponseLength > 0)
+    }
+
     private var lastSubmittedTranscript = ""
     private var lastSubmittedAt = 0L
     private var lastSpokenResponseKey = ""
@@ -32,10 +41,15 @@ class RealtimeVoiceLoopPolicy(
         if (transcript.length < minimumTranscriptLength) {
             return VoiceLoopDecision(ignoreReason = "transcript_too_short")
         }
+        if (transcript.length > maximumTranscriptLength) {
+            return VoiceLoopDecision(stopListening = true, ignoreReason = "transcript_too_long")
+        }
         if (assistantBusy) return VoiceLoopDecision(ignoreReason = "assistant_busy")
 
         val normalized = normalize(transcript)
-        val duplicate = normalized == lastSubmittedTranscript && now - lastSubmittedAt <= duplicateWindowMs
+        if (normalized.isBlank()) return VoiceLoopDecision(ignoreReason = "transcript_empty_after_normalization")
+        val elapsed = (now - lastSubmittedAt).coerceAtLeast(0L)
+        val duplicate = normalized == lastSubmittedTranscript && elapsed <= duplicateWindowMs
         if (duplicate) return VoiceLoopDecision(ignoreReason = "duplicate_transcript")
 
         lastSubmittedTranscript = normalized
@@ -51,8 +65,14 @@ class RealtimeVoiceLoopPolicy(
     ): VoiceLoopDecision {
         val text = responseText.trim()
         if (text.isBlank()) return VoiceLoopDecision(ignoreReason = "blank_response")
-        if (responseKey == lastSpokenResponseKey) return VoiceLoopDecision(ignoreReason = "response_already_spoken")
-        lastSpokenResponseKey = responseKey
+        if (text.length > maximumResponseLength) {
+            return VoiceLoopDecision(ignoreReason = "response_too_long")
+        }
+        val stableKey = responseKey.trim().ifBlank { "text:${normalize(text)}" }
+        if (stableKey == lastSpokenResponseKey) {
+            return VoiceLoopDecision(ignoreReason = "response_already_spoken")
+        }
+        lastSpokenResponseKey = stableKey
         return VoiceLoopDecision(
             speakResponse = text,
             listenAfterSpeech = continuousMode
@@ -79,5 +99,7 @@ class RealtimeVoiceLoopPolicy(
     companion object {
         const val DEFAULT_DUPLICATE_WINDOW_MS = 8_000L
         const val DEFAULT_MIN_TRANSCRIPT_LENGTH = 2
+        const val DEFAULT_MAX_TRANSCRIPT_LENGTH = 2_000
+        const val DEFAULT_MAX_RESPONSE_LENGTH = 8_000
     }
 }
