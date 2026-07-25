@@ -46,7 +46,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/** Visual state only. Action execution and voice safety remain outside this UI layer. */
 enum class UnifiedMayraVisualState {
     READY,
     LISTENING,
@@ -71,6 +70,7 @@ fun MayraUnifiedChatSurface(
     onSend: () -> Unit,
     onVoice: () -> Unit,
     onClear: () -> Unit,
+    onOpenWorkspace: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevice: () -> Unit,
     onOpenRuntime: () -> Unit,
@@ -108,29 +108,26 @@ fun MayraUnifiedChatSurface(
                     onExpand = { menuExpanded = true },
                     onDismiss = { menuExpanded = false },
                     onClear = onClear,
+                    onOpenWorkspace = onOpenWorkspace,
                     onOpenSettings = onOpenSettings,
                     onOpenDevice = onOpenDevice,
                     onOpenRuntime = onOpenRuntime
                 )
 
-                CompactMayraPresence(userName = userName, visualState = visualState)
+                CompactMayraPresence(userName, visualState)
 
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (messages.isEmpty()) {
-                        item { EmptyConversationPrompt(userName) }
-                    }
-                    items(messages, key = { it.timestamp }) { message ->
-                        UnifiedMessageBubble(message)
-                    }
+                    if (messages.isEmpty()) item { EmptyConversationPrompt(userName) }
+                    items(messages, key = { it.timestamp }) { message -> UnifiedMessageBubble(message) }
                 }
 
                 if (partialTranscript.isNotBlank()) {
                     Text(
-                        text = "Heard: $partialTranscript",
+                        "Heard: $partialTranscript",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 4.dp)
@@ -138,7 +135,7 @@ fun MayraUnifiedChatSurface(
                 }
                 error?.takeIf(String::isNotBlank)?.let {
                     Text(
-                        text = it,
+                        it,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = 4.dp)
@@ -167,17 +164,13 @@ fun MayraUnifiedChatSurface(
                         onClick = onVoice,
                         shape = CircleShape,
                         modifier = Modifier.height(56.dp)
-                    ) {
-                        Text(voiceButtonLabel, fontWeight = FontWeight.SemiBold)
-                    }
+                    ) { Text(voiceButtonLabel, fontWeight = FontWeight.SemiBold) }
                     Button(
                         onClick = onSend,
                         enabled = sendEnabled,
                         shape = CircleShape,
                         modifier = Modifier.height(56.dp)
-                    ) {
-                        Text("➤")
-                    }
+                    ) { Text("➤") }
                 }
             }
         }
@@ -191,6 +184,7 @@ private fun UnifiedHeader(
     onExpand: () -> Unit,
     onDismiss: () -> Unit,
     onClear: () -> Unit,
+    onOpenWorkspace: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevice: () -> Unit,
     onOpenRuntime: () -> Unit
@@ -202,17 +196,14 @@ private fun UnifiedHeader(
     ) {
         Column {
             Text("MAYRA", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "Living companion",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("Living companion", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)) {
                 TextButton(onClick = onExpand) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
             }
             DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+                DropdownMenuItem(text = { Text("Personal Workspace") }, onClick = { onDismiss(); onOpenWorkspace() })
                 DropdownMenuItem(text = { Text("Device readiness") }, onClick = { onDismiss(); onOpenDevice() })
                 DropdownMenuItem(text = { Text("Runtime") }, onClick = { onDismiss(); onOpenRuntime() })
                 DropdownMenuItem(text = { Text("Settings") }, onClick = { onDismiss(); onOpenSettings() })
@@ -235,19 +226,16 @@ private fun CompactMayraPresence(userName: String, visualState: UnifiedMayraVisu
             state = visualState.toPresenceState(),
             modifier = Modifier.fillMaxWidth().height(154.dp)
         )
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
-        ) {
+        Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)) {
             Text(
-                text = "${visualState.statusDot()} ${visualState.statusLabel()}",
+                "${visualState.statusDot()} ${visualState.statusLabel()}",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
             )
         }
         Text(
-            text = if (userName.isBlank()) "Hello. I’m here with you." else "Hello, $userName. I’m here with you.",
+            if (userName.isBlank()) "Hello. I’m here with you." else "Hello, $userName. I’m here with you.",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center
@@ -267,12 +255,9 @@ private fun EmptyConversationPrompt(userName: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
+            Text(if (userName.isBlank()) "What would you like to do?" else "What do you need, $userName?", fontWeight = FontWeight.SemiBold)
             Text(
-                if (userName.isBlank()) "What would you like to do?" else "What do you need, $userName?",
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                "Type naturally or tap the microphone. Calls, messages and sensitive actions stay inside Mayra’s local safety layer.",
+                "Type naturally or tap the microphone. Structured file, table and document work can continue inside Personal Workspace.",
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -297,11 +282,8 @@ private fun UnifiedMessageBubble(message: MayraMessage) {
                 bottomEnd = if (user) 7.dp else 22.dp
             ),
             colors = CardDefaults.cardColors(
-                containerColor = if (user) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
-                }
+                containerColor = if (user) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
             )
         ) {
             Column(Modifier.padding(horizontal = 15.dp, vertical = 11.dp)) {
@@ -319,10 +301,7 @@ private fun UnifiedMessageBubble(message: MayraMessage) {
 
 @Composable
 private fun QuickPromptRow(onQuickPrompt: (String) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         AssistChip(
             onClick = { onQuickPrompt("Aaj ka din plan karo") },
             label = { Text("Plan my day", maxLines = 1) },
@@ -334,8 +313,8 @@ private fun QuickPromptRow(onQuickPrompt: (String) -> Unit) {
             modifier = Modifier.weight(1f)
         )
         AssistChip(
-            onClick = { onQuickPrompt("Kisi contact ko call karna hai") },
-            label = { Text("Call", maxLines = 1) },
+            onClick = { onQuickPrompt("XYZ ka bill dekho") },
+            label = { Text("Workspace", maxLines = 1) },
             modifier = Modifier.weight(1f)
         )
     }
