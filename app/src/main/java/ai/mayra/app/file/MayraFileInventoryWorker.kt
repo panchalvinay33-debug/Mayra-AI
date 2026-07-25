@@ -5,12 +5,15 @@ import android.content.Context
 import android.net.Uri
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 class MayraFileInventoryWorker(
     appContext: Context,
@@ -60,22 +63,37 @@ class MayraFileInventoryWorker(
 
     companion object {
         const val UNIQUE_WORK = "mayra_file_inventory"
+        const val PERIODIC_WORK = "mayra_file_inventory_periodic"
         const val FILE_COUNT_KEY = "file_count"
         const val GRANT_COUNT_KEY = "grant_count"
         const val GENERATION_KEY = "generation"
         const val STOPPED_KEY = "global_stop"
         const val ERROR_KEY = "error"
 
+        private fun constraints(): Constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+
         fun enqueue(context: Context) {
             val request = OneTimeWorkRequestBuilder<MayraFileInventoryWorker>()
-                .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
+                .setConstraints(constraints())
                 .build()
             WorkManager.getInstance(context.applicationContext)
                 .enqueueUniqueWork(UNIQUE_WORK, ExistingWorkPolicy.REPLACE, request)
         }
 
+        fun schedulePeriodic(context: Context) {
+            val request = PeriodicWorkRequestBuilder<MayraFileInventoryWorker>(12, TimeUnit.HOURS)
+                .setConstraints(constraints())
+                .build()
+            WorkManager.getInstance(context.applicationContext)
+                .enqueueUniquePeriodicWork(PERIODIC_WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
+        }
+
         fun cancel(context: Context) {
-            WorkManager.getInstance(context.applicationContext).cancelUniqueWork(UNIQUE_WORK)
+            val manager = WorkManager.getInstance(context.applicationContext)
+            manager.cancelUniqueWork(UNIQUE_WORK)
+            manager.cancelUniqueWork(PERIODIC_WORK)
         }
     }
 }
