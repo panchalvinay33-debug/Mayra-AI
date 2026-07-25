@@ -42,7 +42,7 @@ class MayraActionSafetyCoreTest {
     }
 
     @Test
-    fun `missing permission returns permission state without execution`() = runTest {
+    fun `contact lookup permission is required without direct call permission`() = runTest {
         var executed = false
         val request = request(DeviceActionType.CALL_CONTACT, "Mummy")
         val engine = engine(runner = { executed = true; null })
@@ -51,10 +51,16 @@ class MayraActionSafetyCoreTest {
 
         val waiting = assertIs<MayraActionResult.AwaitingPermission>(result)
         assertFalse(executed)
-        assertEquals(
-            setOf(DevicePermission.READ_CONTACTS, DevicePermission.CALL_PHONE),
-            waiting.missing
-        )
+        assertEquals(setOf(DevicePermission.READ_CONTACTS), waiting.missing)
+        assertFalse(DevicePermission.CALL_PHONE in request.requiredPermissions)
+    }
+
+    @Test
+    fun `message composer does not require direct SMS permission`() {
+        val request = request(DeviceActionType.SEND_MESSAGE, "Mummy", "Hello")
+
+        assertEquals(setOf(DevicePermission.READ_CONTACTS), request.requiredPermissions)
+        assertFalse(DevicePermission.SEND_MESSAGES in request.requiredPermissions)
     }
 
     @Test
