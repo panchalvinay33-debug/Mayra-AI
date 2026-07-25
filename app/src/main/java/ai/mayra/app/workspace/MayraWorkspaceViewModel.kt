@@ -1,5 +1,6 @@
 package ai.mayra.app.workspace
 
+import ai.mayra.app.file.MayraFileSearchEngine
 import ai.mayra.app.safety.MayraGlobalStopStore
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -17,6 +18,7 @@ import kotlinx.coroutines.withContext
 class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(application) {
     private val parser = MayraWorkspaceIntentParser()
     private val store = MayraWorkspaceSessionStore(application)
+    private val fileSearch = MayraFileSearchEngine(application)
     private val globalStop = MayraGlobalStopStore(application)
     private val saveMutex = Mutex()
     private val _uiState = MutableStateFlow(MayraWorkspaceUiState())
@@ -44,58 +46,68 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         if (text.isBlank()) return
         val intent = parser.parse(text)
         val now = System.currentTimeMillis()
-        val task = when {
-            globalStop.isStopped() -> MayraWorkspaceTask(
-                intent = intent,
-                state = MayraWorkspaceTaskState.FAILED,
-                statusMessage = "Global Stop is active. Resume Mayra actions before continuing.",
-                updatedAt = now
-            )
-            intent.action == MayraWorkspaceActionType.UNKNOWN -> MayraWorkspaceTask(
-                intent = intent,
-                state = MayraWorkspaceTaskState.FAILED,
-                statusMessage = "I could not map this to a Workspace action yet.",
-                updatedAt = now
-            )
-            intent.action == MayraWorkspaceActionType.CREATE_TABLE -> MayraWorkspaceTask(
-                intent = intent,
-                state = MayraWorkspaceTaskState.COMPLETED,
-                progress = 100,
-                statusMessage = "Table workspace created.",
-                resultSummary = "A local table draft is ready for rows and corrections.",
-                verified = true,
-                updatedAt = now
-            )
-            intent.requiresConfirmation -> MayraWorkspaceTask(
-                intent = intent,
-                state = MayraWorkspaceTaskState.WAITING_FOR_CONFIRMATION,
-                progress = 20,
-                statusMessage = "Review is required before this external action.",
-                updatedAt = now
-            )
-            else -> MayraWorkspaceTask(
-                intent = intent,
-                state = MayraWorkspaceTaskState.WAITING_FOR_TOOL,
-                progress = 10,
-                statusMessage = waitingMessage(intent.action),
-                updatedAt = now
-            )
-        }
+        val task = initialTask(intent, now)
+        appendTask(text, task, now)
+        if (intent.action in FILE_ACTIONS && !globalStop.isStopped()) runFileTask(task)
+        else autosave()
+    }
 
+    private fun initialTask(intent: MayraWorkspaceIntent, now: Long): MayraWorkspaceTask = when {
+        globalStop.isStopped() -> MayraWorkspaceTask(
+            intent = intent,
+            state = MayraWorkspaceTaskState.FAILED,
+            statusMessage = "Global Stop is active. Resume Mayra actions before continuing.",
+            updatedAt = now
+        )
+        intent.action == MayraWorkspaceActionType.UNKNOWN -> MayraWorkspaceTask(
+            intent = intent,
+            state = MayraWorkspaceTaskState.FAILED,
+            statusMessage = "I could not map this to a Workspace action yet.",
+            updatedAt = now
+        )
+        intent.action in FILE_ACTIONS -> MayraWorkspaceTask(
+            intent = intent,
+            state = MayraWorkspaceTaskState.SEARCHING,
+            progress = 20,
+            statusMessage = "Searching the encrypted metadata index…",
+            updatedAt = now
+        )
+        intent.action == MayraWorkspaceActionType.CREATE_TABLE -> MayraWorkspaceTask(
+            intent = intent,
+            state = MayraWorkspaceTaskState.COMPLETED,
+            progress = 100,
+            statusMessage = "Table workspace created.",
+            resultSummary = "A local table draft is ready for rows and corrections.",
+            verified = true,
+            updatedAt = now
+        )
+        intent.requiresConfirmation -> MayraWorkspaceTask(
+            intent = intent,
+            state = MayraWorkspaceTaskState.WAITING_FOR_CONFIRMATION,
+            progress = 20,
+            statusMessage = "Review is required before this external action.",
+            updatedAt = now
+        )
+        else -> MayraWorkspaceTask(
+            intent = intent,
+            state = MayraWorkspaceTaskState.WAITING_FOR_TOOL,
+            progress = 10,
+            statusMessage = waitingMessage(intent.action),
+            updatedAt = now
+        )
+    }
+
+    private fun appendTask(text: String, task: MayraWorkspaceTask, now: Long) {
         _uiState.update { current ->
             val existing = current.session
-            val nextTable = if (intent.action == MayraWorkspaceActionType.CREATE_TABLE) {
-                existing.table ?: MayraWorkspaceTable(
-                    title = "Voice table",
-                    columns = extractColumns(text),
-                    revision = 1L
-                )
+            val table = if (task.intent.action == MayraWorkspaceActionType.CREATE_TABLE) {
+                existing.table ?: MayraWorkspaceTable(title = "Voice table", columns = extractColumns(text), revision = 1L)
             } else existing.table
             current.copy(
                 session = existing.copy(
                     transcript = (existing.transcript + text).takeLast(MAX_TRANSCRIPT_ENTRIES),
                     tasks = (existing.tasks + task).takeLast(MAX_TASKS),
-                    table = nextTable,
+                    table = table,
                     activeTaskId = task.id,
                     revision = existing.revision + 1L,
                     updatedAt = now
@@ -104,34 +116,86 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
                 error = null
             )
         }
-        autosave()
+    }
+
+    private fun runFileTask(task: MayraWorkspaceTask) {
+        viewModelScope.launch {
+            val query = task.intent.entities["query"] ?: task.intent.rawText
+            val result = runCatching { withContext(Dispatchers.IO) { fileSearch.search(query) } }
+            val now = System.currentTimeMillis()
+            _uiState.update { current ->
+                val updatedTasks = current.session.tasks.map { existing ->
+                    if (existing.id != task.id) existing else result.fold(
+                        onSuccess = { found ->
+                            when {
+                                !found.found -> existing.copy(
+                                    state = MayraWorkspaceTaskState.WAITING_FOR_PERMISSION,
+                                    progress = 30,
+                                    statusMessage = "No authorized indexed file matched. Add a folder or run inventory.",
+                                    resultSummary = "No source was found in the current authorized index.",
+                                    updatedAt = now
+                                )
+                                task.intent.action == MayraWorkspaceActionType.SEARCH_FILE -> existing.copy(
+                                    state = MayraWorkspaceTaskState.COMPLETED,
+                                    progress = 100,
+                                    statusMessage = "Found ${found.matches.size} matching file(s).",
+                                    sources = found.sourceReferences,
+                                    resultSummary = found.matches.joinToString(limit = 5) { it.displayName },
+                                    verified = true,
+                                    updatedAt = now
+                                )
+                                else -> existing.copy(
+                                    state = MayraWorkspaceTaskState.WAITING_FOR_TOOL,
+                                    progress = 55,
+                                    statusMessage = "Source file found. PDF text/OCR analysis is not active yet.",
+                                    sources = found.sourceReferences,
+                                    resultSummary = "Metadata source verified; content extraction is pending.",
+                                    verified = false,
+                                    updatedAt = now
+                                )
+                            }
+                        },
+                        onFailure = { error -> existing.copy(
+                            state = MayraWorkspaceTaskState.FAILED,
+                            statusMessage = "File search failed safely.",
+                            resultSummary = error.javaClass.simpleName,
+                            updatedAt = now
+                        ) }
+                    )
+                }
+                current.copy(session = current.session.copy(
+                    tasks = updatedTasks,
+                    revision = current.session.revision + 1,
+                    updatedAt = now
+                ))
+            }
+            autosave()
+        }
     }
 
     fun pauseActiveTask() = mutateActiveTask(MayraWorkspaceTaskState.PAUSED, "Paused by the owner.")
 
     fun continueActiveTask() {
         val task = activeTask()?.takeUnless { it.state in TERMINAL_STATES } ?: return
-        val target = if (task.intent.requiresConfirmation) {
-            MayraWorkspaceTaskState.WAITING_FOR_CONFIRMATION
+        if (task.intent.action in FILE_ACTIONS) {
+            mutateActiveTask(MayraWorkspaceTaskState.SEARCHING, "Searching the encrypted metadata index…")
+            runFileTask(task)
         } else {
-            MayraWorkspaceTaskState.WAITING_FOR_TOOL
+            val target = if (task.intent.requiresConfirmation) MayraWorkspaceTaskState.WAITING_FOR_CONFIRMATION
+            else MayraWorkspaceTaskState.WAITING_FOR_TOOL
+            mutateActiveTask(target, waitingMessage(task.intent.action))
         }
-        mutateActiveTask(target, waitingMessage(task.intent.action))
     }
 
     fun cancelActiveTask() = mutateActiveTask(MayraWorkspaceTaskState.CANCELLED, "Cancelled by the owner.")
 
     fun updateNotes(value: String) {
         val now = System.currentTimeMillis()
-        _uiState.update { current ->
-            current.copy(
-                session = current.session.copy(
-                    notes = value.take(MAX_NOTES_LENGTH),
-                    revision = current.session.revision + 1L,
-                    updatedAt = now
-                )
-            )
-        }
+        _uiState.update { current -> current.copy(session = current.session.copy(
+            notes = value.take(MAX_NOTES_LENGTH),
+            revision = current.session.revision + 1L,
+            updatedAt = now
+        )) }
         autosave()
     }
 
@@ -144,79 +208,44 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         val activeId = _uiState.value.session.activeTaskId ?: return
         val currentTask = activeTask()?.takeUnless { it.state in TERMINAL_STATES } ?: return
         val now = System.currentTimeMillis()
-        _uiState.update { current ->
-            current.copy(
-                session = current.session.copy(
-                    tasks = current.session.tasks.map { task ->
-                        if (task.id == currentTask.id && task.id == activeId) {
-                            task.copy(state = state, statusMessage = message, updatedAt = now)
-                        } else task
-                    },
-                    revision = current.session.revision + 1L,
-                    updatedAt = now
-                )
-            )
-        }
+        _uiState.update { current -> current.copy(session = current.session.copy(
+            tasks = current.session.tasks.map { task ->
+                if (task.id == currentTask.id && task.id == activeId) task.copy(state = state, statusMessage = message, updatedAt = now)
+                else task
+            },
+            revision = current.session.revision + 1L,
+            updatedAt = now
+        )) }
         autosave()
     }
 
-    private fun activeTask(): MayraWorkspaceTask? {
-        val session = _uiState.value.session
-        return session.tasks.firstOrNull { it.id == session.activeTaskId }
+    private fun activeTask(): MayraWorkspaceTask? = _uiState.value.session.let { session ->
+        session.tasks.firstOrNull { it.id == session.activeTaskId }
     }
 
     private fun autosave() {
         val snapshot = _uiState.value.session
         _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    saveMutex.withLock {
-                        if (snapshot.revision >= _uiState.value.lastSavedAtRevision()) {
-                            store.save(snapshot)
-                        }
-                    }
-                }
-            }.onSuccess {
-                _uiState.update { current ->
-                    if (snapshot.revision >= current.session.revision) {
-                        current.copy(isSaving = false, lastSavedAt = snapshot.updatedAt, error = null)
-                    } else current.copy(isSaving = true)
-                }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(isSaving = false, error = error.message ?: "Workspace autosave failed.")
-                }
-            }
+            runCatching { withContext(Dispatchers.IO) { saveMutex.withLock { store.save(snapshot) } } }
+                .onSuccess { _uiState.update { current ->
+                    if (snapshot.revision >= current.session.revision) current.copy(isSaving = false, lastSavedAt = snapshot.updatedAt, error = null)
+                    else current.copy(isSaving = true)
+                } }
+                .onFailure { error -> _uiState.update { it.copy(isSaving = false, error = error.message ?: "Workspace autosave failed.") } }
         }
     }
 
-    private fun MayraWorkspaceUiState.lastSavedAtRevision(): Long =
-        if (lastSavedAt == session.updatedAt) session.revision else 0L
-
     private fun extractColumns(text: String): List<String> {
         val normalized = text.lowercase()
-        val known = listOf(
-            "naam" to "Naam",
-            "name" to "Name",
-            "saman" to "Saman",
-            "item" to "Item",
-            "quantity" to "Quantity",
-            "qty" to "Quantity",
-            "rate" to "Rate",
-            "amount" to "Amount",
-            "total" to "Total",
-            "date" to "Date"
-        )
-        return known.filter { (token, _) -> token in normalized }
-            .map { it.second }
-            .distinct()
+        val known = listOf("naam" to "Naam", "name" to "Name", "saman" to "Saman", "item" to "Item",
+            "quantity" to "Quantity", "qty" to "Quantity", "rate" to "Rate", "amount" to "Amount",
+            "total" to "Total", "date" to "Date")
+        return known.filter { (token, _) -> token in normalized }.map { it.second }.distinct()
             .ifEmpty { listOf("Column 1", "Column 2") }
     }
 
     private fun waitingMessage(action: MayraWorkspaceActionType): String = when (action) {
-        MayraWorkspaceActionType.SEARCH_FILE,
-        MayraWorkspaceActionType.ANALYSE_DOCUMENT -> "Waiting for the File Intelligence index and document tools."
         MayraWorkspaceActionType.UPDATE_TABLE -> "Waiting for the table mutation engine."
         MayraWorkspaceActionType.EXPORT_DOCUMENT -> "Waiting for the export renderer."
         MayraWorkspaceActionType.CREATE_REMINDER -> "Ready to hand this request to the existing reminder engine."
@@ -232,10 +261,7 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
         const val MAX_NOTES_LENGTH = 50_000
         const val MAX_TRANSCRIPT_ENTRIES = 300
         const val MAX_TASKS = 200
-        val TERMINAL_STATES = setOf(
-            MayraWorkspaceTaskState.COMPLETED,
-            MayraWorkspaceTaskState.FAILED,
-            MayraWorkspaceTaskState.CANCELLED
-        )
+        val FILE_ACTIONS = setOf(MayraWorkspaceActionType.SEARCH_FILE, MayraWorkspaceActionType.ANALYSE_DOCUMENT)
+        val TERMINAL_STATES = setOf(MayraWorkspaceTaskState.COMPLETED, MayraWorkspaceTaskState.FAILED, MayraWorkspaceTaskState.CANCELLED)
     }
 }
