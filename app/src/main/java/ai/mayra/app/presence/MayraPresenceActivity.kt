@@ -47,6 +47,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -140,16 +142,16 @@ private fun MayraPresenceHome(
                 Brush.verticalGradient(
                     listOf(
                         MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.055f),
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
                         MaterialTheme.colorScheme.background
                     )
                 )
             )
         ) {
             Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 LivingHomeHeader(
                     expanded = menuExpanded,
@@ -168,15 +170,37 @@ private fun MayraPresenceHome(
                     onFloatingMayra = onFloatingMayra,
                     onSettings = onSettings
                 )
-                Spacer(Modifier.height(2.dp))
-                MayraCharacterPresence(state = state, modifier = Modifier.clickable(onClick = onChat))
-                Text(state.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+                MayraCharacterPresence(
+                    state = state,
+                    modifier = Modifier.fillMaxWidth().height(238.dp).clickable(onClick = onChat)
+                )
+
+                PresenceStatusPill(state.label)
                 Text(greeting, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                Text(state.prompt, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(58.dp), shape = RoundedCornerShape(20.dp)) {
+                Text(
+                    state.prompt,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Button(
+                    onClick = onChat,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
                     Text("Talk to Mayra", fontWeight = FontWeight.SemiBold)
                 }
+
+                QuickAccessRow(
+                    onReminders = onReminders,
+                    onPeople = onPeople,
+                    onMemory = onMemory
+                )
+
                 CompactAccessCard(ownerSummary, onOwnerSetup)
+
                 LivingInfoCard(
                     eyebrow = "MY DAY",
                     title = briefing.title,
@@ -184,19 +208,22 @@ private fun MayraPresenceHome(
                         append(briefing.summary)
                         briefing.highlights.firstOrNull()?.let { append("\n$it") }
                     },
-                    actionLabel = "Open memory",
-                    onAction = onMemory
+                    actionLabel = "Open agenda",
+                    onAction = onAgenda
                 )
+
                 LivingInfoCard(
                     eyebrow = "PHONE PULSE",
                     title = pulse.message.ifBlank { "Your phone looks calm" },
-                    detail = pulse.healthScore?.let { "Phone health $it / 100 · ${pulse.batteryText} battery · ${pulse.networkText}" }
-                        ?: "Open Phone Pulse for current device health.",
+                    detail = pulse.healthScore?.let {
+                        "Phone health $it / 100 · ${pulse.batteryText} battery · ${pulse.networkText}"
+                    } ?: "Open Phone Pulse for current device health.",
                     actionLabel = "View pulse",
                     onAction = onPulse
                 )
+
                 Text(
-                    "Mayra recalls only owner-visible, non-sensitive memory and never reports an action as complete unless it can verify it.",
+                    "Mayra keeps sensitive actions review-first and never says something happened unless it can verify it.",
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -204,6 +231,37 @@ private fun MayraPresenceHome(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PresenceStatusPill(label: String) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+    ) {
+        Text(
+            text = "• $label",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+        )
+    }
+}
+
+@Composable
+private fun QuickAccessRow(
+    onReminders: () -> Unit,
+    onPeople: () -> Unit,
+    onMemory: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedButton(onClick = onReminders, modifier = Modifier.weight(1f)) { Text("Reminders", maxLines = 1) }
+        OutlinedButton(onClick = onPeople, modifier = Modifier.weight(1f)) { Text("People", maxLines = 1) }
+        OutlinedButton(onClick = onMemory, modifier = Modifier.weight(1f)) { Text("Memory", maxLines = 1) }
     }
 }
 
@@ -225,13 +283,21 @@ private fun LivingHomeHeader(
     onFloatingMayra: () -> Unit,
     onSettings: () -> Unit
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
         Column {
             Text("MAYRA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
             Text("Living companion", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box {
-            Surface(modifier = Modifier.clickable(onClick = onExpand), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)) {
+            Surface(
+                modifier = Modifier.clickable(onClick = onExpand),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+            ) {
                 Text("⋮", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp))
             }
             DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
@@ -259,7 +325,13 @@ private fun LivingHomeHeader(
 
 @Composable
 private fun MenuLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 @Composable
@@ -271,25 +343,40 @@ private fun MenuItem(label: String, action: () -> Unit, dismiss: () -> Unit) {
 private fun CompactAccessCard(ownerSummary: String, onOpen: () -> Unit) {
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)),
-        shape = RoundedCornerShape(22.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(20.dp)
     ) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Personal Owner Mode", fontWeight = FontWeight.SemiBold)
-                Text(ownerSummary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                Text(
+                    ownerSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            TextButton(onClick = onOpen) { Text("Access") }
+            TextButton(onClick = onOpen) { Text("Review") }
         }
     }
 }
 
 @Composable
-private fun LivingInfoCard(eyebrow: String, title: String, detail: String, actionLabel: String, onAction: () -> Unit) {
+private fun LivingInfoCard(
+    eyebrow: String,
+    title: String,
+    detail: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
     Card(
         Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
