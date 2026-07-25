@@ -11,6 +11,7 @@
 
 - Main integration work remains in PR #9.
 - Permanent recovery branch: `backup/pr9-living-companion-2026-07-25`.
+- Safety recovery branch: `backup/personal-alpha-safety-2026-07-25`.
 - Stabilization work is isolated from new product expansion.
 - Master Blueprint V2 remains the product source of truth.
 - The Living Intelligence extension locks the one-brain/many-bodies future architecture.
@@ -22,11 +23,24 @@
 - Gradle 8.9 may be bootstrapped from the official distribution with SHA-256 verification.
 - Build output records branch, commit, environment and APK SHA-256.
 - Installation records target device, Android version, APK path and APK SHA-256.
-- Source preflight checks required project files, SDK targets, low-memory settings, launcher/notification/network declarations and obvious tracked secrets.
+- Source preflight checks required files, secrets, privacy, startup containment, encrypted backup, Global Stop, notification safety and reminder reliability markers.
+
+### Safety and reliability foundations coded
+
+- Android automatic/full backup and cleartext traffic are disabled.
+- Memory export uses a versioned encrypted `.mayrabackup` format with authenticated encryption and preview-first additive restore.
+- Non-critical startup steps are crash-contained and owner-visible through private diagnostics.
+- Global Stop persists across process death, reboot and app update.
+- Notification capture, reply and proactive behavior are privacy-gated and Global Stop-aware.
+- Reminder workers are bound to exact persisted revisions and due times.
+- Stale reminder workers and stale notification actions cannot mutate a newer reminder state.
+- Completed or cancelled reminders cannot be revived by old snooze/complete actions.
+- Reboot recovery does not repeatedly alert reminders already marked missed.
+- Reminder UI only claims complete, snooze, cancel or delete when the transition actually succeeds.
 
 ## Evidence status
 
-The latest GitHub Actions runs fail before Checkout and expose no steps or logs. This is an infrastructure/account runner condition and is not evidence that source compilation succeeded or failed.
+GitHub Actions runs have failed before Checkout and exposed no source steps or logs. This is not evidence that source compilation succeeded or failed.
 
 Therefore the following remain unverified:
 
@@ -59,7 +73,7 @@ Personal Alpha V0.1 is accepted only when:
 - no OTP, secret or private notification content leaks;
 - no wrong contact or duplicate send/reply occurs;
 - action wording remains honest and verifiable;
-- reminders survive reboot and can complete/snooze;
+- reminders survive reboot, fire once per revision and can complete/snooze without stale-action races;
 - Floating Mayra starts, moves, docks, restores and stops;
 - at least 80% of mandatory device checks pass;
 - source commit and APK SHA-256 are recorded;
