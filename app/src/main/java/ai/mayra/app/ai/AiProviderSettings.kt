@@ -23,23 +23,26 @@ data class AiProviderConfig(
     val lastConnectionMessage: String = "Not tested"
 ) {
     val onlineEnabled: Boolean
-        get() = provider == AiProviderKind.OPENAI && apiKeyConfigured && model.isNotBlank()
+        get() = provider == AiProviderKind.OPENAI &&
+            apiKeyConfigured &&
+            AiProviderSafetyPolicy.validateModel(model) == null
 
     fun status(): String = when {
         provider == AiProviderKind.LOCAL_ONLY -> "Local assistant active"
         !apiKeyConfigured -> "OpenAI key required"
-        model.isBlank() -> "Choose an OpenAI model"
-        lastConnectionSuccessAt > 0L -> "OpenAI connected · $model"
+        AiProviderSafetyPolicy.validateModel(model) != null -> "Choose a valid OpenAI model"
+        lastConnectionSuccessAt > 0L -> "OpenAI connected · ${AiProviderSafetyPolicy.normalizeModel(model)}"
         else -> "OpenAI configured · connection not verified"
     }
 
-    fun validationMessage(apiKeyInput: String?): String? = when {
-        provider == AiProviderKind.LOCAL_ONLY -> null
-        model.trim().isBlank() -> "Enter an OpenAI model name."
-        !apiKeyConfigured && apiKeyInput.isNullOrBlank() -> "Enter an OpenAI API key."
-        !apiKeyInput.isNullOrBlank() && !apiKeyInput.trim().startsWith("sk-") ->
-            "OpenAI API keys normally start with sk-."
-        else -> null
+    fun validationMessage(apiKeyInput: String?): String? {
+        if (provider == AiProviderKind.LOCAL_ONLY) return null
+        AiProviderSafetyPolicy.validateModel(model)?.let { return it }
+        if (!apiKeyConfigured && apiKeyInput.isNullOrBlank()) return "Enter an OpenAI API key."
+        if (!apiKeyInput.isNullOrBlank()) {
+            AiProviderSafetyPolicy.validateNewApiKey(apiKeyInput)?.let { return it }
+        }
+        return null
     }
 
     companion object {
@@ -52,22 +55,36 @@ class AiProviderSettingsStore(context: Context) {
     private val preferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val secretStore = AndroidKeystoreSecretStore(preferences)
 
-    fun read(): AiProviderConfig = AiProviderConfig(
-        provider = runCatching {
-            AiProviderKind.valueOf(preferences.getString(KEY_PROVIDER, null) ?: AiProviderKind.LOCAL_ONLY.name)
-        }.getOrDefault(AiProviderKind.LOCAL_ONLY),
-        model = preferences.getString(KEY_MODEL, AiProviderConfig.DEFAULT_OPENAI_MODEL)
-            ?.trim().orEmpty().ifBlank { AiProviderConfig.DEFAULT_OPENAI_MODEL },
-        apiKeyConfigured = secretStore.hasSecret(),
-        lastConnectionSuccessAt = preferences.getLong(KEY_LAST_SUCCESS_AT, 0L),
-        lastConnectionMessage = preferences.getString(KEY_LAST_MESSAGE, "Not tested").orEmpty()
-    )
+    fun read(): AiProviderConfig {
+        val keyAvailable = secretStore.hasReadableSecret()
+        return AiProviderConfig(
+            provider = runCatching {
+                AiProviderKind.valueOf(preferences.getString(KEY_PROVIDER, null) ?: AiProviderKind.LOCAL_ONLY.name)
+            }.getOrDefault(AiProviderKind.LOCAL_ONLY),
+            model = AiProviderSafetyPolicy.normalizeModel(
+                preferences.getString(KEY_MODEL, AiProviderConfig.DEFAULT_OPENAI_MODEL).orEmpty()
+            ).ifBlank { AiProviderConfig.DEFAULT_OPENAI_MODEL },
+            apiKeyConfigured = keyAvailable,
+            lastConnectionSuccessAt = if (keyAvailable) preferences.getLong(KEY_LAST_SUCCESS_AT, 0L) else 0L,
+            lastConnectionMessage = AiProviderSafetyPolicy.sanitizeConnectionMessage(
+                preferences.getString(KEY_LAST_MESSAGE, "Not tested")
+            )
+        )
+    }
 
     fun save(config: AiProviderConfig, apiKey: String? = null) {
-        apiKey?.trim()?.takeIf(String::isNotBlank)?.let(secretStore::write)
+        apiKey?.takeIf(String::isNotBlank)?.let {
+            val normalized = AiProviderSafetyPolicy.normalizeApiKey(it)
+            require(AiProviderSafetyPolicy.validateNewApiKey(normalized) == null) {
+                "OpenAI API key format is not valid."
+            }
+            secretStore.write(normalized)
+        }
+        val normalizedModel = AiProviderSafetyPolicy.normalizeModel(config.model)
+            .ifBlank { AiProviderConfig.DEFAULT_OPENAI_MODEL }
         preferences.edit()
             .putString(KEY_PROVIDER, config.provider.name)
-            .putString(KEY_MODEL, config.model.trim().ifBlank { AiProviderConfig.DEFAULT_OPENAI_MODEL })
+            .putString(KEY_MODEL, normalizedModel)
             .apply()
     }
 
@@ -76,7 +93,7 @@ class AiProviderSettingsStore(context: Context) {
     fun recordConnection(success: Boolean, message: String, now: Long = System.currentTimeMillis()) {
         preferences.edit()
             .putLong(KEY_LAST_SUCCESS_AT, if (success) now else 0L)
-            .putString(KEY_LAST_MESSAGE, message.take(160))
+            .putString(KEY_LAST_MESSAGE, AiProviderSafetyPolicy.sanitizeConnectionMessage(message))
             .apply()
     }
 
@@ -105,32 +122,47 @@ class AiProviderSettingsStore(context: Context) {
 private class AndroidKeystoreSecretStore(
     private val preferences: android.content.SharedPreferences
 ) {
-    fun hasSecret(): Boolean = preferences.contains(KEY_CIPHERTEXT) && preferences.contains(KEY_IV)
+    fun hasReadableSecret(): Boolean = read()?.isNotBlank() == true
 
     fun write(value: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
-        preferences.edit()
-            .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-            .apply()
+        check(
+            preferences.edit()
+                .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .commit()
+        ) { "Could not persist encrypted API key." }
     }
 
-    fun read(): String? = runCatching {
+    fun read(): String? {
         val ciphertext = preferences.getString(KEY_CIPHERTEXT, null) ?: return null
-        val iv = preferences.getString(KEY_IV, null) ?: return null
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(
-            Cipher.DECRYPT_MODE,
-            secretKey(),
-            GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP))
-        )
-        String(cipher.doFinal(Base64.decode(ciphertext, Base64.NO_WRAP)), Charsets.UTF_8)
-    }.getOrNull()
+        val iv = preferences.getString(KEY_IV, null) ?: return clearCorrupted()
+        return runCatching {
+            val decodedIv = Base64.decode(iv, Base64.NO_WRAP)
+            require(decodedIv.size == EXPECTED_GCM_IV_BYTES) { "Invalid encrypted-key IV." }
+            val decodedCiphertext = Base64.decode(ciphertext, Base64.NO_WRAP)
+            require(decodedCiphertext.isNotEmpty()) { "Encrypted key is empty." }
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                secretKey(),
+                GCMParameterSpec(128, decodedIv)
+            )
+            String(cipher.doFinal(decodedCiphertext), Charsets.UTF_8)
+                .takeIf { AiProviderSafetyPolicy.validateNewApiKey(it) == null }
+                ?: error("Decrypted API key is invalid.")
+        }.getOrElse { clearCorrupted() }
+    }
 
     fun clear() {
-        preferences.edit().remove(KEY_CIPHERTEXT).remove(KEY_IV).apply()
+        preferences.edit().remove(KEY_CIPHERTEXT).remove(KEY_IV).commit()
+    }
+
+    private fun clearCorrupted(): String? {
+        clear()
+        return null
     }
 
     private fun secretKey(): SecretKey {
@@ -155,5 +187,6 @@ private class AndroidKeystoreSecretStore(
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val KEY_CIPHERTEXT = "api_key_ciphertext"
         const val KEY_IV = "api_key_iv"
+        const val EXPECTED_GCM_IV_BYTES = 12
     }
 }
