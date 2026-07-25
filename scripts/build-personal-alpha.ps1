@@ -31,8 +31,7 @@ function Invoke-NativeCapture([string]$Executable, [string[]]$Arguments) {
     $ErrorActionPreference = "Continue"
     try {
         $output = & $Executable @Arguments 2>&1 | ForEach-Object { $_.ToString() }
-        $exitCode = $LASTEXITCODE
-        return [PSCustomObject]@{ Output = $output; ExitCode = $exitCode }
+        return [PSCustomObject]@{ Output = $output; ExitCode = $LASTEXITCODE }
     } finally {
         $ErrorActionPreference = $previousPreference
     }
@@ -42,19 +41,18 @@ function Resolve-Java {
     $java = Get-Command java -ErrorAction SilentlyContinue
     if ($java) { return $java.Source }
 
-    $studioCandidates = @(
+    $candidates = @(
         (Join-Path $env:ProgramFiles "Android\Android Studio\jbr\bin\java.exe"),
         (Join-Path $env:ProgramFiles "Android\Android Studio\jre\bin\java.exe"),
         (Join-Path ${env:ProgramFiles(x86)} "Android\Android Studio\jbr\bin\java.exe")
     ) | Where-Object { $_ -and (Test-Path $_) }
 
-    if ($studioCandidates.Count -gt 0) {
-        $javaPath = $studioCandidates[0]
+    if ($candidates.Count -gt 0) {
+        $javaPath = $candidates[0]
         $env:JAVA_HOME = Split-Path -Parent (Split-Path -Parent $javaPath)
         $env:Path = "$(Split-Path -Parent $javaPath);$env:Path"
         return $javaPath
     }
-
     return $null
 }
 
@@ -74,7 +72,6 @@ function Install-VerifiedGradle([string]$RepoRoot) {
     $gradleHome = Join-Path $toolsRoot "gradle-$RequiredGradleVersion"
     $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
     if (Test-Path $gradleBat) { return $gradleBat }
-
     if ($NoGradleBootstrap) {
         Fail "Gradle $RequiredGradleVersion was not found and automatic bootstrap was disabled."
     }
@@ -89,30 +86,24 @@ function Install-VerifiedGradle([string]$RepoRoot) {
             Write-Info "Downloading $GradleDistributionUrl"
             Invoke-WebRequest -UseBasicParsing -Uri $GradleDistributionUrl -OutFile $zipPath
         }
-
         $actualHash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
         if ($actualHash -ne $GradleDistributionSha256) {
             Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
-            Fail "Gradle download checksum mismatch. Expected $GradleDistributionSha256 but received $actualHash. The file was deleted."
+            Fail "Gradle checksum mismatch. The downloaded archive was deleted."
         }
-
         Remove-Item -Recurse -Force $tempExtract -ErrorAction SilentlyContinue
         Expand-Archive -Path $zipPath -DestinationPath $tempExtract -Force
         $expandedHome = Join-Path $tempExtract "gradle-$RequiredGradleVersion"
         if (-not (Test-Path (Join-Path $expandedHome "bin\gradle.bat"))) {
             Fail "Verified Gradle archive did not contain the expected executable."
         }
-
         Remove-Item -Recurse -Force $gradleHome -ErrorAction SilentlyContinue
         Move-Item -Path $expandedHome -Destination $gradleHome
         Remove-Item -Recurse -Force $tempExtract -ErrorAction SilentlyContinue
     } catch {
-        Fail "Could not bootstrap Gradle $RequiredGradleVersion. Check internet access, antivirus and proxy settings. $($_.Exception.Message)"
+        Fail "Could not bootstrap Gradle $RequiredGradleVersion. $($_.Exception.Message)"
     }
-
-    if (-not (Test-Path $gradleBat)) {
-        Fail "Gradle bootstrap finished but gradle.bat was not found at $gradleBat"
-    }
+    if (-not (Test-Path $gradleBat)) { Fail "Gradle bootstrap completed without gradle.bat." }
     return $gradleBat
 }
 
@@ -122,15 +113,13 @@ function Resolve-Gradle([string]$RepoRoot) {
         if (-not $explicit -and -not (Test-Path $GradleCommand)) {
             Fail "Gradle command '$GradleCommand' was not found."
         }
-        return $(if ($explicit) { $explicit.Source } else { (Resolve-Path $GradleCommand).Path })
+        if ($explicit) { return $explicit.Source }
+        return (Resolve-Path $GradleCommand).Path
     }
-
     $wrapper = Join-Path $RepoRoot "gradlew.bat"
     if (Test-Path $wrapper) { return $wrapper }
-
     $installed = Get-Command gradle -ErrorAction SilentlyContinue
     if ($installed) { return $installed.Source }
-
     return Install-VerifiedGradle $RepoRoot
 }
 
@@ -147,141 +136,181 @@ function Invoke-GradleStep(
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
+$reportDir = Join-Path $repoRoot "build\personal-alpha"
+New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+Write-Step "Checking exact source identity"
+$git = Get-Command git -ErrorAction SilentlyContinue
+if (-not $git) { Fail "Git is required to record and verify the exact source commit." }
+$shaResult = Invoke-NativeCapture $git.Source @("rev-parse", "HEAD")
+$branchResult = Invoke-NativeCapture $git.Source @("branch", "--show-current")
+$statusResult = Invoke-NativeCapture $git.Source @("status", "--porcelain")
+if ($shaResult.ExitCode -ne 0) { Fail "Could not resolve the current Git commit." }
+if ($statusResult.ExitCode -ne 0) { Fail "Could not inspect the Git working tree." }
+$gitSha = (($shaResult.Output | Select-Object -First 1) -join "").Trim().ToLowerInvariant()
+$gitBranch = (($branchResult.Output | Select-Object -First 1) -join "").Trim()
+if ($gitSha -notmatch '^[0-9a-f]{40}$') { Fail "Git returned an invalid source SHA: $gitSha" }
+if (@($statusResult.Output | Where-Object { $_.Trim() }).Count -gt 0) {
+    Fail "The working tree has uncommitted changes. Commit or discard them before producing a traceable Personal Alpha APK."
+}
 
 $preflight = Join-Path $PSScriptRoot "verify-personal-alpha-source.ps1"
-if (-not (Test-Path $preflight)) {
-    Fail "Source preflight script is missing: $preflight"
-}
+if (-not (Test-Path $preflight)) { Fail "Source preflight script is missing: $preflight" }
 Write-Step "Running strict source preflight"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $preflight -Strict
 if ($LASTEXITCODE -ne 0) {
     Fail "Source preflight failed. Review build\personal-alpha\source-preflight.json before compiling."
 }
+$preflightReport = Join-Path $reportDir "source-preflight.json"
+if (-not (Test-Path $preflightReport)) { Fail "Source preflight passed without creating its JSON report." }
+$preflightHash = (Get-FileHash -Algorithm SHA256 $preflightReport).Hash.ToLowerInvariant()
 
 Write-Step "Checking reproducible Windows build environment"
-
 $javaExecutable = Resolve-Java
-if (-not $javaExecutable) {
-    Fail "Java was not found. Install Android Studio with its embedded JDK 17 or set JAVA_HOME to JDK 17."
-}
-
+if (-not $javaExecutable) { Fail "Java was not found. Install Android Studio with JDK 17." }
 $javaCheck = Invoke-NativeCapture $javaExecutable @("-version")
-if ($javaCheck.ExitCode -ne 0) {
-    Fail "Java exists but 'java -version' failed. Check JAVA_HOME and PATH."
-}
+if ($javaCheck.ExitCode -ne 0) { Fail "java -version failed." }
 $javaVersion = ($javaCheck.Output | Select-Object -First 1) -join ""
-Write-Host "Java: $javaVersion"
 $javaMajorMatch = [regex]::Match($javaVersion, '(?:version\s+")?(?<major>\d+)')
-if (-not $javaMajorMatch.Success) {
-    Fail "Could not read the Java major version from: $javaVersion"
-}
+if (-not $javaMajorMatch.Success) { Fail "Could not read Java version from: $javaVersion" }
 $javaMajor = [int]$javaMajorMatch.Groups["major"].Value
-if ($javaMajor -ne 17) {
-    Fail "The stabilisation build is locked to JDK 17 for reproducibility. Current Java major version: $javaMajor"
-}
+if ($javaMajor -ne 17) { Fail "Personal Alpha is locked to JDK 17. Current major: $javaMajor" }
 
 $androidSdk = Resolve-AndroidSdk
-if (-not $androidSdk -or -not (Test-Path $androidSdk)) {
-    Fail "Android SDK was not found. Set ANDROID_SDK_ROOT or install SDK 35 from Android Studio."
-}
-Write-Host "Android SDK: $androidSdk"
-
-$platform35 = Join-Path $androidSdk "platforms\android-35"
-if (-not (Test-Path $platform35)) {
-    Fail "Android SDK Platform 35 is missing. Install it from Android Studio > SDK Manager."
+if (-not $androidSdk -or -not (Test-Path $androidSdk)) { Fail "Android SDK was not found." }
+if (-not (Test-Path (Join-Path $androidSdk "platforms\android-35"))) {
+    Fail "Android SDK Platform 35 is missing."
 }
 
 $gradleExecutable = Resolve-Gradle $repoRoot
-Write-Host "Gradle executable: $gradleExecutable"
-$gradleVersionCheck = Invoke-NativeCapture $gradleExecutable @("--version")
-if ($gradleVersionCheck.ExitCode -ne 0) {
-    Fail "Gradle exists but '--version' failed."
-}
-$gradleVersionText = $gradleVersionCheck.Output -join "`n"
+$gradleCheck = Invoke-NativeCapture $gradleExecutable @("--version")
+if ($gradleCheck.ExitCode -ne 0) { Fail "Gradle --version failed." }
+$gradleVersionText = $gradleCheck.Output -join "`n"
 if ($gradleVersionText -notmatch "Gradle\s+$([regex]::Escape($RequiredGradleVersion))(?:\s|$)") {
-    Fail "Mayra stabilisation requires Gradle $RequiredGradleVersion. Use the automatic bootstrap or pass the correct -GradleCommand."
+    Fail "Personal Alpha requires Gradle $RequiredGradleVersion."
 }
-Write-Host "Gradle: $RequiredGradleVersion"
 
 $env:GRADLE_OPTS = "-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -Dkotlin.daemon.jvm.options=-Xmx768m"
 $common = @("--no-daemon", "--stacktrace", "--console=plain", "--max-workers=1")
 
-$reportDir = Join-Path $repoRoot "build\personal-alpha"
-New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-
-$gitSha = "unknown"
-$gitBranch = "unknown"
-if (Get-Command git -ErrorAction SilentlyContinue) {
-    $shaResult = Invoke-NativeCapture "git" @("rev-parse", "HEAD")
-    if ($shaResult.ExitCode -eq 0) { $gitSha = ($shaResult.Output | Select-Object -First 1) }
-    $branchResult = Invoke-NativeCapture "git" @("branch", "--show-current")
-    if ($branchResult.ExitCode -eq 0) { $gitBranch = ($branchResult.Output | Select-Object -First 1) }
+$environment = [PSCustomObject]@{
+    schema = "mayra.personal-alpha.environment.v1"
+    generatedAt = (Get-Date).ToString("o")
+    source = [PSCustomObject]@{ branch = $gitBranch; sha = $gitSha; clean = $true }
+    toolchain = [PSCustomObject]@{
+        java = $javaVersion
+        javaMajor = $javaMajor
+        gradle = $RequiredGradleVersion
+        androidSdk = $androidSdk
+        compileSdk = 35
+        targetSdk = 35
+        maxWorkers = 1
+        gradleHeapMb = 1536
+    }
+    sourcePreflightSha256 = $preflightHash
 }
-
-$environmentSummary = @"
-Mayra AI Personal Alpha Environment
-Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-Source branch: $gitBranch
-Source commit: $gitSha
-Java: $javaVersion
-Gradle: $RequiredGradleVersion
-Android SDK: $androidSdk
-Compile SDK: 35
-Target SDK: 35
-Low-memory mode: max workers 1, Gradle heap 1536 MB
-Source preflight: passed
-"@
-$environmentSummary | Set-Content -Encoding UTF8 (Join-Path $reportDir "environment.txt")
+$environment | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $reportDir "environment.json")
 
 if ($Clean) {
     Write-Step "Cleaning previous build"
-    Invoke-GradleStep $gradleExecutable $common @("clean") (Join-Path $reportDir "clean.log") "Gradle clean failed. See build\personal-alpha\clean.log"
+    Invoke-GradleStep $gradleExecutable $common @("clean") (Join-Path $reportDir "clean.log") "Gradle clean failed."
 }
 
 Write-Step "Compiling Mayra debug sources"
-Invoke-GradleStep $gradleExecutable $common @(":app:compileDebugKotlin") (Join-Path $reportDir "compile.log") "Compilation failed. Share build\personal-alpha\compile.log for the exact source fix."
+Invoke-GradleStep $gradleExecutable $common @(":app:compileDebugKotlin") (Join-Path $reportDir "compile.log") "Compilation failed. Review build\personal-alpha\compile.log."
 
+$testsPassed = $false
 if (-not $SkipTests) {
     Write-Step "Running complete unit tests"
-    Invoke-GradleStep $gradleExecutable $common @(":app:testDebugUnitTest") (Join-Path $reportDir "tests.log") "Unit tests failed. Share build\personal-alpha\tests.log."
+    Invoke-GradleStep $gradleExecutable $common @(":app:testDebugUnitTest") (Join-Path $reportDir "tests.log") "Unit tests failed. Review build\personal-alpha\tests.log."
+    $testsPassed = $true
 }
 
+$lintPassed = $false
 if (-not $SkipLint) {
     Write-Step "Running Android lint"
-    Invoke-GradleStep $gradleExecutable $common @(":app:lintDebug") (Join-Path $reportDir "lint.log") "Android lint failed. Share build\personal-alpha\lint.log."
+    Invoke-GradleStep $gradleExecutable $common @(":app:lintDebug") (Join-Path $reportDir "lint.log") "Android lint failed. Review build\personal-alpha\lint.log."
+    $lintPassed = $true
 }
 
 Write-Step "Building personal alpha APK"
-Invoke-GradleStep $gradleExecutable $common @(":app:assembleDebug") (Join-Path $reportDir "assemble.log") "APK build failed. Share build\personal-alpha\assemble.log."
+Invoke-GradleStep $gradleExecutable $common @(":app:assembleDebug") (Join-Path $reportDir "assemble.log") "APK build failed. Review build\personal-alpha\assemble.log."
 
 $apk = Join-Path $repoRoot "app\build\outputs\apk\debug\app-debug.apk"
-if (-not (Test-Path $apk)) { Fail "Gradle completed but app-debug.apk was not found at $apk" }
-
-$hash = (Get-FileHash -Algorithm SHA256 $apk).Hash
-$sizeMb = [Math]::Round((Get-Item $apk).Length / 1MB, 2)
+if (-not (Test-Path $apk)) { Fail "Gradle completed but app-debug.apk was not found." }
+$hash = (Get-FileHash -Algorithm SHA256 $apk).Hash.ToLowerInvariant()
+$sizeBytes = (Get-Item $apk).Length
+$sizeMb = [Math]::Round($sizeBytes / 1MB, 2)
 $releaseApkName = "mayra-personal-alpha-$gitSha.apk"
 $releaseApk = Join-Path $reportDir $releaseApkName
 Copy-Item -Force $apk $releaseApk
+
+$artifactManifest = [PSCustomObject]@{
+    schema = "mayra.personal-alpha.artifact.v1"
+    generatedAt = (Get-Date).ToString("o")
+    source = [PSCustomObject]@{
+        repository = "panchalvinay33-debug/Mayra-AI"
+        ref = $gitBranch
+        sha = $gitSha
+        clean = $true
+    }
+    toolchain = [PSCustomObject]@{
+        jdk = $javaMajor
+        gradle = $RequiredGradleVersion
+        compileSdk = 35
+        targetSdk = 35
+        maxWorkers = 1
+    }
+    gates = [PSCustomObject]@{
+        sourcePreflight = $true
+        compileDebugKotlin = $true
+        testDebugUnitTest = $testsPassed
+        lintDebug = $lintPassed
+        assembleDebug = $true
+    }
+    artifact = [PSCustomObject]@{
+        fileName = $releaseApkName
+        sha256 = $hash
+        sizeBytes = $sizeBytes
+    }
+    sourcePreflightSha256 = $preflightHash
+}
+$artifactManifestPath = Join-Path $reportDir "artifact-manifest.json"
+$artifactManifest | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 $artifactManifestPath
+
+$verifyScript = Join-Path $PSScriptRoot "verify-personal-alpha-artifact.ps1"
+if (-not (Test-Path $verifyScript)) { Fail "Artifact verifier is missing." }
+$verifyArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $verifyScript, "-ApkPath", $releaseApk, "-ManifestPath", $artifactManifestPath)
+if ($SkipTests -or $SkipLint) { $verifyArgs += "-AllowSkippedGates" }
+& powershell.exe @verifyArgs
+if ($LASTEXITCODE -ne 0) { Fail "The newly built APK failed provenance verification." }
 
 $summary = @"
 Mayra AI Personal Alpha Build
 Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 Source branch: $gitBranch
 Source commit: $gitSha
+Source clean: true
 APK: $releaseApk
 Size MB: $sizeMb
 SHA-256: $hash
 Source preflight: passed
 Compile: passed
-Tests skipped: $SkipTests
-Lint skipped: $SkipLint
+Tests passed: $testsPassed
+Lint passed: $lintPassed
+Assemble: passed
+Artifact manifest: $artifactManifestPath
 Gradle: $RequiredGradleVersion
 JDK: $javaMajor
 "@
 $summary | Set-Content -Encoding UTF8 (Join-Path $reportDir "build-summary.txt")
 
 Write-Host "`nSUCCESS: Personal alpha APK is ready." -ForegroundColor Green
+if ($SkipTests -or $SkipLint) {
+    Write-Host "WARNING: Tests or lint were skipped; this is a diagnostic artifact, not a release-gate artifact." -ForegroundColor Yellow
+}
 Write-Host "APK: $releaseApk"
+Write-Host "Manifest: $artifactManifestPath"
 Write-Host "Source commit: $gitSha"
 Write-Host "Size: $sizeMb MB"
 Write-Host "SHA-256: $hash"
