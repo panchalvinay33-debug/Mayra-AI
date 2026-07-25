@@ -1,6 +1,7 @@
 package ai.mayra.app.owner
 
 import ai.mayra.app.action.MayraActionRisk
+import ai.mayra.app.assistive.MayraAssistiveService
 import ai.mayra.app.background.MayraNotificationListener
 import ai.mayra.app.core.actions.DeviceActionRequest
 import android.Manifest
@@ -108,13 +109,7 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
         notificationPermission(),
         notificationAccess(),
         floatingOverlayAccess(),
-        OwnerCapabilityStatus(
-            OwnerCapability.ACCESSIBILITY,
-            OwnerAccessState.ACTION_REQUIRED,
-            "Assistive screen control",
-            "Optional. Enable only when you want Mayra to understand supported visible screen context. Secure fields and hidden actions stay blocked.",
-            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        ),
+        accessibilityAccess(),
         OwnerCapabilityStatus(
             OwnerCapability.BATTERY_BACKGROUND,
             OwnerAccessState.ACTION_REQUIRED,
@@ -190,6 +185,26 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
             "Floating Mayra",
             if (enabled) "Ready to appear as a draggable companion over other apps." else "Allow display over other apps to use the minimized Mayra companion.",
             Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${appContext.packageName}"))
+        )
+    }
+
+    private fun accessibilityAccess(): OwnerCapabilityStatus {
+        val expected = ComponentName(appContext, MayraAssistiveService::class.java).flattenToString()
+        val enabledServices = Settings.Secure.getString(
+            appContext.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ).orEmpty()
+        val enabled = enabledServices.split(':').any { it.equals(expected, ignoreCase = true) }
+        return OwnerCapabilityStatus(
+            OwnerCapability.ACCESSIBILITY,
+            if (enabled) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
+            "Assistive screen context",
+            if (enabled) {
+                "Ready for user-invoked, visible, non-sensitive screen assistance. No hidden clicks or password reading."
+            } else {
+                "Optional. Enable Mayra assistive context only when you want help with visible screen content."
+            },
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
         )
     }
 }
