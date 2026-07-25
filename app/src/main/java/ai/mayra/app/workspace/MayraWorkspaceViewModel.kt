@@ -1,5 +1,6 @@
 package ai.mayra.app.workspace
 
+import ai.mayra.app.document.MayraDocumentAnalysisEngine
 import ai.mayra.app.file.MayraFileSearchEngine
 import ai.mayra.app.safety.MayraGlobalStopStore
 import android.app.Application
@@ -19,6 +20,7 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
     private val parser = MayraWorkspaceIntentParser()
     private val store = MayraWorkspaceSessionStore(application)
     private val fileSearch = MayraFileSearchEngine(application)
+    private val documentAnalysis = MayraDocumentAnalysisEngine(application)
     private val globalStop = MayraGlobalStopStore(application)
     private val saveMutex = Mutex()
     private val _uiState = MutableStateFlow(MayraWorkspaceUiState())
@@ -121,57 +123,85 @@ class MayraWorkspaceViewModel(application: Application) : AndroidViewModel(appli
     private fun runFileTask(task: MayraWorkspaceTask) {
         viewModelScope.launch {
             val query = task.intent.entities["query"] ?: task.intent.rawText
-            val result = runCatching { withContext(Dispatchers.IO) { fileSearch.search(query) } }
             val now = System.currentTimeMillis()
-            _uiState.update { current ->
-                val updatedTasks = current.session.tasks.map { existing ->
-                    if (existing.id != task.id) existing else result.fold(
-                        onSuccess = { found ->
-                            when {
-                                !found.found -> existing.copy(
-                                    state = MayraWorkspaceTaskState.WAITING_FOR_PERMISSION,
-                                    progress = 30,
-                                    statusMessage = "No authorized indexed file matched. Add a folder or run inventory.",
-                                    resultSummary = "No source was found in the current authorized index.",
-                                    updatedAt = now
-                                )
-                                task.intent.action == MayraWorkspaceActionType.SEARCH_FILE -> existing.copy(
-                                    state = MayraWorkspaceTaskState.COMPLETED,
-                                    progress = 100,
-                                    statusMessage = "Found ${found.matches.size} matching file(s).",
-                                    sources = found.sourceReferences,
-                                    resultSummary = found.matches.joinToString(limit = 5) { it.displayName },
-                                    verified = true,
-                                    updatedAt = now
-                                )
-                                else -> existing.copy(
-                                    state = MayraWorkspaceTaskState.WAITING_FOR_TOOL,
-                                    progress = 55,
-                                    statusMessage = "Source file found. PDF text/OCR analysis is not active yet.",
-                                    sources = found.sourceReferences,
-                                    resultSummary = "Metadata source verified; content extraction is pending.",
-                                    verified = false,
-                                    updatedAt = now
-                                )
-                            }
-                        },
-                        onFailure = { error -> existing.copy(
-                            state = MayraWorkspaceTaskState.FAILED,
-                            statusMessage = "File search failed safely.",
-                            resultSummary = error.javaClass.simpleName,
-                            updatedAt = now
-                        ) }
-                    )
-                }
-                current.copy(session = current.session.copy(
-                    tasks = updatedTasks,
-                    revision = current.session.revision + 1,
-                    updatedAt = now
-                ))
+            val updatedTask = when (task.intent.action) {
+                MayraWorkspaceActionType.SEARCH_FILE -> runSearchTask(task, query, now)
+                MayraWorkspaceActionType.ANALYSE_DOCUMENT -> runAnalysisTask(task, query, now)
+                else -> task
             }
+            _uiState.update { current -> current.copy(session = current.session.copy(
+                tasks = current.session.tasks.map { if (it.id == task.id) updatedTask else it },
+                revision = current.session.revision + 1,
+                updatedAt = now
+            )) }
             autosave()
         }
     }
+
+    private suspend fun runSearchTask(task: MayraWorkspaceTask, query: String, now: Long): MayraWorkspaceTask =
+        runCatching { withContext(Dispatchers.IO) { fileSearch.search(query) } }.fold(
+            onSuccess = { found -> when {
+                !found.found -> task.copy(
+                    state = MayraWorkspaceTaskState.WAITING_FOR_PERMISSION,
+                    progress = 30,
+                    statusMessage = "No authorized indexed file matched. Add a folder or run inventory.",
+                    resultSummary = "No source was found in the current authorized index.",
+                    updatedAt = now
+                )
+                else -> task.copy(
+                    state = MayraWorkspaceTaskState.COMPLETED,
+                    progress = 100,
+                    statusMessage = "Found ${found.matches.size} matching file(s).",
+                    sources = found.sourceReferences,
+                    resultSummary = found.matches.joinToString(limit = 5) { it.displayName },
+                    verified = true,
+                    updatedAt = now
+                )
+            } },
+            onFailure = { error -> task.copy(
+                state = MayraWorkspaceTaskState.FAILED,
+                statusMessage = "File search failed safely.",
+                resultSummary = error.javaClass.simpleName,
+                updatedAt = now
+            ) }
+        )
+
+    private suspend fun runAnalysisTask(task: MayraWorkspaceTask, query: String, now: Long): MayraWorkspaceTask =
+        runCatching { withContext(Dispatchers.IO) { documentAnalysis.analyse(query) } }.fold(
+            onSuccess = { analysis -> when {
+                analysis.source == null -> task.copy(
+                    state = MayraWorkspaceTaskState.WAITING_FOR_PERMISSION,
+                    progress = 30,
+                    statusMessage = analysis.summary,
+                    resultSummary = analysis.summary,
+                    updatedAt = now
+                )
+                analysis.needsPdfOrOcrTool -> task.copy(
+                    state = MayraWorkspaceTaskState.WAITING_FOR_TOOL,
+                    progress = 55,
+                    statusMessage = analysis.summary,
+                    sources = listOf(analysis.source),
+                    resultSummary = analysis.summary,
+                    verified = false,
+                    updatedAt = now
+                )
+                else -> task.copy(
+                    state = MayraWorkspaceTaskState.COMPLETED,
+                    progress = 100,
+                    statusMessage = if (analysis.verified) "Document analysed with source verification." else "Document parsed with low confidence; review required.",
+                    sources = listOf(analysis.source),
+                    resultSummary = analysis.summary,
+                    verified = analysis.verified,
+                    updatedAt = now
+                )
+            } },
+            onFailure = { error -> task.copy(
+                state = MayraWorkspaceTaskState.FAILED,
+                statusMessage = "Document analysis failed safely.",
+                resultSummary = error.javaClass.simpleName,
+                updatedAt = now
+            ) }
+        )
 
     fun pauseActiveTask() = mutateActiveTask(MayraWorkspaceTaskState.PAUSED, "Paused by the owner.")
 
