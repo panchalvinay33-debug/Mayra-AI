@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ReminderRecoveryPolicyTest {
-    private val now = 10_000L
+    private val now = 100_000L
 
     @Test
     fun `future scheduled reminder is scheduled`() {
