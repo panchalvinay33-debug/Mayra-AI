@@ -12,6 +12,7 @@ import ai.mayra.app.voice.MicrophonePermission
 import ai.mayra.app.voice.RealtimeVoiceLoopPolicy
 import ai.mayra.app.voice.VoiceState
 import ai.mayra.app.voice.VoiceTransportState
+import ai.mayra.app.workspace.MayraWorkspaceActivity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -32,23 +33,17 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-/**
- * Chat-first launcher experience. The older dashboard remains available as a secondary overview,
- * while this activity keeps Mayra visibly present during every conversation.
- */
 class MayraCompanionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val settingsStore = MayraSettingsStore(this)
         if (!settingsStore.read().onboardingCompleted) {
-            startActivity(
-                Intent(this, SettingsActivity::class.java)
-                    .putExtra(SettingsActivity.EXTRA_ONBOARDING, true)
-            )
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_ONBOARDING, true))
         }
         setContent {
             MayraAITheme {
                 MayraCompanionScreen(
+                    onOpenWorkspace = { startActivity(Intent(this, MayraWorkspaceActivity::class.java)) },
                     onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                     onOpenDevice = { startActivity(Intent(this, MayraDeviceTestActivity::class.java)) },
                     onOpenRuntime = { startActivity(Intent(this, RuntimeControlActivity::class.java)) }
@@ -60,6 +55,7 @@ class MayraCompanionActivity : ComponentActivity() {
 
 @Composable
 private fun MayraCompanionScreen(
+    onOpenWorkspace: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDevice: () -> Unit,
     onOpenRuntime: () -> Unit,
@@ -72,13 +68,9 @@ private fun MayraCompanionScreen(
     var settings by remember { mutableStateOf(settingsStore.read()) }
     var voiceState by remember { mutableStateOf(VoiceState()) }
     val voiceLoopPolicy = remember { RealtimeVoiceLoopPolicy() }
-    val voiceAssistant = remember {
-        AndroidVoiceAssistant(context) { next -> voiceState = next }
-    }
+    val voiceAssistant = remember { AndroidVoiceAssistant(context) { next -> voiceState = next } }
 
-    val microphoneLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
+    val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             voiceAssistant.setContinuousMode(settings.continuousVoiceByDefault)
             voiceAssistant.startListening()
@@ -198,6 +190,7 @@ private fun MayraCompanionScreen(
             voiceLoopPolicy.reset()
             chatViewModel.clearConversation()
         },
+        onOpenWorkspace = onOpenWorkspace,
         onOpenSettings = onOpenSettings,
         onOpenDevice = onOpenDevice,
         onOpenRuntime = onOpenRuntime,
