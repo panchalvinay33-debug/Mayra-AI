@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.Reader
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -21,34 +22,55 @@ class HybridMayraAssistant(
     }
 ) : MayraAssistant {
     override suspend fun reply(message: String, conversation: List<MayraMessage>): Result<String> {
-        val intent = intentEngine.parse(message.trim())
-        if (intent !is AssistantIntent.Chat) return localAssistant.reply(message, conversation)
+        val boundedMessage = AiProviderSafetyPolicy.boundUserMessage(message)
+        if (boundedMessage.isBlank()) return Result.failure(IllegalArgumentException("Message cannot be empty."))
+        val intent = intentEngine.parse(boundedMessage)
+        if (intent !is AssistantIntent.Chat) return localAssistant.reply(boundedMessage, conversation)
 
         val config = providerStore.read()
         val key = providerStore.apiKey()
         if (!config.onlineEnabled || key.isNullOrBlank()) {
-            return localAssistant.reply(message, conversation)
+            return localAssistant.reply(boundedMessage, conversation)
         }
 
-        return remoteFactory(config, key).reply(message, conversation)
+        val remote = runCatching { remoteFactory(config, key) }.getOrNull()
+            ?: return offlineFallback(boundedMessage, conversation)
+        return remote.reply(boundedMessage, conversation)
             .recoverCatching {
-                localAssistant.reply(message, conversation).getOrThrow() +
-                    "\n\nOnline AI was unavailable, so I answered with Mayra's offline brain."
+                offlineFallback(boundedMessage, conversation).getOrThrow()
             }
+    }
+
+    private suspend fun offlineFallback(
+        message: String,
+        conversation: List<MayraMessage>
+    ): Result<String> = localAssistant.reply(message, conversation).map { answer ->
+        "$answer\n\nOnline AI was unavailable, so I answered with Mayra's offline brain."
     }
 }
 
 class OpenAiResponsesAssistant(
-    private val apiKey: String,
-    private val model: String,
+    apiKey: String,
+    model: String,
     private val endpoint: String = RESPONSES_ENDPOINT,
     private val connectionFactory: (URL) -> HttpURLConnection = { url ->
         url.openConnection() as HttpURLConnection
     }
 ) : MayraAssistant {
+    private val apiKey = AiProviderSafetyPolicy.normalizeApiKey(apiKey)
+    private val model = AiProviderSafetyPolicy.normalizeModel(model)
+
+    init {
+        require(AiProviderSafetyPolicy.validateNewApiKey(this.apiKey) == null) { "OpenAI API key format is not valid." }
+        require(AiProviderSafetyPolicy.validateModel(this.model) == null) { "OpenAI model name is not valid." }
+        AiProviderSafetyPolicy.requireHttpsEndpoint(endpoint)
+    }
+
     override suspend fun reply(message: String, conversation: List<MayraMessage>): Result<String> =
         withContext(Dispatchers.IO) {
             runCatching {
+                val boundedMessage = AiProviderSafetyPolicy.boundUserMessage(message)
+                require(boundedMessage.isNotBlank()) { "Message cannot be empty." }
                 val input = JSONArray()
                 input.put(
                     JSONObject()
@@ -60,22 +82,27 @@ class OpenAiResponsesAssistant(
                         )
                 )
                 conversation.takeLast(MAX_CONTEXT_MESSAGES).forEach { item ->
-                    input.put(
-                        JSONObject()
-                            .put("role", if (item.sender == MayraMessage.Sender.USER) "user" else "assistant")
-                            .put("content", item.text)
-                    )
+                    val boundedText = AiProviderSafetyPolicy.boundContextMessage(item.text)
+                    if (boundedText.isNotBlank()) {
+                        input.put(
+                            JSONObject()
+                                .put("role", if (item.sender == MayraMessage.Sender.USER) "user" else "assistant")
+                                .put("content", boundedText)
+                        )
+                    }
                 }
-                if (conversation.lastOrNull()?.text != message) {
-                    input.put(JSONObject().put("role", "user").put("content", message))
+                if (conversation.lastOrNull()?.text?.trim() != boundedMessage) {
+                    input.put(JSONObject().put("role", "user").put("content", boundedMessage))
                 }
 
                 val payload = JSONObject()
                     .put("model", model)
                     .put("input", input)
                     .put("max_output_tokens", MAX_OUTPUT_TOKENS)
+                    .toString()
+                require(payload.length <= MAX_REQUEST_CHARACTERS) { "Online AI request is too large." }
 
-                val response = request("POST", endpoint, apiKey, payload.toString())
+                val response = request("POST", endpoint, apiKey, payload)
                 parseResponseText(JSONObject(response))
             }
         }
@@ -93,33 +120,41 @@ class OpenAiResponsesAssistant(
                 }
             }
         }
-        return parts.joinToString("\n").trim().ifBlank {
+        return parts.joinToString("\n").trim().take(MAX_ASSISTANT_TEXT_LENGTH).ifBlank {
             error("OpenAI returned an empty response.")
         }
     }
 
     private fun request(method: String, target: String, key: String, body: String?): String {
+        AiProviderSafetyPolicy.requireHttpsEndpoint(target)
         val connection = connectionFactory(URL(target)).apply {
             requestMethod = method
             connectTimeout = CONNECT_TIMEOUT_MILLIS
             readTimeout = READ_TIMEOUT_MILLIS
+            instanceFollowRedirects = false
             setRequestProperty("Authorization", "Bearer $key")
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
             if (body != null) {
+                require(body.length <= MAX_REQUEST_CHARACTERS) { "Online AI request is too large." }
                 doOutput = true
-                outputStream.bufferedWriter().use { it.write(body) }
+                outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
             }
         }
-        return connection.useResponse()
+        return connection.useBoundedResponse()
     }
 
     companion object {
         const val RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
         private const val MAX_CONTEXT_MESSAGES = 16
         private const val MAX_OUTPUT_TOKENS = 900
+        private const val MAX_REQUEST_CHARACTERS = 140_000
+        private const val MAX_RESPONSE_CHARACTERS = 220_000
+        private const val MAX_ASSISTANT_TEXT_LENGTH = 20_000
         private const val CONNECT_TIMEOUT_MILLIS = 15_000
         private const val READ_TIMEOUT_MILLIS = 60_000
+
+        internal fun maxResponseCharacters(): Int = MAX_RESPONSE_CHARACTERS
     }
 }
 
@@ -130,34 +165,59 @@ class AiProviderConnectionTester(
 ) {
     suspend fun test(apiKey: String, model: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            require(apiKey.isNotBlank()) { "API key is missing." }
-            require(model.isNotBlank()) { "Model name is missing." }
-            val target = "https://api.openai.com/v1/models/${model.trim()}"
+            val normalizedKey = AiProviderSafetyPolicy.normalizeApiKey(apiKey)
+            val normalizedModel = AiProviderSafetyPolicy.normalizeModel(model)
+            require(AiProviderSafetyPolicy.validateNewApiKey(normalizedKey) == null) { "API key is invalid." }
+            require(AiProviderSafetyPolicy.validateModel(normalizedModel) == null) { "Model name is invalid." }
+            val target = "https://api.openai.com/v1/models/$normalizedModel"
+            AiProviderSafetyPolicy.requireHttpsEndpoint(target)
             val connection = connectionFactory(URL(target)).apply {
                 requestMethod = "GET"
                 connectTimeout = 15_000
                 readTimeout = 30_000
-                setRequestProperty("Authorization", "Bearer ${apiKey.trim()}")
+                instanceFollowRedirects = false
+                setRequestProperty("Authorization", "Bearer $normalizedKey")
                 setRequestProperty("Accept", "application/json")
             }
-            val json = JSONObject(connection.useResponse())
-            val resolvedModel = json.optString("id", model.trim())
+            val json = JSONObject(connection.useBoundedResponse())
+            val resolvedModel = AiProviderSafetyPolicy.normalizeModel(json.optString("id", normalizedModel))
+                .ifBlank { normalizedModel }
             "Connected successfully · $resolvedModel"
+        }.recoverCatching { error ->
+            throw IllegalStateException(
+                AiProviderSafetyPolicy.sanitizeConnectionMessage(error.message),
+                null
+            )
         }
     }
 }
 
-private fun HttpURLConnection.useResponse(): String = try {
+private fun HttpURLConnection.useBoundedResponse(): String = try {
     val status = responseCode
     val stream = if (status in 200..299) inputStream else errorStream
-    val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+    val text = stream?.bufferedReader(Charsets.UTF_8)?.use {
+        it.readAtMost(OpenAiResponsesAssistant.maxResponseCharacters())
+    }.orEmpty()
     if (status !in 200..299) {
         val message = runCatching {
             JSONObject(text).optJSONObject("error")?.optString("message")
         }.getOrNull().orEmpty().ifBlank { "HTTP $status" }
-        error(message.take(240))
+        error(AiProviderSafetyPolicy.sanitizeConnectionMessage(message))
     }
     text
 } finally {
     disconnect()
+}
+
+private fun Reader.readAtMost(limit: Int): String {
+    require(limit > 0)
+    val output = StringBuilder(limit.coerceAtMost(8_192))
+    val buffer = CharArray(4_096)
+    while (output.length < limit) {
+        val count = read(buffer, 0, minOf(buffer.size, limit - output.length))
+        if (count < 0) break
+        output.append(buffer, 0, count)
+    }
+    if (read() >= 0) error("Online AI response exceeded the safe size limit.")
+    return output.toString()
 }
