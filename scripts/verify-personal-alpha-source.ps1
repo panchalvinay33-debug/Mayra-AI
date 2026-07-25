@@ -164,12 +164,14 @@ $actionModelsText = Read-Text "app/src/main/java/ai/mayra/app/core/actions/Devic
 $actionSpecText = Read-Text "app/src/main/java/ai/mayra/app/core/actions/AndroidDeviceActionSpec.kt"
 $safeExecutorText = Read-Text "app/src/main/java/ai/mayra/app/platform/device/MayraSafeActionExecutor.kt"
 $androidExecutorText = Read-Text "app/src/main/java/ai/mayra/app/platform/device/AndroidActionExecutor.kt"
-$results.Add((Write-Check "Conservative identity matching" ($identityText -match 'MIN_PARTIAL_QUERY_LENGTH' -and $identityText -match 'Ambiguous') 'Short and tied contact matches are not guessed'))
+$results.Add((Write-Check "Conservative identity matching" ($identityText -match 'MIN_PARTIAL_LENGTH' -and $identityText -match 'MIN_SCORE_MARGIN' -and $identityText -match 'MayraIdentityResolution\.Ambiguous') 'Short, tied and near-tied contact matches are not guessed'))
 $results.Add((Write-Check "Action fingerprint duplicate protection" ($actionModelsText -match 'safetyFingerprint' -and $actionModelsText -match 'DUPLICATE_BLOCKED' -and $actionModelsText -match 'MAX_REQUEST_AGE_MILLIS') 'Duplicate and stale actions are blocked'))
 $results.Add((Write-Check "Review-first call handoff" ($actionSpecText -match 'ACTION_DIAL' -and $actionSpecText -notmatch 'ACTION_CALL') 'Owner starts the final call'))
 $results.Add((Write-Check "Review-first message handoff" ($actionSpecText -match 'ACTION_SENDTO' -and $actionSpecText -match 'smsto:') 'Owner sends the final message'))
 $results.Add((Write-Check "Owner identity integrated" ($safeExecutorText -match 'MayraContactIdentityStore' -and $androidExecutorText -match 'MayraContactIdentityStore') 'Both production executors use owner identity mapping'))
-$results.Add((Write-Check "Single pending confirmation" ($safeExecutorText -match 'Finish or cancel the pending action first' -and $androidExecutorText -match 'Finish or cancel the pending action first') 'Executors cannot orphan confirmation tickets'))
+$singlePendingSafe = $safeExecutorText -match 'request\.requiresConfirmation\s*&&\s*pendingConfirmationToken != null'
+$singlePendingAndroid = $androidExecutorText -match 'request\.requiresConfirmation\s*&&\s*pendingConfirmationToken != null'
+$results.Add((Write-Check "Single pending confirmation" ($singlePendingSafe -and $singlePendingAndroid) 'Executors serialize high-risk confirmation tickets'))
 
 $backupText = Read-Text "app/src/main/java/ai/mayra/app/memory/MayraMemoryBackupEngine.kt"
 $results.Add((Write-Check "Authenticated backup encryption" ($backupText -match 'AES/GCM/NoPadding') 'Backup uses AES-GCM'))
@@ -182,7 +184,8 @@ $artifactVerifierText = Read-Text "scripts/verify-personal-alpha-artifact.ps1"
 $artifactTestText = Read-Text "scripts/test-artifact-provenance.ps1"
 $ciText = Read-Text ".github/workflows/android-ci.yml"
 $results.Add((Write-Check "Build invokes strict preflight" ($buildScriptText -match 'verify-personal-alpha-source\.ps1' -and $buildScriptText -match '-Strict') 'Every controlled local build checks source'))
-$results.Add((Write-Check "Build requires clean exact source" ($buildScriptText -match 'git status' -and $buildScriptText -match 'uncommitted changes' -and $buildScriptText -match '^[\s\S]*artifact-manifest\.json') 'Artifact records one clean commit'))
+$cleanSourceCheck = $buildScriptText -match 'status",\s*"--porcelain"' -and $buildScriptText -match 'working tree has uncommitted changes' -and $buildScriptText -match 'clean = \$true'
+$results.Add((Write-Check "Build requires clean exact source" $cleanSourceCheck 'Artifact records one clean commit'))
 $results.Add((Write-Check "Artifact manifest schema" ($buildScriptText -match 'mayra\.personal-alpha\.artifact\.v1' -and $artifactVerifierText -match 'mayra\.personal-alpha\.artifact\.v1') 'Builder and verifier share schema'))
 $results.Add((Write-Check "Artifact hash and size verification" ($artifactVerifierText -match 'Get-FileHash' -and $artifactVerifierText -match 'size mismatch') 'Tampered or truncated APK is rejected'))
 $results.Add((Write-Check "Installer verifies provenance" ($installScriptText -match 'verify-personal-alpha-artifact\.ps1' -and $installScriptText -match 'AllowUnverifiedArtifact') 'Unverified installs require explicit diagnostic override'))
