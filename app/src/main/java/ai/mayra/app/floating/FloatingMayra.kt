@@ -53,12 +53,7 @@ class FloatingMayraActivity : ComponentActivity() {
                 FloatingMayraScreen(
                     hasOverlayAccess = Settings.canDrawOverlays(this),
                     onGrantAccess = {
-                        startActivity(
-                            Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse("package:$packageName")
-                            )
-                        )
+                        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                     },
                     onStart = {
                         ContextCompat.startForegroundService(
@@ -123,7 +118,6 @@ private fun FloatingMayraScreen(
 class FloatingMayraService : Service() {
     private lateinit var windowManager: WindowManager
     private var bubble: MayraBubbleView? = null
-    private var params: WindowManager.LayoutParams? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -154,17 +148,14 @@ class FloatingMayraService : Service() {
         val layoutParams = WindowManager.LayoutParams(
             dp(68),
             dp(68),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = dp(12)
             y = dp(180)
         }
-        params = layoutParams
         bubble = view
         attachDragAndTap(view, layoutParams)
         windowManager.addView(view, layoutParams)
@@ -220,7 +211,6 @@ class FloatingMayraService : Service() {
     private fun removeBubble() {
         bubble?.let { runCatching { windowManager.removeView(it) } }
         bubble = null
-        params = null
     }
 
     private fun buildNotification(): android.app.Notification {
@@ -248,11 +238,9 @@ class FloatingMayraService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Floating Mayra",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Keeps the user-enabled floating Mayra companion active." }
+            val channel = NotificationChannel(CHANNEL_ID, "Floating Mayra", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Keeps the user-enabled floating Mayra companion active."
+            }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
@@ -275,7 +263,6 @@ private class MayraBubbleView(context: Context) : View(context) {
         val cx = width / 2f
         val cy = height / 2f
         val radius = width.coerceAtMost(height) * 0.46f
-
         paint.style = Paint.Style.FILL
         paint.color = Color.argb(44, 101, 84, 192)
         canvas.drawCircle(cx, cy, radius, paint)
@@ -283,27 +270,16 @@ private class MayraBubbleView(context: Context) : View(context) {
         canvas.drawCircle(cx, cy - radius * 0.08f, radius * 0.78f, paint)
         paint.color = Color.rgb(243, 183, 143)
         canvas.drawCircle(cx, cy, radius * 0.61f, paint)
-
         paint.color = Color.WHITE
         canvas.drawCircle(cx - radius * 0.22f, cy - radius * 0.10f, radius * 0.16f, paint)
         canvas.drawCircle(cx + radius * 0.22f, cy - radius * 0.10f, radius * 0.16f, paint)
         paint.color = Color.rgb(55, 35, 31)
         canvas.drawCircle(cx - radius * 0.22f, cy - radius * 0.08f, radius * 0.09f, paint)
         canvas.drawCircle(cx + radius * 0.22f, cy - radius * 0.08f, radius * 0.09f, paint)
-
         paint.color = Color.rgb(183, 58, 78)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = radius * 0.08f
-        canvas.drawArc(
-            cx - radius * 0.18f,
-            cy + radius * 0.02f,
-            cx + radius * 0.18f,
-            cy + radius * 0.32f,
-            18f,
-            144f,
-            false,
-            paint
-        )
+        canvas.drawArc(cx - radius * 0.18f, cy + radius * 0.02f, cx + radius * 0.18f, cy + radius * 0.32f, 18f, 144f, false, paint)
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(207, 23, 56)
         canvas.drawCircle(cx, cy + radius * 0.66f, radius * 0.18f, paint)
