@@ -33,14 +33,20 @@ class MayraFileInventoryScanner(context: Context) {
                 if (output.size >= boundedLimit) return@forEach
                 val nextPath = listOf(path, child.name).filter(String::isNotBlank).joinToString("/")
                 if (child.isDirectory) queue.add(child to nextPath)
-                else toIndexedFile(child.uri, MayraIndexedSourceKind.SAF_TREE, nextPath)?.let(output::add)
+                else toIndexedFile(
+                    uri = child.uri,
+                    kind = MayraIndexedSourceKind.SAF_TREE,
+                    relative = nextPath,
+                    modifiedHint = child.lastModified().coerceAtLeast(0L),
+                    grantRootUri = treeUri.toString()
+                )?.let(output::add)
             }
         }
         return output
     }
 
     fun inspectDocument(uri: Uri): MayraIndexedFile? =
-        toIndexedFile(uri, MayraIndexedSourceKind.SAF_DOCUMENT, null)
+        toIndexedFile(uri, MayraIndexedSourceKind.SAF_DOCUMENT, null, 0L, null)
 
     private fun scanCollection(collection: Uri, kind: MayraIndexedSourceKind): List<MayraIndexedFile> {
         val baseProjection = mutableListOf(
@@ -50,25 +56,15 @@ class MayraFileInventoryScanner(context: Context) {
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_MODIFIED
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            baseProjection += MediaStore.MediaColumns.RELATIVE_PATH
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) baseProjection += MediaStore.MediaColumns.RELATIVE_PATH
         return runCatching {
-            resolver.query(
-                collection,
-                baseProjection.toTypedArray(),
-                null,
-                null,
-                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
-            )?.use { cursor ->
+            resolver.query(collection, baseProjection.toTypedArray(), null, null, "${MediaStore.MediaColumns.DATE_MODIFIED} DESC")?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val typeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
                 val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
-                val pathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
-                } else -1
+                val pathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH) else -1
                 buildList {
                     while (cursor.moveToNext() && size < MAX_MEDIASTORE_FILES) {
                         val uri = Uri.withAppendedPath(collection, cursor.getLong(idColumn).toString())
@@ -78,7 +74,7 @@ class MayraFileInventoryScanner(context: Context) {
                         val modified = cursor.getLong(modifiedColumn).coerceAtLeast(0L) * 1000L
                         val relative = pathColumn.takeIf { it >= 0 }?.let(cursor::getString)
                         if (MayraFilePrivacyPolicy.isAllowed(name, relative, mime)) {
-                            add(buildFile(uri, name, mime, bytes, modified, kind, relative))
+                            add(buildFile(uri, name, mime, bytes, modified, kind, relative, null))
                         }
                     }
                 }
@@ -86,7 +82,13 @@ class MayraFileInventoryScanner(context: Context) {
         }.getOrDefault(emptyList())
     }
 
-    private fun toIndexedFile(uri: Uri, kind: MayraIndexedSourceKind, relative: String?): MayraIndexedFile? = runCatching {
+    private fun toIndexedFile(
+        uri: Uri,
+        kind: MayraIndexedSourceKind,
+        relative: String?,
+        modifiedHint: Long,
+        grantRootUri: String?
+    ): MayraIndexedFile? = runCatching {
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
             val nameColumn = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -95,7 +97,7 @@ class MayraFileInventoryScanner(context: Context) {
             val size = sizeColumn.takeIf { it >= 0 }?.let(cursor::getLong)?.coerceAtLeast(0L) ?: 0L
             val mime = resolver.getType(uri)
             if (!MayraFilePrivacyPolicy.isAllowed(name, relative, mime)) return@use null
-            buildFile(uri, name, mime, size, 0L, kind, relative)
+            buildFile(uri, name, mime, size, modifiedHint, kind, relative, grantRootUri)
         }
     }.getOrNull()
 
@@ -106,7 +108,8 @@ class MayraFileInventoryScanner(context: Context) {
         bytes: Long,
         modified: Long,
         kind: MayraIndexedSourceKind,
-        relative: String?
+        relative: String?,
+        grantRootUri: String?
     ): MayraIndexedFile = MayraIndexedFile(
         uri = uri.toString(),
         displayName = name.take(MAX_NAME),
@@ -115,6 +118,7 @@ class MayraFileInventoryScanner(context: Context) {
         modifiedAt = modified,
         sourceKind = kind,
         relativeLocation = relative?.take(MAX_LOCATION),
+        grantRootUri = grantRootUri,
         fingerprint = sha256("${uri}|$bytes|$modified|${mime.orEmpty()}")
     )
 
