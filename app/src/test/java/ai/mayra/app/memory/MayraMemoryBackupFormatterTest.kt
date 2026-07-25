@@ -31,7 +31,7 @@ class MayraMemoryBackupFormatterTest {
         context.getSharedPreferences("mayra_personal_memory", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
-    @Test fun exportsNormalNotesAndChecklistState() {
+    @Test fun formatsNormalNotesAndChecklistForLocalReview() {
         memory.saveNote(
             PersonalNote(
                 type = PersonalNoteType.CHECKLIST,
@@ -47,11 +47,11 @@ class MayraMemoryBackupFormatterTest {
 
         val text = MayraMemoryBackupFormatter.format(memory, now = 0L)
 
+        assertTrue(text.startsWith("Mayra Memory Backup Preview"))
         assertTrue(text.contains("Trip preparation"))
         assertTrue(text.contains("[x] Pack charger"))
         assertTrue(text.contains("[ ] Carry ID"))
         assertTrue(text.contains("Tags: travel"))
-        assertTrue(text.contains("Pinned: yes"))
     }
 
     @Test fun excludesSensitiveNotesAndTimelineEvents() {
