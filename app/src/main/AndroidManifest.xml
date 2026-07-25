@@ -20,11 +20,14 @@
     <queries>
         <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent>
         <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
-        <intent><action android:name="android.intent.action.OPEN_DOCUMENT" /><category android:name="android.intent.category.OPENABLE" /><data android:mimeType="image/*" /></intent>
+        <intent><action android:name="android.intent.action.OPEN_DOCUMENT" /><category android:name="android.intent.category.OPENABLE" /><data android:mimeType="*/*" /></intent>
         <intent><action android:name="android.intent.action.INSERT" /><data android:mimeType="vnd.android.cursor.dir/event" /></intent>
+        <intent><action android:name="android.speech.action.RECOGNIZE_SPEECH" /></intent>
     </queries>
 
     <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
+        <activity android:name=".document.MayraDocumentActivity" android:exported="false" />
+        <activity android:name=".memory.MayraVoiceNotesActivity" android:exported="false" />
         <activity android:name=".memory.MayraMemoryActivity" android:exported="false" />
         <activity android:name=".floating.FloatingMayraActivity" android:exported="false" />
         <activity android:name=".testing.MayraDeviceTestActivity" android:exported="false" />
