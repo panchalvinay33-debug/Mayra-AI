@@ -42,14 +42,9 @@ class MayraFileGrantRegistry(context: Context) {
             if (flags != 0) runCatching { appContext.contentResolver.releasePersistableUriPermission(uri, flags) }
         }
         val current = indexStore.read()
-        val removedGrant = current.grants.firstOrNull { it.treeUri == treeUri }
-        val cutoff = removedGrant?.grantedAt ?: Long.MAX_VALUE
         indexStore.write(current.copy(
             grants = current.grants.filterNot { it.treeUri == treeUri },
-            files = current.files.filterNot {
-                it.sourceKind == MayraIndexedSourceKind.SAF_TREE && it.indexedAt >= cutoff &&
-                    (it.relativeLocation?.startsWith(removedGrant?.label.orEmpty(), ignoreCase = true) == true)
-            },
+            files = current.files.filterNot { it.grantRootUri == treeUri },
             generation = current.generation + 1,
             updatedAt = System.currentTimeMillis()
         ))
