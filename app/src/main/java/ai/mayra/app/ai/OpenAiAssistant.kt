@@ -57,11 +57,11 @@ class OpenAiResponsesAssistant(
         url.openConnection() as HttpURLConnection
     }
 ) : MayraAssistant {
-    private val apiKey = AiProviderSafetyPolicy.normalizeApiKey(apiKey)
+    private val providerKey = AiProviderSafetyPolicy.normalizeApiKey(apiKey)
     private val model = AiProviderSafetyPolicy.normalizeModel(model)
 
     init {
-        require(AiProviderSafetyPolicy.validateNewApiKey(this.apiKey) == null) { "OpenAI API key format is not valid." }
+        require(AiProviderSafetyPolicy.validateNewApiKey(this.providerKey) == null) { "OpenAI API key format is not valid." }
         require(AiProviderSafetyPolicy.validateModel(this.model) == null) { "OpenAI model name is not valid." }
         AiProviderSafetyPolicy.requireHttpsEndpoint(endpoint)
     }
@@ -102,7 +102,7 @@ class OpenAiResponsesAssistant(
                     .toString()
                 require(payload.length <= MAX_REQUEST_CHARACTERS) { "Online AI request is too large." }
 
-                val response = request("POST", endpoint, apiKey, payload)
+                val response = request("POST", endpoint, providerKey, payload)
                 parseResponseText(JSONObject(response))
             }
         }
