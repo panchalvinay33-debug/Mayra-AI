@@ -25,13 +25,19 @@ data class MayraReminder(
     val priority: ReminderPriority = ReminderPriority.NORMAL,
     val followUpEnabled: Boolean = true,
     val notificationCount: Int = 0,
-    val lastNotifiedAt: Long? = null
+    val lastNotifiedAt: Long? = null,
+    val revision: Long = 0L
 ) {
     init {
         require(id.isNotBlank())
         require(title.isNotBlank())
+        require(title.length <= 160)
+        require(detail == null || detail.length <= 500)
         require(dueAt >= 0L)
         require(createdAt >= 0L)
+        require(updatedAt >= createdAt)
+        require(notificationCount >= 0)
+        require(revision >= 0L)
     }
 }
 
@@ -156,7 +162,17 @@ class MayraReminderParser(
     }
 }
 
+object ReminderLifecyclePolicy {
+    private val mutableStates = setOf(ReminderState.SCHEDULED, ReminderState.SNOOZED, ReminderState.DUE, ReminderState.MISSED)
+    fun canComplete(state: ReminderState): Boolean = state in mutableStates
+    fun canCancel(state: ReminderState): Boolean = state in mutableStates
+    fun canSnooze(state: ReminderState): Boolean = state in mutableStates
+    fun canNotify(state: ReminderState): Boolean = state in setOf(ReminderState.SCHEDULED, ReminderState.SNOOZED, ReminderState.MISSED)
+    fun validSnooze(duration: Duration): Boolean = !duration.isZero && !duration.isNegative && duration <= Duration.ofDays(30)
+}
+
 class MayraReminderStore(context: Context, private val maxEntries: Int = 500) {
+    init { require(maxEntries in 20..5_000) }
     private val preferences = context.applicationContext.getSharedPreferences("mayra_owned_reminders", Context.MODE_PRIVATE)
 
     @Synchronized
@@ -188,34 +204,67 @@ class MayraReminderStore(context: Context, private val maxEntries: Int = 500) {
         .sortedBy { it.dueAt }
 
     fun due(now: Long = System.currentTimeMillis()): List<MayraReminder> = active(now).filter { it.dueAt <= now }
+
     fun complete(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
-        it.copy(state = ReminderState.COMPLETED, updatedAt = now)
+        if (!ReminderLifecyclePolicy.canComplete(it.state)) return@update null
+        it.nextRevision(state = ReminderState.COMPLETED, now = now)
     }
+
     fun cancel(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
-        it.copy(state = ReminderState.CANCELLED, updatedAt = now)
+        if (!ReminderLifecyclePolicy.canCancel(it.state)) return@update null
+        it.nextRevision(state = ReminderState.CANCELLED, now = now)
     }
-    fun snooze(id: String, duration: Duration, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
-        it.copy(state = ReminderState.SNOOZED, dueAt = now + duration.toMillis(), updatedAt = now)
+
+    fun snooze(id: String, duration: Duration, now: Long = System.currentTimeMillis()): MayraReminder? {
+        if (!ReminderLifecyclePolicy.validSnooze(duration)) return null
+        return update(id) {
+            if (!ReminderLifecyclePolicy.canSnooze(it.state)) return@update null
+            it.nextRevision(state = ReminderState.SNOOZED, now = now, dueAt = now + duration.toMillis())
+        }
     }
-    fun markNotified(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
-        it.copy(state = ReminderState.DUE, updatedAt = now, notificationCount = it.notificationCount + 1, lastNotifiedAt = now)
+
+    fun markNotified(
+        id: String,
+        expectedRevision: Long? = null,
+        expectedDueAt: Long? = null,
+        now: Long = System.currentTimeMillis()
+    ): MayraReminder? = update(id) {
+        if (!ReminderLifecyclePolicy.canNotify(it.state)) return@update null
+        if (expectedRevision != null && it.revision != expectedRevision) return@update null
+        if (expectedDueAt != null && it.dueAt != expectedDueAt) return@update null
+        it.copy(
+            state = ReminderState.DUE,
+            updatedAt = now,
+            notificationCount = it.notificationCount + 1,
+            lastNotifiedAt = now,
+            revision = it.revision + 1L
+        )
     }
+
     fun markMissed(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
-        it.copy(state = ReminderState.MISSED, updatedAt = now)
+        if (!ReminderLifecyclePolicy.canNotify(it.state)) return@update null
+        it.nextRevision(state = ReminderState.MISSED, now = now)
     }
 
     @Synchronized
-    private fun update(id: String, transform: (MayraReminder) -> MayraReminder): MayraReminder? {
+    private fun update(id: String, transform: (MayraReminder) -> MayraReminder?): MayraReminder? {
         val item = find(id) ?: return null
-        val updated = transform(item)
+        val updated = transform(item) ?: return null
         upsert(updated)
         return updated
     }
 
+    private fun MayraReminder.nextRevision(state: ReminderState, now: Long, dueAt: Long = this.dueAt): MayraReminder = copy(
+        state = state,
+        dueAt = dueAt,
+        updatedAt = now.coerceAtLeast(createdAt),
+        revision = revision + 1L
+    )
+
     private fun write(items: List<MayraReminder>) {
         val array = JSONArray()
         items.forEach { array.put(it.toJson()) }
-        preferences.edit().putString(KEY_ITEMS, array.toString()).apply()
+        preferences.edit().putString(KEY_ITEMS, array.toString()).commit()
     }
 
     private fun MayraReminder.toJson() = JSONObject()
@@ -223,15 +272,16 @@ class MayraReminderStore(context: Context, private val maxEntries: Int = 500) {
         .put("dueAt", dueAt).put("createdAt", createdAt).put("updatedAt", updatedAt)
         .put("state", state.name).put("priority", priority.name)
         .put("followUp", followUpEnabled).put("notificationCount", notificationCount)
-        .put("lastNotifiedAt", lastNotifiedAt)
+        .put("lastNotifiedAt", lastNotifiedAt).put("revision", revision)
 
     private fun JSONObject.toReminder() = MayraReminder(
-        id = getString("id"), title = getString("title"), detail = optString("detail").takeIf(String::isNotBlank),
+        id = getString("id"), title = getString("title").take(160), detail = optString("detail").takeIf(String::isNotBlank)?.take(500),
         dueAt = getLong("dueAt"), createdAt = getLong("createdAt"), updatedAt = getLong("updatedAt"),
         state = runCatching { ReminderState.valueOf(getString("state")) }.getOrDefault(ReminderState.SCHEDULED),
         priority = runCatching { ReminderPriority.valueOf(getString("priority")) }.getOrDefault(ReminderPriority.NORMAL),
-        followUpEnabled = optBoolean("followUp", true), notificationCount = optInt("notificationCount", 0),
-        lastNotifiedAt = if (isNull("lastNotifiedAt")) null else optLong("lastNotifiedAt")
+        followUpEnabled = optBoolean("followUp", true), notificationCount = optInt("notificationCount", 0).coerceAtLeast(0),
+        lastNotifiedAt = if (isNull("lastNotifiedAt")) null else optLong("lastNotifiedAt"),
+        revision = optLong("revision", 0L).coerceAtLeast(0L)
     )
 
     private companion object { const val KEY_ITEMS = "items" }
