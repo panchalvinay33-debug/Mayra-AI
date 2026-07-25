@@ -1,13 +1,14 @@
 package ai.mayra.app.owner
 
-import ai.mayra.app.background.MayraNotificationListener
 import ai.mayra.app.action.MayraActionRisk
+import ai.mayra.app.background.MayraNotificationListener
 import ai.mayra.app.core.actions.DeviceActionRequest
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
@@ -17,7 +18,7 @@ enum class OwnerAccessState { READY, ACTION_REQUIRED, DEVICE_UNSUPPORTED }
 
 enum class OwnerCapability {
     MICROPHONE, CONTACTS, CAMERA, PHONE_CALLS, SMS, NOTIFICATIONS,
-    NOTIFICATION_ACCESS, ACCESSIBILITY, BATTERY_BACKGROUND, DEFAULT_APPS
+    NOTIFICATION_ACCESS, FLOATING_OVERLAY, ACCESSIBILITY, BATTERY_BACKGROUND, DEFAULT_APPS
 }
 
 data class OwnerCapabilityStatus(
@@ -106,32 +107,35 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
         telephonyPermission(OwnerCapability.SMS, "SMS", Manifest.permission.SEND_SMS),
         notificationPermission(),
         notificationAccess(),
+        floatingOverlayAccess(),
         OwnerCapabilityStatus(
             OwnerCapability.ACCESSIBILITY,
             OwnerAccessState.ACTION_REQUIRED,
             "Assistive screen control",
-            "Optional. Android requires you to enable an Accessibility service manually; Mayra must never hide or bypass this consent.",
+            "Optional. Enable only when you want Mayra to understand supported visible screen context. Secure fields and hidden actions stay blocked.",
             Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
         ),
         OwnerCapabilityStatus(
             OwnerCapability.BATTERY_BACKGROUND,
             OwnerAccessState.ACTION_REQUIRED,
             "Background reliability",
-            "Review battery optimization and allow Mayra to run reliably in the background where your phone permits it.",
+            "Review battery optimization so reminders, notifications and Floating Mayra can remain dependable.",
             Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         ),
         OwnerCapabilityStatus(
             OwnerCapability.DEFAULT_APPS,
             OwnerAccessState.ACTION_REQUIRED,
             "Default assistant / phone roles",
-            "Full call control and deeper assistant integration require Android default-app roles and complete role-specific implementations.",
+            "Deeper assistant and call control require Android default-app roles and complete role-specific implementations.",
             Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
         )
     )
 
     fun readinessScore(statuses: List<OwnerCapabilityStatus> = snapshot()): Int {
         if (statuses.isEmpty()) return 0
-        return (statuses.count { it.state == OwnerAccessState.READY } * 100) / statuses.size
+        val supported = statuses.filterNot { it.state == OwnerAccessState.DEVICE_UNSUPPORTED }
+        if (supported.isEmpty()) return 100
+        return (supported.count { it.state == OwnerAccessState.READY } * 100) / supported.size
     }
 
     private fun runtimePermission(capability: OwnerCapability, title: String, permission: String): OwnerCapabilityStatus {
@@ -140,8 +144,8 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
             capability,
             if (granted) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
             title,
-            if (granted) "Ready" else "Grant when Mayra opens the relevant feature.",
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(android.net.Uri.parse("package:${appContext.packageName}"))
+            if (granted) "Ready" else "Grant this permission in the guided basic-access step.",
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:${appContext.packageName}"))
         )
     }
 
@@ -160,7 +164,7 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
             OwnerCapability.NOTIFICATIONS,
             if (ready) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
             "Mayra notifications",
-            if (ready) "Ready" else "Allow notification permission and enable Mayra notifications.",
+            if (ready) "Ready" else "Allow notification permission and keep Mayra notifications enabled.",
             Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
         )
     }
@@ -172,9 +176,20 @@ class MayraOwnerCapabilityInspector(private val context: Context) {
             OwnerCapability.NOTIFICATION_ACCESS,
             if (enabled) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
             "Notification intelligence",
-            if (enabled) "Ready" else "Enable Notification Access so Mayra can summarize and safely reply to supported notifications.",
+            if (enabled) "Ready" else "Enable Notification Access for summaries and supported confirmed replies.",
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                 .putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", component.flattenToString())
+        )
+    }
+
+    private fun floatingOverlayAccess(): OwnerCapabilityStatus {
+        val enabled = Settings.canDrawOverlays(appContext)
+        return OwnerCapabilityStatus(
+            OwnerCapability.FLOATING_OVERLAY,
+            if (enabled) OwnerAccessState.READY else OwnerAccessState.ACTION_REQUIRED,
+            "Floating Mayra",
+            if (enabled) "Ready to appear as a draggable companion over other apps." else "Allow display over other apps to use the minimized Mayra companion.",
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${appContext.packageName}"))
         )
     }
 }
