@@ -148,6 +148,16 @@ function Invoke-GradleStep(
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
+$preflight = Join-Path $PSScriptRoot "verify-personal-alpha-source.ps1"
+if (-not (Test-Path $preflight)) {
+    Fail "Source preflight script is missing: $preflight"
+}
+Write-Step "Running strict source preflight"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $preflight -Strict
+if ($LASTEXITCODE -ne 0) {
+    Fail "Source preflight failed. Review build\personal-alpha\source-preflight.json before compiling."
+}
+
 Write-Step "Checking reproducible Windows build environment"
 
 $javaExecutable = Resolve-Java
@@ -219,6 +229,7 @@ Android SDK: $androidSdk
 Compile SDK: 35
 Target SDK: 35
 Low-memory mode: max workers 1, Gradle heap 1536 MB
+Source preflight: passed
 "@
 $environmentSummary | Set-Content -Encoding UTF8 (Join-Path $reportDir "environment.txt")
 
@@ -260,6 +271,7 @@ Source commit: $gitSha
 APK: $releaseApk
 Size MB: $sizeMb
 SHA-256: $hash
+Source preflight: passed
 Compile: passed
 Tests skipped: $SkipTests
 Lint skipped: $SkipLint
