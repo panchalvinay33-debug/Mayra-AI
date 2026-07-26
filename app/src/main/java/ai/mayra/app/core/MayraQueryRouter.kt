@@ -1,5 +1,6 @@
 package ai.mayra.app.core
 
+import java.text.Normalizer
 import java.util.Locale
 
 enum class MayraQueryRoute {
@@ -22,15 +23,15 @@ data class MayraRoutingDecision(
  */
 object MayraQueryRouter {
     fun route(message: String): MayraRoutingDecision {
-        val normalized = message.lowercase(Locale.ROOT).trim()
+        val normalized = normalize(message)
         if (normalized.isBlank()) return delegate()
 
-        val documentSignals = DOCUMENT_MARKERS.filter(normalized::contains)
+        val documentSignals = DOCUMENT_MARKERS.filter { normalized.containsMarker(it) }
         if (documentSignals.isEmpty()) return delegate()
 
-        val insightSignals = DOCUMENT_INSIGHT_MARKERS.filter(normalized::contains)
+        val insightSignals = DOCUMENT_INSIGHT_MARKERS.filter { normalized.containsMarker(it) }
         val questionSignals = QUESTION_MARKERS.filter { marker ->
-            normalized.startsWith(marker) || normalized.contains(" $marker ")
+            normalized.startsWithMarker(marker) || normalized.containsMarker(marker)
         }
         val deviceSignals = DEVICE_ACTION_MARKERS.filter { marker -> normalized.startsWith(marker) }
 
@@ -60,15 +61,31 @@ object MayraQueryRouter {
         matchedSignals = emptyList()
     )
 
+    private fun normalize(value: String): String = Normalizer
+        .normalize(value, Normalizer.Form.NFKC)
+        .lowercase(Locale.ROOT)
+        .trim()
+
+    private fun String.containsMarker(marker: String): Boolean = markerRegex(marker).containsMatchIn(this)
+
+    private fun String.startsWithMarker(marker: String): Boolean = markerRegex(marker, anchored = true)
+        .containsMatchIn(this)
+
+    private fun markerRegex(marker: String, anchored: Boolean = false): Regex {
+        val escaped = Regex.escape(normalize(marker)).replace("\\ ", "\\s+")
+        val prefix = if (anchored) "^" else "(?<![\\p{L}\\p{M}\\p{N}_-])"
+        return Regex("$prefix$escaped(?![\\p{L}\\p{M}\\p{N}_-])")
+    }
+
     private val DOCUMENT_MARKERS = listOf(
-        "document", "documents", "pdf", "file", "files", "library",
-        "दस्तावेज", "फाइल", "फ़ाइल", "पीडीएफ"
+        "document", "documents", "doc", "docs", "pdf", "file", "files", "library",
+        "note", "notes", "दस्तावेज", "फाइल", "फ़ाइल", "पीडीएफ", "नोट", "नोट्स"
     )
 
     private val DOCUMENT_INSIGHT_MARKERS = listOf(
         "search", "find", "look for", "summarize", "summary", "answer from",
         "inside", "in my", "from my", "indexed", "invoice", "payment terms",
-        "खोज", "ढूंढ", "ढूँढ", "सारांश", "इसमें", "मेरी फाइल", "मेरी फ़ाइल"
+        "खोज", "खोजो", "ढूंढ", "ढूँढ", "सारांश", "इसमें", "मेरी फाइल", "मेरी फ़ाइल"
     )
 
     private val QUESTION_MARKERS = listOf(
