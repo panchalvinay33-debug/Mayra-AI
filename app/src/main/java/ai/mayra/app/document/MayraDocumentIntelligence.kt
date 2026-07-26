@@ -214,7 +214,7 @@ object DocumentSearchEngine {
 
     fun tokenizeQuery(query: String): List<String> = query
         .lowercase(Locale.ROOT)
-        .split(Regex("[^\\p{L}\\p{N}_-]+"))
+        .split(Regex("[^\\p{L}\\p{M}\\p{N}_-]+"))
         .asSequence()
         .map(String::trim)
         .filter { it.length >= 2 }
@@ -242,7 +242,7 @@ object DocumentSearchEngine {
         wholeTermRegex(term).find(this)?.range?.first
 
     private fun wholeTermRegex(term: String): Regex = Regex(
-        "(?<![\\p{L}\\p{N}_-])${Regex.escape(term)}(?![\\p{L}\\p{N}_-])"
+        "(?<![\\p{L}\\p{M}\\p{N}_-])${Regex.escape(term)}(?![\\p{L}\\p{M}\\p{N}_-])"
     )
 
     private val STOP_WORDS = setOf(
@@ -250,7 +250,9 @@ object DocumentSearchEngine {
         "in", "to", "of", "on", "about", "file", "files", "document", "documents",
         "library", "mayra", "please", "show", "find", "tell", "mera", "meri", "mere",
         "mein", "me", "hai", "ka", "ki", "ke", "ko", "kya", "batao", "dikhao",
-        "karo", "kar", "karna", "do", "de", "search"
+        "karo", "kar", "karna", "do", "de", "search", "मेरा", "मेरी", "मेरे", "में",
+        "को", "का", "की", "के", "क्या", "बताओ", "दिखाओ", "खोजो", "ढूंढो", "ढूँढो",
+        "फाइल", "फ़ाइल", "दस्तावेज", "दस्तावेज़", "पीडीएफ"
     )
 }
 
