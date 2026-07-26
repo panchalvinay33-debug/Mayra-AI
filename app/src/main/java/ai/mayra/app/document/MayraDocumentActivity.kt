@@ -49,15 +49,40 @@ class MayraDocumentActivity : ComponentActivity() {
 private fun DocumentLibraryScreen(onClose: () -> Unit) {
     val context = LocalContext.current
     val store = remember(context) { MayraDocumentStore(context) }
+    val contentStore = remember(context) { MayraDocumentContentStore(context) }
+    val extractor = remember(context) { MayraDocumentTextExtractor(context) }
+    val searchEngine = remember(context) { MayraDocumentSearch(store, contentStore) }
     var refresh by remember { mutableIntStateOf(0) }
     var search by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf<String?>(null) }
+
     val documents = remember(refresh, search) {
-        store.list().filter {
-            search.isBlank() ||
-                it.name.contains(search, ignoreCase = true) ||
-                it.mimeType.contains(search, ignoreCase = true)
+        if (search.isBlank()) {
+            store.list().map { document ->
+                DocumentSearchHit(
+                    document = document,
+                    score = 0,
+                    snippet = contentStore.get(document.uri)?.text.orEmpty().take(220),
+                    matchedContent = contentStore.get(document.uri) != null
+                )
+            }
+        } else {
+            searchEngine.search(search, limit = 20)
         }
+    }
+
+    fun index(document: MayraDocument): String = when (val result = extractor.extract(document)) {
+        is DocumentExtractionResult.Success -> {
+            contentStore.put(document.uri, result.text, result.truncated)
+            if (result.text.isBlank()) {
+                "Document opened, but no readable text was found."
+            } else {
+                val suffix = if (result.truncated) " The index was safely limited to 500,000 characters." else ""
+                "Indexed ${result.text.length} characters locally.$suffix"
+            }
+        }
+        is DocumentExtractionResult.Unsupported -> result.reason
+        is DocumentExtractionResult.Failure -> result.reason
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -67,12 +92,13 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
-                store.add(uri)
-            }.onSuccess {
+                val document = store.add(uri)
+                index(document)
+            }.onSuccess { indexNotice ->
                 refresh++
-                notice = "Document added to Mayra Library."
+                notice = "Document added. $indexNotice"
             }.onFailure {
-                notice = "Mayra could not keep access to this document."
+                notice = "Mayra could not keep access to this document: ${it.message.orEmpty()}"
             }
         }
     }
@@ -92,8 +118,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Choose documents you want Mayra to remember as local library entries. " +
-                    "This foundation stores persistent access and file metadata locally on your device."
+                "Keep selected documents available to Mayra on this device. Plain-text files are indexed locally for search and chat; nothing is uploaded by this feature."
             )
 
             Button(
@@ -103,7 +128,9 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                             "application/pdf",
                             "text/*",
                             "application/msword",
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/json",
+                            "application/xml"
                         )
                     )
                 },
@@ -116,39 +143,59 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                 value = search,
                 onValueChange = { search = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search documents") },
+                label = { Text("Search title or indexed text") },
+                supportingText = {
+                    Text("Try a name, topic, invoice number, person or phrase.")
+                },
                 singleLine = true
             )
             notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
+            Text(
+                if (search.isBlank()) "${documents.size} saved document${if (documents.size == 1) "" else "s"}"
+                else "${documents.size} search result${if (documents.size == 1) "" else "s"}",
+                style = MaterialTheme.typography.labelLarge
+            )
+
             if (documents.isEmpty()) {
-                Text("No matching documents yet.")
+                Text(
+                    if (search.isBlank()) "No documents yet."
+                    else "No matching title or indexed text found."
+                )
             } else {
-                documents.forEach { document ->
+                documents.forEach { hit ->
+                    val indexed = contentStore.get(hit.document.uri)
                     DocumentCard(
-                        document = document,
+                        document = hit.document,
+                        snippet = if (search.isNotBlank()) hit.snippet else indexed?.text.orEmpty().take(220),
+                        indexedContent = indexed,
+                        onIndex = {
+                            notice = index(hit.document)
+                            refresh++
+                        },
                         onOpen = {
                             runCatching {
-                                val documentUri = Uri.parse(document.uri)
+                                val documentUri = Uri.parse(hit.document.uri)
                                 context.startActivity(
                                     Intent(Intent.ACTION_VIEW).apply {
                                         setDataAndType(
                                             documentUri,
-                                            document.mimeType.ifBlank { "*/*" }
+                                            hit.document.mimeType.ifBlank { "*/*" }
                                         )
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
                                 )
-                                store.markOpened(document.uri)
+                                store.markOpened(hit.document.uri)
                                 refresh++
                             }.onFailure {
                                 notice = "No compatible app could open this document."
                             }
                         },
                         onRemove = {
-                            store.remove(document.uri)
+                            contentStore.remove(hit.document.uri)
+                            store.remove(hit.document.uri)
                             refresh++
-                            notice = "Document removed from Mayra Library."
+                            notice = "Document and its local text index were removed."
                         }
                     )
                 }
@@ -161,8 +208,11 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                 ) {
                     Text("Document intelligence status", fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Local library, persistent access, metadata search and document opening are ready. " +
-                            "Full-text extraction, page search and AI summaries remain a later milestone.",
+                        "Ready: persistent library access, metadata search, plain-text extraction, local full-text search, snippets and Mayra chat lookup. Pending: reliable PDF/DOC page parsing, OCR and generated summaries.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "In chat, try: ‘Search my documents for payment terms’ or ‘मेरी files में invoice search करो’.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -177,6 +227,9 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
 @Composable
 private fun DocumentCard(
     document: MayraDocument,
+    snippet: String,
+    indexedContent: IndexedDocumentContent?,
+    onIndex: () -> Unit,
     onOpen: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -193,7 +246,27 @@ private fun DocumentCard(
             if (document.sizeBytes >= 0) {
                 Text(formatFileSize(document.sizeBytes), style = MaterialTheme.typography.bodySmall)
             }
+            Text(
+                when {
+                    indexedContent == null -> "Text not indexed"
+                    indexedContent.truncated -> "Indexed locally (${indexedContent.text.length} characters, limited)"
+                    else -> "Indexed locally (${indexedContent.text.length} characters)"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (indexedContent == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+            if (snippet.isNotBlank()) {
+                Text(
+                    snippet.replace(Regex("\\s+"), " ").trim().let {
+                        if (it.length > 220) it.take(220) + "…" else it
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onIndex) {
+                    Text(if (indexedContent == null) "Index text" else "Re-index")
+                }
                 TextButton(onClick = onRemove) { Text("Remove") }
                 TextButton(onClick = onOpen) { Text("Open") }
             }
@@ -217,8 +290,8 @@ class MayraDocumentStore(context: Context) {
     @Synchronized
     fun add(uri: Uri): MayraDocument {
         val metadata = readMetadata(uri)
-        val current = list().filterNot { it.uri == uri.toString() }
-        val existing = list().firstOrNull { it.uri == uri.toString() }
+        val existingDocuments = list()
+        val existing = existingDocuments.firstOrNull { it.uri == uri.toString() }
         val document = MayraDocument(
             uri = uri.toString(),
             name = metadata.first,
@@ -227,7 +300,7 @@ class MayraDocumentStore(context: Context) {
             addedAt = existing?.addedAt ?: System.currentTimeMillis(),
             lastOpenedAt = existing?.lastOpenedAt ?: 0L
         )
-        write(current + document)
+        write(existingDocuments.filterNot { it.uri == uri.toString() } + document)
         return document
     }
 
