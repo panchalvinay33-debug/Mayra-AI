@@ -14,13 +14,15 @@ These documents must be read together. They are not competing plans.
    Complete Android product and engineering blueprint.
 2. [`MAYRA_LIVING_INTELLIGENCE_VISION.md`](MAYRA_LIVING_INTELLIGENCE_VISION.md)  
    Permanent one-brain/many-bodies strategic extension.
-3. [`PERSONAL_ALPHA_DEVICE_CHECK.md`](PERSONAL_ALPHA_DEVICE_CHECK.md)  
+3. [`HINDI_HINGLISH_VOICE_ARCHITECTURE.md`](HINDI_HINGLISH_VOICE_ARCHITECTURE.md)  
+   Locked Hindi/Hinglish voice-intelligence architecture, privacy rules, benchmark plan and post-alpha implementation phases. It selects no offline model yet.
+4. [`PERSONAL_ALPHA_DEVICE_CHECK.md`](PERSONAL_ALPHA_DEVICE_CHECK.md)  
    Physical-device acceptance gate.
-4. [`WINDOWS_PERSONAL_ALPHA_BUILD.md`](WINDOWS_PERSONAL_ALPHA_BUILD.md)  
+5. [`WINDOWS_PERSONAL_ALPHA_BUILD.md`](WINDOWS_PERSONAL_ALPHA_BUILD.md)  
    Reproducible Windows build and install guidance.
-5. [`BUILD_AND_ARTIFACT_PROVENANCE_STATUS.md`](BUILD_AND_ARTIFACT_PROVENANCE_STATUS.md)  
+6. [`BUILD_AND_ARTIFACT_PROVENANCE_STATUS.md`](BUILD_AND_ARTIFACT_PROVENANCE_STATUS.md)  
    Exact-source, gate, APK hash and installation-evidence contract.
-6. Feature status documents in `docs/*_STATUS.md`  
+7. Feature status documents in `docs/*_STATUS.md`  
    Honest implementation boundaries and remaining gaps.
 
 No future batch may silently remove or contradict a locked product capability. Any deliberate owner-approved change must update the relevant source-of-truth documents in the same batch.
@@ -45,6 +47,12 @@ Safety snapshot of PR #9 before Living Intelligence stabilisation work. Do not u
 
 Dedicated Personal Alpha V0.1 stabilisation track. Allowed changes are limited to build reproducibility, compile/test/lint fixes, lifecycle, safety, privacy, critical Living Home/voice/Floating Mayra integration, reminder/agenda/notification/action reliability, physical diagnostics, backup and low-memory stability.
 
+The Hindi/Hinglish Voice Intelligence milestone may be documented and audited here, but packages, offline model binaries, wake-word engines and broad recognition refactors remain deferred until Personal Alpha acceptance.
+
+### Future `agent/hindi-hinglish-voice-intelligence`
+
+Create this dedicated implementation branch only from the accepted integrated Personal Alpha source. It must own recognition-alternative scoring, deterministic Hinglish normalization, personal correction vocabulary, confidence/safety integration and any separately approved offline-model experiment. Do not mix this work into PR #11, PR #12 or a document-intelligence branch.
+
 ### `backup/personal-alpha-safety-2026-07-25`
 
 Immutable-style safety snapshot at commit `38626088db6f9fa586c3ef3b4e843f40e3fe5a41`. It includes the encrypted memory backup engine, startup crash containment and diagnostics, voice-loop hardening, twenty-check physical alpha gate, privacy manifest protections and persistent Global Stop with reboot enforcement.
@@ -66,7 +74,7 @@ Unrelated major feature expansion remains deferred until the alpha gate is accep
 | `3978c5b2db84e45ce887a358937e270f2e06a67d` | Living Intelligence vision locked on the integration branch |
 | `backup/personal-alpha-safety-2026-07-25` at `38626088db6f9fa586c3ef3b4e843f40e3fe5a41` | Recover encrypted backup, startup, voice and persistent-stop safety work |
 | `backup/personal-alpha-provenance-2026-07-25` at `4a3498e550ba0c173ec3f3c4a3d308a7de9b92c4` | Recover contact/action safety plus exact-source build, APK and install provenance controls |
-| `stabilize/living-companion-v0.1` | Current moving stabilisation and alpha-delivery branch |
+| `stabilize/living-companion-v0.1` | Current moving stabilisation and alpha-delivery branch, including the documentation-only Hindi/Hinglish voice lock |
 
 Before a risky merge, schema migration or broad refactor, create another dated backup branch and record its exact commit here.
 
@@ -84,6 +92,7 @@ Before a risky merge, schema migration or broad refactor, create another dated b
 - Missing provenance requires an explicit diagnostic override and cannot count toward acceptance.
 - Build and install reports go to `build/personal-alpha/` locally and must not contain secrets.
 - API keys, signing passwords, backup passwords and user data never enter Git or artifact metadata.
+- Voice samples, raw transcripts, personal vocabulary, correction mappings and model telemetry never enter Git, CI artifacts or logs.
 - Keep at least one rollback APK from the previous accepted physical-device build.
 - Preserve Room schemas and document migrations.
 - Never force-update a backup branch.
@@ -114,6 +123,8 @@ Before a risky merge, schema migration or broad refactor, create another dated b
 - schema/app version migration;
 - rollback if a multi-category restore fails.
 
+Future voice vocabulary and correction mappings are owner data. They must remain local by default and may enter backup only through an explicit encrypted category with preview, selective restore and deletion controls. Raw audio is excluded by default.
+
 No plaintext sensitive export is allowed by default. Android automatic/full backup is disabled; explicit Mayra encrypted backup is authoritative.
 
 ---
@@ -126,6 +137,7 @@ Global Stop is an owner safety boundary, not a temporary UI toggle.
 - new Mayra phone actions remain blocked until explicit owner resume;
 - Floating Mayra is stopped and cannot automatically return after reboot while Global Stop is active;
 - background automation and attention scheduling remain stopped;
+- future wake-word or background voice listening must remain stopped;
 - already-created reminders remain scheduled as owner commitments;
 - state stores only bounded operational metadata, never personal content;
 - source preflight must fail if persistence or reboot enforcement is removed.
@@ -144,7 +156,9 @@ Global Stop is an owner safety boundary, not a temporary UI toggle.
 8. **Installed** — verified artifact installs on a named device and package/version evidence is recorded.
 9. **Physical-device verified** — relevant manual checks pass.
 10. **Personal-alpha accepted** — mandatory gate passes with no critical blocker and a rollback artifact exists.
-11. **Production-ready** — release signing, policies, compatibility, privacy and distribution gates pass.
+11. **Voice-baseline benchmarked** — Android recognizer/TTS baseline is measured on the owner's Motorola with a versioned Hindi/Hinglish corpus.
+12. **Offline voice candidate accepted** — one optional model shows measurable benefit within documented APK, RAM, latency, battery, thermal, privacy and accuracy limits.
+13. **Production-ready** — release signing, policies, compatibility, privacy and distribution gates pass.
 
 GitHub Actions failing before Checkout proves neither source failure nor source success.
 
@@ -166,11 +180,31 @@ GitHub Actions failing before Checkout proves neither source failure nor source 
 12. Preserve rollback APK/source snapshot.
 13. Merge accepted stabilisation into the integration branch, then integrate safely into `main`.
 14. Complete multi-category encrypted Backup & Restore V1.
-15. Continue deeper context assistance and multi-device platform work.
+15. Create the dedicated Hindi/Hinglish voice branch from the accepted integrated source.
+16. Instrument and benchmark the existing Android SpeechRecognizer/TextToSpeech baseline on the owner's Motorola.
+17. Add deterministic Hinglish normalization, owner vocabulary and confidence/safety integration.
+18. Evaluate at most one optional offline model candidate at a time only after baseline evidence exists.
+19. Continue deeper context assistance and multi-device platform work.
 
 ---
 
-## 9. Fast-Batch Rule
+## 9. Hindi/Hinglish Voice Milestone Lock
+
+- current Android SpeechRecognizer, Android TextToSpeech, language settings, partial results, bounded loop recovery and duplicate suppression are reusable foundations.
+- all recognition alternatives and confidence metadata should be preserved in the future implementation.
+- deterministic Hindi/Hinglish normalization and personal vocabulary come before any heavy offline model.
+- Whisper.cpp, Vosk and Sherpa-ONNX remain evaluation candidates, not chosen dependencies.
+- optional models must be downloadable, removable, verified and benchmarked; the base APK retains an Android-only mode.
+- voice confidence never bypasses existing Action Safety.
+- raw audio is not persisted by default.
+- wake word is a separate opt-in, battery/privacy-gated phase and must obey Global Stop.
+- implementation remains deferred until Personal Alpha acceptance.
+
+The complete architecture and test plan is in [`HINDI_HINGLISH_VOICE_ARCHITECTURE.md`](HINDI_HINGLISH_VOICE_ARCHITECTURE.md).
+
+---
+
+## 10. Fast-Batch Rule
 
 Work should move quickly, but each batch must maximise coherent value rather than raw file count. A good large batch includes closely related fixes, deterministic tests where possible, updated boundaries, exact recovery references and no inflated completion claims.
 
@@ -178,6 +212,6 @@ A batch must stop before it becomes an unreviewable mixture of unrelated systems
 
 ---
 
-## 10. Current Product Statement
+## 11. Current Product Statement
 
 > Mayra is one living personal intelligence with a portable brain, authorised memory, shared safety constitution, replaceable device adapters and multiple possible presence renderers. Android is the first body; stable daily usefulness is the first gate; smart-device and holographic continuity are future bodies of the same Mayra.
