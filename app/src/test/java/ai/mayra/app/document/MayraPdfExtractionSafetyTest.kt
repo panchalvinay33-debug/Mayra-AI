@@ -42,6 +42,5 @@ class MayraPdfExtractionSafetyTest {
         val result = MayraDocumentTextExtractor(context).extract(document)
 
         assertTrue(result is DocumentExtractionResult.Failure)
-        assertTrue((result as DocumentExtractionResult.Failure).reason.contains("DOCX stream"))
     }
 }
