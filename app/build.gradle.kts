@@ -18,6 +18,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildTypes {
+        create("documentTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".documenttest"
+            versionNameSuffix = "-document-test"
+            isDebuggable = false
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
     buildFeatures { compose = true }
 
     compileOptions {
