@@ -93,8 +93,11 @@ class MayraApplication : Application() {
         planStore.prune()
         pendingActions.expireDue()
         pendingActions.prune()
-        MayraBackgroundRuntime.initialize(applicationContext)
-        MayraBriefingScheduler.sync(applicationContext)
+
+        // Background scheduling is useful but non-critical. A provider/OEM/test-environment failure
+        // must not prevent Mayra's local assistant and safety runtime from starting.
+        runCatching { MayraBackgroundRuntime.initialize(applicationContext) }
+        runCatching { MayraBriefingScheduler.sync(applicationContext) }
     }
 }
 
