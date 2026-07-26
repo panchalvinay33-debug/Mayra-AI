@@ -33,10 +33,14 @@ sealed interface DocumentExtractionResult {
 }
 
 class MayraDocumentTextExtractor(private val context: Context) {
+    private val docxExtractor by lazy { MayraDocxTextExtractor(context) }
+
     fun extract(document: MayraDocument): DocumentExtractionResult {
         val mimeType = document.mimeType.lowercase(Locale.ROOT)
         val name = document.name.lowercase(Locale.ROOT)
         val isPdf = mimeType == PDF_MIME || name.endsWith(".pdf")
+        val isDocx = mimeType == DOCX_MIME || name.endsWith(".docx")
+        val isLegacyDoc = mimeType == DOC_MIME || name.endsWith(".doc")
         val textCompatible = mimeType.startsWith("text/") ||
             mimeType == "application/json" || mimeType == "application/xml" ||
             name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".csv") ||
@@ -44,9 +48,13 @@ class MayraDocumentTextExtractor(private val context: Context) {
 
         return when {
             isPdf -> extractPdf(document)
+            isDocx -> docxExtractor.extract(document)
             textCompatible -> extractPlainText(document)
+            isLegacyDoc -> DocumentExtractionResult.Unsupported(
+                "Legacy .doc files are not supported yet. Save or export this document as DOCX to index it locally."
+            )
             else -> DocumentExtractionResult.Unsupported(
-                "Text extraction is available for plain-text and PDF documents. DOC/DOCX and OCR require dedicated parser milestones."
+                "Text extraction is available for plain-text, PDF and DOCX documents. Legacy DOC and OCR require dedicated parser milestones."
             )
         }
     }
@@ -133,6 +141,8 @@ class MayraDocumentTextExtractor(private val context: Context) {
         const val MAX_PDF_PAGES = 100
         const val MAX_PDF_BYTES = 50L * 1_048_576L
         const val PDF_MIME = "application/pdf"
+        const val DOC_MIME = "application/msword"
+        const val DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     }
 }
 
@@ -339,7 +349,7 @@ class DocumentAwareMayraAssistant(
 
             val hits = search.search(message, limit = 5)
             if (hits.isEmpty()) {
-                return@runCatching "I checked ${documents.size} document${if (documents.size == 1) "" else "s"} in your local Mayra Library, but found no matching title or indexed text. Plain-text and text-based PDF files can be indexed now; DOC/DOCX and OCR remain future parser milestones."
+                return@runCatching "I checked ${documents.size} document${if (documents.size == 1) "" else "s"} in your local Mayra Library, but found no matching title or indexed text. Plain-text, text-based PDF and DOCX files can be indexed now; legacy DOC and OCR remain future parser milestones."
             }
 
             buildString {
@@ -356,7 +366,7 @@ class DocumentAwareMayraAssistant(
     private fun looksLikeDocumentQuery(message: String): Boolean {
         val normalized = message.lowercase(Locale.ROOT)
         return listOf(
-            "document", "documents", "pdf", "file", "files", "library",
+            "document", "documents", "pdf", "docx", "file", "files", "library",
             "दस्तावेज", "फाइल", "फ़ाइल", "पीडीएफ"
         ).any(normalized::contains)
     }
