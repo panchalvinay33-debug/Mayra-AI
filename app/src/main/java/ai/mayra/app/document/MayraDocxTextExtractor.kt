@@ -114,7 +114,13 @@ class MayraDocxTextExtractor(private val context: Context) {
         var textDepth = -1
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT && output.length <= MAX_INDEXED_CHARS) {
+            if (parser.depth > MAX_XML_DEPTH) {
+                throw IllegalArgumentException("DOCX XML nesting exceeds the safe parsing limit.")
+            }
             when (event) {
+                XmlPullParser.DOCDECL -> throw IllegalArgumentException(
+                    "DOCX XML declarations with external entities are not supported."
+                )
                 XmlPullParser.START_TAG -> when (parser.name) {
                     "t", "instrText", "delText" -> textDepth = parser.depth
                     "tab" -> output.append('\t')
@@ -146,6 +152,7 @@ class MayraDocxTextExtractor(private val context: Context) {
         const val MAX_SINGLE_XML_BYTES = 8 * 1_048_576
         const val MAX_RELEVANT_XML_BYTES = 20L * 1_048_576L
         const val MAX_INDEXED_CHARS = 500_000
+        const val MAX_XML_DEPTH = 256
         private const val BUFFER_SIZE = 8_192
         private const val MAIN_DOCUMENT_PART = "word/document.xml"
     }
