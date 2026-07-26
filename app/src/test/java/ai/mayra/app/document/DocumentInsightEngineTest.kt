@@ -33,21 +33,22 @@ class DocumentInsightEngineTest {
     }
 
     @Test
-    fun summarySelectsImportantSentencesAndKeepsOriginalOrder() {
+    fun summaryPrioritizesRepeatedTopicsAndKeepsOriginalOrder() {
         val text = """
             Project Mayra is an offline-first Android assistant.
             The weather was pleasant during the meeting.
             Local document search protects private user data on the device.
             The team discussed lunch after the review.
-            Document summaries use indexed text and never invent missing facts.
+            Document search and document summaries use indexed text on the device.
         """.trimIndent()
 
         val summary = DocumentInsightEngine.summarize(text, maxSentences = 3)
 
         assertTrue(summary.contains("Project Mayra"))
         assertTrue(summary.contains("Local document search"))
-        assertTrue(summary.contains("never invent"))
+        assertTrue(summary.contains("Document search and document summaries"))
         assertTrue(summary.indexOf("Project Mayra") < summary.indexOf("Local document search"))
+        assertTrue(summary.indexOf("Local document search") < summary.indexOf("Document search and document summaries"))
     }
 
     @Test
