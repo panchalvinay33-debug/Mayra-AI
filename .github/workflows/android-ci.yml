@@ -16,7 +16,7 @@ concurrency:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -52,39 +52,53 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:lintDebug --stacktrace --console=plain 2>&1 | tee build/ci/lint-debug.log
+          gradle --no-daemon :app:lintDebug :app:lintDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/lint.log
 
-      - name: Assemble debug APK
+      - name: Assemble isolated document-test APK
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-debug.log
+          gradle --no-daemon :app:assembleDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/assemble-document-test.log
 
-      - name: Verify permission-minimal debug APK
+      - name: Verify isolated APK manifest and permissions
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -n 1)"
+          APK="$(find app/build/outputs/apk/documentTest -name '*.apk' -type f | head -n 1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
           test -x "$AAPT"
-          "$AAPT" dump permissions "$APK" | tee build/ci/debug-apk-permissions.log
 
-          forbidden=(
-            android.permission.RECORD_AUDIO
-            android.permission.READ_CONTACTS
-            android.permission.CALL_PHONE
-            android.permission.SEND_SMS
-            android.permission.POST_NOTIFICATIONS
-            android.permission.SCHEDULE_EXACT_ALARM
-            android.permission.RECEIVE_BOOT_COMPLETED
+          "$AAPT" dump permissions "$APK" | tee build/ci/document-test-permissions.log
+          "$AAPT" dump badging "$APK" | tee build/ci/document-test-badging.log
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/document-test-manifest-tree.log
+
+          if grep -q '^uses-permission:' build/ci/document-test-permissions.log; then
+            echo "Document-test APK unexpectedly requests Android permissions" >&2
+            exit 1
+          fi
+
+          grep -Fq "package: name='ai.mayra.app.documenttest'" build/ci/document-test-badging.log
+          grep -Fq "application-label:'Mayra Document Test'" build/ci/document-test-badging.log
+
+          forbidden_components=(
+            ai.mayra.app.MainActivity
+            ai.mayra.app.MayraApplication
+            ai.mayra.app.background.MayraNotificationListener
+            ai.mayra.app.background.MayraBootReceiver
+            androidx.startup.InitializationProvider
+            androidx.work.impl.background.systemjob.SystemJobService
+            androidx.work.impl.foreground.SystemForegroundService
           )
-          for permission in "${forbidden[@]}"; do
-            if grep -Fq "$permission" build/ci/debug-apk-permissions.log; then
-              echo "Forbidden debug permission found: $permission" >&2
+          for component in "${forbidden_components[@]}"; do
+            if grep -Fq "$component" build/ci/document-test-manifest-tree.log; then
+              echo "Forbidden component found in isolated APK: $component" >&2
               exit 1
             fi
           done
+
+          grep -Fq "ai.mayra.app.document.MayraDocumentActivity" build/ci/document-test-manifest-tree.log
+          grep -Fq "ai.mayra.app.documenttest.DocumentTestApplication" build/ci/document-test-manifest-tree.log
 
       - name: Upload reports
         if: always()
@@ -94,17 +108,18 @@ jobs:
           path: |
             build/ci/
             app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-documentTest.html
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/problems/
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Upload debug APK
+      - name: Upload isolated document-test APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: mayra-debug-apk-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/*.apk
+          name: mayra-document-test-apk-${{ github.run_number }}
+          path: app/build/outputs/apk/documentTest/*.apk
           if-no-files-found: error
           retention-days: 7
