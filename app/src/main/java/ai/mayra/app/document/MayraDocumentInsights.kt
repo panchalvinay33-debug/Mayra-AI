@@ -84,6 +84,7 @@ object DocumentInsightEngine {
         if (terms.isEmpty() || evidence.isEmpty()) return 0
         val combined = normalizeForMatching(evidence.joinToString(" "))
         val matched = terms.count { combined.containsWholeTerm(it) }
+        if (matched == 0) return 0
         return ((matched.toDouble() / terms.size) * 100).toInt().coerceIn(1, 100)
     }
 
@@ -139,9 +140,11 @@ object DocumentInsightEngine {
         "the", "and", "for", "with", "from", "this", "that", "are", "was", "were",
         "have", "has", "had", "into", "about", "your", "documents", "document", "file",
         "files", "library", "mayra", "please", "tell", "show", "find", "summary",
-        "summarize", "mera", "meri", "mere", "mein", "hai", "kya", "ka", "ki", "ke",
+        "summarize", "what", "when", "where", "who", "why", "how", "which",
+        "mera", "meri", "mere", "mein", "hai", "kya", "ka", "ki", "ke",
         "ko", "batao", "dikhao", "दस्तावेज", "फाइल", "फ़ाइल", "बताओ", "क्या",
-        "मेरा", "मेरी", "मेरे", "में", "का", "की", "के", "को", "खोजो", "ढूंढो", "ढूँढो"
+        "कब", "कहाँ", "कौन", "क्यों", "कैसे", "कितना", "मेरा", "मेरी", "मेरे",
+        "में", "का", "की", "के", "को", "खोजो", "ढूंढो", "ढूँढो"
     )
 
     private const val MAX_SENTENCE_CHARS = 700
