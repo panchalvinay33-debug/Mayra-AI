@@ -62,6 +62,7 @@ class DocumentMaintenanceTest {
             failed = 0,
             blank = 0,
             truncated = 1,
+            removedOrphanedIndexes = 1,
             messages = emptyList()
         )
         val unhealthy = healthy.copy(failed = 1, indexed = 1)
@@ -70,5 +71,6 @@ class DocumentMaintenanceTest {
         assertEquals(3, healthy.completed)
         assertFalse(unhealthy.healthy)
         assertTrue(healthy.userMessage().contains("safely limited 1"))
+        assertTrue(healthy.userMessage().contains("removed stale indexes 1"))
     }
 }
