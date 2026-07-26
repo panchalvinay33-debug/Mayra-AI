@@ -19,7 +19,7 @@ import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
-import ai.mayra.app.document.DocumentAwareMayraAssistant
+import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import android.app.Application
 import java.util.Calendar
@@ -34,7 +34,7 @@ class MayraApplication : Application() {
                 actionDispatcher = ActionDispatcher(actionExecutor)
             )
         )
-        MayraRuntime.assistant = DocumentAwareMayraAssistant(
+        MayraRuntime.assistant = DocumentInsightAwareMayraAssistant(
             delegate = localAssistant,
             context = applicationContext
         )
