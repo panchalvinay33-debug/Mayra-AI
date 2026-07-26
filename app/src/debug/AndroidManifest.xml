@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      The CI/distributed debug APK is intentionally permission-minimal for physical
+      document-library validation. Production capability declarations remain in the
+      main manifest, while debug builds use the system document picker and app-private
+      storage without contacts, telephony, microphone, notification, alarm or boot access.
+    -->
+    <uses-permission
+        android:name="android.permission.RECORD_AUDIO"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.READ_CONTACTS"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.CALL_PHONE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.SEND_SMS"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.POST_NOTIFICATIONS"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.RECEIVE_BOOT_COMPLETED"
+        tools:node="remove" />
+
+    <application
+        android:label="Mayra Library Test"
+        tools:replace="android:label">
+
+        <service
+            android:name=".background.MayraNotificationListener"
+            android:enabled="false"
+            tools:replace="android:enabled" />
+
+        <receiver
+            android:name=".background.MayraBootReceiver"
+            android:enabled="false"
+            tools:replace="android:enabled" />
+    </application>
+</manifest>
