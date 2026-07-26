@@ -160,7 +160,8 @@ object DocumentSearchEngine {
         return documents.mapNotNull { document ->
             val name = document.name.lowercase(Locale.ROOT)
             val mime = document.mimeType.lowercase(Locale.ROOT)
-            val content = indexedText[document].orEmpty().lowercase(Locale.ROOT)
+            val originalContent = indexedText[document].orEmpty()
+            val normalizedContent = originalContent.lowercase(Locale.ROOT)
             var score = 0
             var matchedContent = false
 
@@ -168,7 +169,7 @@ object DocumentSearchEngine {
                 if (name == term) score += 14
                 if (name.contains(term)) score += 8
                 if (mime.contains(term)) score += 2
-                val occurrences = content.countOccurrences(term).coerceAtMost(8)
+                val occurrences = normalizedContent.countOccurrences(term).coerceAtMost(8)
                 if (occurrences > 0) {
                     score += 3 + occurrences
                     matchedContent = true
@@ -178,7 +179,7 @@ object DocumentSearchEngine {
             if (score == 0) null else DocumentSearchHit(
                 document = document,
                 score = score,
-                snippet = if (matchedContent) contentSnippet(content, terms) else document.name,
+                snippet = if (matchedContent) contentSnippet(originalContent, terms) else document.name,
                 matchedContent = matchedContent
             )
         }.sortedWith(
@@ -200,7 +201,8 @@ object DocumentSearchEngine {
         .toList()
 
     private fun contentSnippet(content: String, terms: List<String>): String {
-        val firstIndex = terms.map { content.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: 0
+        val normalized = content.lowercase(Locale.ROOT)
+        val firstIndex = terms.map { normalized.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: 0
         val start = (firstIndex - 70).coerceAtLeast(0)
         val end = (firstIndex + 180).coerceAtMost(content.length)
         val prefix = if (start > 0) "…" else ""
@@ -220,8 +222,9 @@ object DocumentSearchEngine {
 
     private val STOP_WORDS = setOf(
         "the", "and", "for", "with", "from", "this", "that", "file", "files",
-        "document", "documents", "library", "mayra", "mera", "meri", "mere", "mein",
-        "me", "hai", "ka", "ki", "ke", "ko", "kya", "batao", "dikhao", "search"
+        "document", "documents", "library", "mayra", "please", "show", "find", "tell",
+        "mera", "meri", "mere", "mein", "me", "hai", "ka", "ki", "ke", "ko", "kya",
+        "batao", "dikhao", "karo", "kar", "karna", "do", "de", "search"
     )
 }
 
