@@ -37,6 +37,23 @@ class DocumentSearchEngineTest {
     }
 
     @Test
+    fun `exact phrase ranks above separated terms`() {
+        val exact = invoice.copy(uri = "content://exact", name = "Exact.txt")
+        val separated = contract.copy(uri = "content://separated", name = "Separated.txt")
+        val hits = DocumentSearchEngine.search(
+            documents = listOf(separated, exact),
+            indexedText = mapOf(
+                exact to "The contract specifies payment terms of net thirty days.",
+                separated to "Payment is due after approval. Other terms apply later."
+            ),
+            query = "payment terms"
+        )
+
+        assertEquals(exact, hits.first().document)
+        assertTrue(hits.first().score > hits.last().score)
+    }
+
+    @Test
     fun `content match returns contextual snippet`() {
         val hits = DocumentSearchEngine.search(
             documents = listOf(contract),
@@ -68,6 +85,17 @@ class DocumentSearchEngineTest {
     }
 
     @Test
+    fun `content term matching does not match inside a larger word`() {
+        val hits = DocumentSearchEngine.search(
+            documents = listOf(contract),
+            indexedText = mapOf(contract to "Internet access is included in the office agreement."),
+            query = "net"
+        )
+
+        assertTrue(hits.isEmpty())
+    }
+
+    @Test
     fun `assistant filler words are ignored`() {
         val terms = DocumentSearchEngine.tokenizeQuery(
             "Mayra please meri documents mein invoice search karo"
@@ -81,12 +109,13 @@ class DocumentSearchEngineTest {
     }
 
     @Test
-    fun `english command fillers are ignored`() {
+    fun `english command and possessive fillers are ignored`() {
         val terms = DocumentSearchEngine.tokenizeQuery(
             "Please find and show my files with payment terms"
         )
 
-        assertEquals(listOf("my", "payment", "terms"), terms)
+        assertEquals(listOf("payment", "terms"), terms)
+        assertFalse("my" in terms)
         assertFalse("please" in terms)
         assertFalse("find" in terms)
         assertFalse("show" in terms)
