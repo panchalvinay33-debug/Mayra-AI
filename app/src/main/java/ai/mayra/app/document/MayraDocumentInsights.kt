@@ -127,8 +127,8 @@ object DocumentInsightEngine {
 
     private val STOP_WORDS = setOf(
         "the", "and", "for", "with", "from", "this", "that", "are", "was", "were",
-        "have", "has", "had", "into", "about", "your", "document", "documents", "file",
-        "files", "library", "mayra", "please", "tell", "show", "find", "search", "summary",
+        "have", "has", "had", "into", "about", "your", "documents", "file",
+        "files", "library", "mayra", "please", "tell", "show", "find", "summary",
         "summarize", "mera", "meri", "mere", "mein", "hai", "kya", "ka", "ki", "ke",
         "ko", "batao", "dikhao", "दस्तावेज", "फाइल", "फ़ाइल", "बताओ", "क्या"
     )
