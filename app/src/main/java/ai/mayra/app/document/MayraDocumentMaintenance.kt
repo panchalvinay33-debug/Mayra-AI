@@ -19,7 +19,7 @@ data class DocumentMaintenanceReport(
     fun userMessage(): String = buildString {
         append("Checked $totalDocuments document${if (totalDocuments == 1) "" else "s"}. ")
         append("Indexed $indexed")
-        if (blank > 0) append(", blank $blank")
+        if (blank > 0) append(", no readable text $blank")
         if (unsupported > 0) append(", waiting for parser $unsupported")
         if (failed > 0) append(", failed $failed")
         if (truncated > 0) append(", safely limited $truncated")
@@ -39,10 +39,7 @@ data class DocumentParserCapability(
 
 enum class ParserCapabilityState { READY, FOUNDATION_ONLY, PLANNED }
 
-/**
- * Central capability catalog. Future PDF, Office and OCR implementations should register here
- * rather than spreading format checks across UI and assistant code.
- */
+/** Central parser capability catalog used by UI and maintenance diagnostics. */
 object MayraDocumentParserCatalog {
     val capabilities: List<DocumentParserCapability> = listOf(
         DocumentParserCapability(
@@ -58,8 +55,8 @@ object MayraDocumentParserCatalog {
             label = "PDF",
             extensions = setOf("pdf"),
             mimePrefixes = setOf("application/pdf"),
-            state = ParserCapabilityState.FOUNDATION_ONLY,
-            note = "Library access is ready; reliable page-text extraction still needs a PDF parser."
+            state = ParserCapabilityState.READY,
+            note = "Text-based PDFs are parsed locally, up to 100 pages, 50 MB and 500,000 indexed characters. Scanned-image PDFs still require OCR."
         ),
         DocumentParserCapability(
             id = "office",
@@ -118,7 +115,7 @@ class MayraDocumentMaintenance(
                     if (result.text.isBlank()) {
                         contentStore.remove(document.uri)
                         blank++
-                        messages += "${document.name}: no readable text"
+                        messages += "${document.name}: no readable text; scanned PDFs may require OCR"
                     } else {
                         contentStore.put(document.uri, result.text, result.truncated)
                         indexed++
