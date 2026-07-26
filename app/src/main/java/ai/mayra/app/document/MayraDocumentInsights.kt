@@ -1,5 +1,6 @@
 package ai.mayra.app.document
 
+import java.text.Normalizer
 import java.util.Locale
 
 /** A grounded answer produced only from locally indexed document text. */
@@ -19,7 +20,7 @@ enum class DocumentQueryIntent {
 /** Pure deterministic document insight engine. It never invents content outside the supplied text. */
 object DocumentInsightEngine {
     fun detectIntent(message: String): DocumentQueryIntent {
-        val normalized = message.lowercase(Locale.ROOT)
+        val normalized = normalizeForMatching(message)
         return when {
             SUMMARY_MARKERS.any(normalized::contains) -> DocumentQueryIntent.SUMMARY
             QUESTION_MARKERS.any(normalized::contains) || normalized.trim().endsWith("?") ->
@@ -53,16 +54,22 @@ object DocumentInsightEngine {
     fun answer(question: String, text: String, maxEvidence: Int = 3): Pair<String, List<String>>? {
         val queryTerms = meaningfulTokens(question).distinct()
         if (queryTerms.isEmpty()) return null
+        val meaningfulPhrase = queryTerms.takeIf { it.size > 1 }?.joinToString(" ")
 
         val ranked = splitSentences(text).mapIndexedNotNull { index, sentence ->
-            val normalized = sentence.lowercase(Locale.ROOT)
-            val matchedTerms = queryTerms.filter(normalized::contains)
+            val normalized = normalizeForMatching(sentence)
+            val matchedTerms = queryTerms.filter { normalized.containsWholeTerm(it) }
             if (matchedTerms.isEmpty()) return@mapIndexedNotNull null
 
-            val exactPhraseBonus = if (normalized.contains(question.lowercase(Locale.ROOT).trim())) 8 else 0
+            val exactPhraseBonus = if (
+                meaningfulPhrase != null && normalized.contains(meaningfulPhrase)
+            ) 8 else 0
+            val coverageBonus = if (matchedTerms.size == queryTerms.size && queryTerms.size > 1) 5 else 0
             val density = matchedTerms.size * 5
-            val occurrenceScore = matchedTerms.sumOf { normalized.countOccurrences(it).coerceAtMost(4) }
-            RankedSentence(index, sentence, density + occurrenceScore + exactPhraseBonus)
+            val occurrenceScore = matchedTerms.sumOf {
+                normalized.countWholeTermOccurrences(it).coerceAtMost(4)
+            }
+            RankedSentence(index, sentence, density + occurrenceScore + exactPhraseBonus + coverageBonus)
         }
             .sortedWith(compareByDescending<RankedSentence> { it.score }.thenBy { it.index })
             .take(maxEvidence.coerceIn(1, 5))
@@ -75,8 +82,8 @@ object DocumentInsightEngine {
     fun confidence(question: String, evidence: List<String>): Int {
         val terms = meaningfulTokens(question).distinct()
         if (terms.isEmpty() || evidence.isEmpty()) return 0
-        val combined = evidence.joinToString(" ").lowercase(Locale.ROOT)
-        val matched = terms.count(combined::contains)
+        val combined = normalizeForMatching(evidence.joinToString(" "))
+        val matched = terms.count { combined.containsWholeTerm(it) }
         return ((matched.toDouble() / terms.size) * 100).toInt().coerceIn(1, 100)
     }
 
@@ -93,9 +100,8 @@ object DocumentInsightEngine {
         .groupingBy { it }
         .eachCount()
 
-    private fun meaningfulTokens(value: String): List<String> = value
-        .lowercase(Locale.ROOT)
-        .split(Regex("[^\\p{L}\\p{N}_-]+"))
+    private fun meaningfulTokens(value: String): List<String> = normalizeForMatching(value)
+        .split(Regex("[^\\p{L}\\p{M}\\p{N}_-]+"))
         .asSequence()
         .map(String::trim)
         .filter { it.length >= 3 }
@@ -103,15 +109,19 @@ object DocumentInsightEngine {
         .take(MAX_TOKENS)
         .toList()
 
-    private fun String.countOccurrences(term: String): Int {
-        var count = 0
-        var index = indexOf(term)
-        while (index >= 0) {
-            count++
-            index = indexOf(term, index + term.length)
-        }
-        return count
-    }
+    private fun normalizeForMatching(value: String): String = Normalizer
+        .normalize(value, Normalizer.Form.NFKC)
+        .lowercase(Locale.ROOT)
+
+    private fun String.containsWholeTerm(term: String): Boolean = wholeTermRegex(term).containsMatchIn(this)
+
+    private fun String.countWholeTermOccurrences(term: String): Int = wholeTermRegex(term)
+        .findAll(this)
+        .count()
+
+    private fun wholeTermRegex(term: String): Regex = Regex(
+        "(?<![\\p{L}\\p{M}\\p{N}_-])${Regex.escape(term)}(?![\\p{L}\\p{M}\\p{N}_-])"
+    )
 
     private data class RankedSentence(val index: Int, val text: String, val score: Int)
 
@@ -127,10 +137,11 @@ object DocumentInsightEngine {
 
     private val STOP_WORDS = setOf(
         "the", "and", "for", "with", "from", "this", "that", "are", "was", "were",
-        "have", "has", "had", "into", "about", "your", "documents", "file",
+        "have", "has", "had", "into", "about", "your", "documents", "document", "file",
         "files", "library", "mayra", "please", "tell", "show", "find", "summary",
         "summarize", "mera", "meri", "mere", "mein", "hai", "kya", "ka", "ki", "ke",
-        "ko", "batao", "dikhao", "दस्तावेज", "फाइल", "फ़ाइल", "बताओ", "क्या"
+        "ko", "batao", "dikhao", "दस्तावेज", "फाइल", "फ़ाइल", "बताओ", "क्या",
+        "मेरा", "मेरी", "मेरे", "में", "का", "की", "के", "को", "खोजो", "ढूंढो", "ढूँढो"
     )
 
     private const val MAX_SENTENCE_CHARS = 700
