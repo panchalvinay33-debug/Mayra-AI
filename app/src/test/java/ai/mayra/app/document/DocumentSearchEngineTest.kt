@@ -122,6 +122,34 @@ class DocumentSearchEngineTest {
     }
 
     @Test
+    fun `Devanagari words retain combining marks and Hindi fillers are ignored`() {
+        val terms = DocumentSearchEngine.tokenizeQuery(
+            "मेरी फाइल में भुगतान की शर्तें खोजो"
+        )
+
+        assertEquals(listOf("भुगतान", "शर्तें"), terms)
+        assertFalse("मेरी" in terms)
+        assertFalse("फाइल" in terms)
+        assertFalse("खोजो" in terms)
+    }
+
+    @Test
+    fun `Hindi content search matches complete Devanagari terms`() {
+        val hits = DocumentSearchEngine.search(
+            documents = listOf(contract),
+            indexedText = mapOf(
+                contract to "इस अनुबंध में भुगतान की शर्तें तीस दिन की हैं।"
+            ),
+            query = "मेरी फाइल में भुगतान शर्तें खोजो"
+        )
+
+        assertEquals(1, hits.size)
+        assertTrue(hits.single().matchedContent)
+        assertTrue(hits.single().snippet.contains("भुगतान"))
+        assertTrue(hits.single().snippet.contains("शर्तें"))
+    }
+
+    @Test
     fun `blank or filler-only query has no results`() {
         val hits = DocumentSearchEngine.search(
             documents = listOf(invoice),
