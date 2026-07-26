@@ -29,9 +29,10 @@ class MayraRuntimeIntegrationTest {
         memory = MayraContextMemory(context)
         registry = MayraSkillRegistry()
         planner = MayraTaskPlanner()
-        brain = MayraBrainCoordinator(BrainEventBus()) {
-            BrainContextSnapshot(10, 0, 0, true, 0)
-        }
+        brain = MayraBrainCoordinator(
+            eventBus = BrainEventBus(),
+            contextProvider = { BrainContextSnapshot(10, 0, 0, true, 0) }
+        )
     }
 
     @Test
