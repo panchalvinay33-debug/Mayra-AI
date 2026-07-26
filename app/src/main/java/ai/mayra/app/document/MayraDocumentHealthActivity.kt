@@ -22,10 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MayraDocumentHealthActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +45,7 @@ class MayraDocumentHealthActivity : ComponentActivity() {
 @Composable
 private fun DocumentHealthScreen(onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val maintenance = remember(context) {
         MayraDocumentMaintenance(
             documentStore = MayraDocumentStore(context),
@@ -50,6 +55,7 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
     }
     var report by remember { mutableStateOf<DocumentMaintenanceReport?>(null) }
     var running by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     Scaffold { padding ->
         Column(
@@ -72,9 +78,19 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
 
             Button(
                 onClick = {
+                    if (running) return@Button
                     running = true
-                    report = maintenance.rebuildAll()
-                    running = false
+                    error = null
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { maintenance.rebuildAll() }
+                        }.onSuccess {
+                            report = it
+                        }.onFailure {
+                            error = it.message ?: "Library maintenance failed."
+                        }
+                        running = false
+                    }
                 },
                 enabled = !running,
                 modifier = Modifier.fillMaxWidth()
@@ -82,6 +98,9 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
                 Text(if (running) "Checking…" else "Re-index complete library")
             }
 
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
             report?.let { MaintenanceReportCard(it) }
 
             Text("Parser capabilities", fontWeight = FontWeight.SemiBold)
@@ -108,6 +127,13 @@ private fun MaintenanceReportCard(report: DocumentMaintenanceReport) {
                 fontWeight = FontWeight.SemiBold
             )
             Text(report.userMessage())
+            if (report.removedOrphanedIndexes > 0) {
+                Text(
+                    "Removed ${report.removedOrphanedIndexes} stale local index" +
+                        if (report.removedOrphanedIndexes == 1) "." else "es.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             if (report.messages.isNotEmpty()) {
                 Text("Diagnostics", fontWeight = FontWeight.Medium)
                 report.messages.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
