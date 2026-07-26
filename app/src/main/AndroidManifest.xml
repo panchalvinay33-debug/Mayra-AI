@@ -40,6 +40,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".document.MayraDocumentHealthActivity"
+            android:exported="false"
+            android:label="Mayra Library Health" />
+
         <service
             android:name=".background.MayraNotificationListener"
             android:exported="false"
