@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The isolated document-test APK requests no Android runtime or special permissions. -->
+    <uses-permission tools:node="removeAll" />
+    <permission tools:node="removeAll" />
+    <uses-feature tools:node="removeAll" />
+    <queries tools:node="removeAll" />
+
+    <application
+        android:name=".documenttest.DocumentTestApplication"
+        android:allowBackup="false"
+        android:label="Mayra Document Test"
+        android:usesCleartextTraffic="false"
+        tools:replace="android:name,android:allowBackup,android:label">
+
+        <!-- Remove all background/special-access components contributed by main and libraries. -->
+        <service tools:node="removeAll" />
+        <receiver tools:node="removeAll" />
+        <provider tools:node="removeAll" />
+
+        <!-- The full assistant UI is intentionally absent from this standalone validation app. -->
+        <activity
+            android:name=".MainActivity"
+            tools:node="remove" />
+
+        <activity
+            android:name=".document.MayraDocumentActivity"
+            android:exported="true"
+            android:label="Mayra Document Test"
+            tools:replace="android:exported,android:label">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".document.MayraDocumentHealthActivity"
+            android:exported="false"
+            android:label="Document Health"
+            tools:replace="android:exported,android:label" />
+    </application>
+</manifest>
