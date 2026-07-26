@@ -62,6 +62,7 @@ class DocumentMaintenanceTest {
             failed = 0,
             blank = 0,
             truncated = 1,
+            removedOrphanedIndexes = 0,
             messages = emptyList()
         )
         val unhealthy = healthy.copy(failed = 1, indexed = 1)
