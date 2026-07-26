@@ -43,6 +43,32 @@ class DocumentMaintenanceTest {
     }
 
     @Test
+    fun parserCatalogSeparatesReadyDocxFromLegacyDoc() {
+        val docx = MayraDocument(
+            uri = "content://docs/contract.docx",
+            name = "contract.docx",
+            mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            sizeBytes = 800,
+            addedAt = 3L
+        )
+        val legacy = docx.copy(
+            uri = "content://docs/contract.doc",
+            name = "contract.doc",
+            mimeType = "application/msword"
+        )
+
+        val docxCapability = MayraDocumentParserCatalog.capabilityFor(docx)
+        val legacyCapability = MayraDocumentParserCatalog.capabilityFor(legacy)
+
+        assertEquals("docx", docxCapability?.id)
+        assertEquals(ParserCapabilityState.READY, docxCapability?.state)
+        assertTrue(MayraDocumentParserCatalog.statusText(docx).contains("ZIP/XML"))
+        assertEquals("legacy-doc", legacyCapability?.id)
+        assertEquals(ParserCapabilityState.PLANNED, legacyCapability?.state)
+        assertTrue(MayraDocumentParserCatalog.statusText(legacy).contains("DOCX"))
+    }
+
+    @Test
     fun unknownFormatReturnsNoRegisteredParser() {
         val document = MayraDocument(
             uri = "content://docs/3",
