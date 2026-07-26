@@ -52,14 +52,44 @@ class DocumentSearchEngineTest {
     }
 
     @Test
-    fun `assistant filler words are ignored`() {
-        val terms = DocumentSearchEngine.tokenizeQuery(
-            "Mayra meri documents mein invoice search karo"
+    fun `content snippet preserves original capitalization`() {
+        val hits = DocumentSearchEngine.search(
+            documents = listOf(contract),
+            indexedText = mapOf(
+                contract to "The Payment Terms require Rahul Traders to pay within 30 Days."
+            ),
+            query = "payment terms"
         )
 
-        assertEquals(listOf("invoice", "karo"), terms)
+        assertEquals(1, hits.size)
+        assertTrue(hits.single().snippet.contains("Payment Terms"))
+        assertTrue(hits.single().snippet.contains("Rahul Traders"))
+        assertTrue(hits.single().snippet.contains("30 Days"))
+    }
+
+    @Test
+    fun `assistant filler words are ignored`() {
+        val terms = DocumentSearchEngine.tokenizeQuery(
+            "Mayra please meri documents mein invoice search karo"
+        )
+
+        assertEquals(listOf("invoice"), terms)
         assertFalse("documents" in terms)
         assertFalse("mayra" in terms)
+        assertFalse("please" in terms)
+        assertFalse("karo" in terms)
+    }
+
+    @Test
+    fun `english command fillers are ignored`() {
+        val terms = DocumentSearchEngine.tokenizeQuery(
+            "Please find and show my files with payment terms"
+        )
+
+        assertEquals(listOf("my", "payment", "terms"), terms)
+        assertFalse("please" in terms)
+        assertFalse("find" in terms)
+        assertFalse("show" in terms)
     }
 
     @Test
@@ -67,7 +97,7 @@ class DocumentSearchEngineTest {
         val hits = DocumentSearchEngine.search(
             documents = listOf(invoice),
             indexedText = mapOf(invoice to "invoice"),
-            query = "Mayra documents mein search batao"
+            query = "Mayra please documents mein search karo batao"
         )
 
         assertTrue(hits.isEmpty())
