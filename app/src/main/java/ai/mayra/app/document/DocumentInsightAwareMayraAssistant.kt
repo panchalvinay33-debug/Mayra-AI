@@ -2,12 +2,15 @@ package ai.mayra.app.document
 
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
+import ai.mayra.app.core.MayraQueryRoute
+import ai.mayra.app.core.MayraQueryRouter
 import android.content.Context
 import java.util.Locale
 
 /**
- * Offline document assistant that routes explicit library requests to deterministic search,
- * summaries, or grounded answers. Existing device-command behavior remains delegated.
+ * Offline document assistant that uses Mayra's local-first router before running deterministic
+ * document search, summaries, or grounded answers. Existing device-command behavior remains
+ * delegated when the router does not select the document route.
  */
 class DocumentInsightAwareMayraAssistant(
     private val delegate: MayraAssistant,
@@ -22,7 +25,10 @@ class DocumentInsightAwareMayraAssistant(
         message: String,
         conversation: List<MayraMessage>
     ): Result<String> {
-        if (!looksLikeDocumentQuery(message)) return delegate.reply(message, conversation)
+        val routing = MayraQueryRouter.route(message)
+        if (routing.route != MayraQueryRoute.DOCUMENTS) {
+            return delegate.reply(message, conversation)
+        }
 
         return runCatching {
             val documents = documentStore.list()
@@ -109,16 +115,4 @@ class DocumentInsightAwareMayraAssistant(
 
     private fun noMatchReply(totalDocuments: Int): String =
         "I checked $totalDocuments local document${if (totalDocuments == 1) "" else "s"}, but found no grounded answer in the indexed text. Try a document name or more specific keywords. Plain-text compatible files can be indexed now; reliable PDF and DOC parsing is the next parser milestone."
-
-    private fun looksLikeDocumentQuery(message: String): Boolean {
-        val normalized = message.lowercase(Locale.ROOT)
-        return DOCUMENT_MARKERS.any(normalized::contains)
-    }
-
-    private companion object {
-        val DOCUMENT_MARKERS = listOf(
-            "document", "documents", "pdf", "file", "files", "library",
-            "दस्तावेज", "फाइल", "फ़ाइल", "पीडीएफ"
-        )
-    }
 }
