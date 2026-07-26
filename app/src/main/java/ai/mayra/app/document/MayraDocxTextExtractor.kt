@@ -111,20 +111,20 @@ class MayraDocxTextExtractor(private val context: Context) {
             setInput(ByteArrayInputStream(bytes), StandardCharsets.UTF_8.name())
         }
 
+        var textDepth = -1
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT && output.length <= MAX_INDEXED_CHARS) {
             when (event) {
                 XmlPullParser.START_TAG -> when (parser.name) {
+                    "t", "instrText", "delText" -> textDepth = parser.depth
                     "tab" -> output.append('\t')
                     "br", "cr" -> output.append('\n')
                 }
-                XmlPullParser.TEXT -> if (parser.depth > 0 && parser.name == null) {
-                    val parentName = runCatching { parser.getNameAtDepth(parser.depth) }.getOrNull()
-                    if (parentName == "t" || parentName == "instrText" || parentName == "delText") {
-                        output.append(parser.text)
-                    }
+                XmlPullParser.TEXT -> if (textDepth >= 0 && parser.depth == textDepth) {
+                    output.append(parser.text)
                 }
                 XmlPullParser.END_TAG -> when (parser.name) {
+                    "t", "instrText", "delText" -> textDepth = -1
                     "p", "tr" -> output.append('\n')
                     "tc" -> output.append('\t')
                 }
@@ -132,9 +132,6 @@ class MayraDocxTextExtractor(private val context: Context) {
             event = parser.next()
         }
     }
-
-    private fun XmlPullParser.getNameAtDepth(targetDepth: Int): String? =
-        if (depth == targetDepth) name else null
 
     private fun isReadableWordXml(name: String): Boolean =
         name == MAIN_DOCUMENT_PART ||
