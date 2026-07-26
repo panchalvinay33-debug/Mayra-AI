@@ -19,6 +19,7 @@ import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.document.DocumentAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import android.app.Application
 import java.util.Calendar
@@ -28,10 +29,14 @@ class MayraApplication : Application() {
         super.onCreate()
 
         val actionExecutor = AndroidActionExecutor(applicationContext)
-        MayraRuntime.assistant = LocalMayraAssistant(
+        val localAssistant = LocalMayraAssistant(
             LocalCommandEngine(
                 actionDispatcher = ActionDispatcher(actionExecutor)
             )
+        )
+        MayraRuntime.assistant = DocumentAwareMayraAssistant(
+            delegate = localAssistant,
+            context = applicationContext
         )
 
         val eventBus = BrainEventBus()
