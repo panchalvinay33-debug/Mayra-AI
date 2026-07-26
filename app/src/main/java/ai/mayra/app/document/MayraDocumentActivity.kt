@@ -204,17 +204,25 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(
                     Modifier.fillMaxWidth().padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text("Document intelligence status", fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Ready: persistent library access, metadata search, plain-text extraction, local full-text search, snippets and Mayra chat lookup. Pending: reliable PDF/DOC page parsing, OCR and generated summaries.",
+                        "Ready: persistent library access, metadata and full-text search, plain-text extraction, snippets, extractive summaries, grounded document Q&A and Mayra chat lookup. Pending: reliable PDF/DOC page parsing and OCR.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
                         "In chat, try: ‘Search my documents for payment terms’ or ‘मेरी files में invoice search करो’.",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    OutlinedButton(
+                        onClick = {
+                            context.startActivity(Intent(context, MayraDocumentHealthActivity::class.java))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Open Library Health")
+                    }
                 }
             }
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
