@@ -33,7 +33,7 @@ object MayraQueryRouter {
         val questionSignals = QUESTION_MARKERS.filter { marker ->
             normalized.startsWithMarker(marker) || normalized.containsMarker(marker)
         }
-        val deviceSignals = DEVICE_ACTION_MARKERS.filter { marker -> normalized.startsWith(marker) }
+        val deviceSignals = DEVICE_ACTION_MARKERS.filter(normalized::startsWith)
 
         if (deviceSignals.isNotEmpty() && insightSignals.isEmpty() && questionSignals.isEmpty()) {
             return MayraRoutingDecision(
@@ -72,7 +72,10 @@ object MayraQueryRouter {
         .containsMatchIn(this)
 
     private fun markerRegex(marker: String, anchored: Boolean = false): Regex {
-        val escaped = Regex.escape(normalize(marker)).replace("\\ ", "\\s+")
+        val escaped = normalize(marker)
+            .split(Regex("\\s+"))
+            .filter(String::isNotBlank)
+            .joinToString("\\s+") { Regex.escape(it) }
         val prefix = if (anchored) "^" else "(?<![\\p{L}\\p{M}\\p{N}_-])"
         return Regex("$prefix$escaped(?![\\p{L}\\p{M}\\p{N}_-])")
     }
