@@ -3,6 +3,7 @@ package ai.mayra.app.document
 import ai.mayra.app.TestMayraApplication
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -21,6 +22,7 @@ class MayraPdfExtractionIntegrationTest {
     @Test
     fun extractsSearchableTextFromGeneratedPdf() {
         val context = ApplicationProvider.getApplicationContext<TestMayraApplication>()
+        PDFBoxResourceLoader.init(context)
         val file = File(context.cacheDir, "generated-text.pdf")
         PDDocument().use { pdf ->
             val page = PDPage()
@@ -54,6 +56,7 @@ class MayraPdfExtractionIntegrationTest {
     @Test
     fun emptyPdfReturnsBlankSuccessfulExtractionForFutureOcrHandling() {
         val context = ApplicationProvider.getApplicationContext<TestMayraApplication>()
+        PDFBoxResourceLoader.init(context)
         val file = File(context.cacheDir, "generated-empty.pdf")
         PDDocument().use { pdf ->
             pdf.addPage(PDPage())
