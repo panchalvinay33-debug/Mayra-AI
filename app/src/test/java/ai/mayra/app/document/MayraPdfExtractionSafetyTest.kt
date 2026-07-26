@@ -30,7 +30,7 @@ class MayraPdfExtractionSafetyTest {
     }
 
     @Test
-    fun docxRemainsExplicitlyUnsupported() {
+    fun docxIsRoutedToParserInsteadOfUnsupportedFallback() {
         val document = MayraDocument(
             uri = "content://missing/report.docx",
             name = "report.docx",
@@ -41,7 +41,7 @@ class MayraPdfExtractionSafetyTest {
 
         val result = MayraDocumentTextExtractor(context).extract(document)
 
-        assertTrue(result is DocumentExtractionResult.Unsupported)
-        assertTrue((result as DocumentExtractionResult.Unsupported).reason.contains("DOC/DOCX"))
+        assertTrue(result is DocumentExtractionResult.Failure)
+        assertTrue((result as DocumentExtractionResult.Failure).reason.contains("DOCX stream"))
     }
 }
