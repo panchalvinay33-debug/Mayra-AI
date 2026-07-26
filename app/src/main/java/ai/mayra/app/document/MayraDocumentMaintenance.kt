@@ -59,15 +59,22 @@ object MayraDocumentParserCatalog {
             note = "Text-based PDFs are parsed locally, up to 100 pages, 50 MB and 500,000 indexed characters. Scanned-image PDFs still require OCR."
         ),
         DocumentParserCapability(
-            id = "office",
-            label = "Word documents",
-            extensions = setOf("doc", "docx"),
+            id = "docx",
+            label = "Word DOCX",
+            extensions = setOf("docx"),
             mimePrefixes = setOf(
-                "application/msword",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             ),
+            state = ParserCapabilityState.READY,
+            note = "DOCX text, headers, footers, footnotes and endnotes are extracted locally with ZIP/XML safety limits."
+        ),
+        DocumentParserCapability(
+            id = "legacy-doc",
+            label = "Legacy Word DOC",
+            extensions = setOf("doc"),
+            mimePrefixes = setOf("application/msword"),
             state = ParserCapabilityState.PLANNED,
-            note = "Library access is ready; DOC/DOCX text parsing is not yet implemented."
+            note = "Legacy binary DOC parsing is not implemented; export the file as DOCX for local indexing."
         ),
         DocumentParserCapability(
             id = "ocr",
