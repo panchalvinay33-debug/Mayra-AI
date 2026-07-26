@@ -23,7 +23,7 @@ class DocumentMaintenanceTest {
     }
 
     @Test
-    fun parserCatalogRecognizesPdfFoundation() {
+    fun parserCatalogRecognizesReadyPdfParserAndSafetyLimits() {
         val document = MayraDocument(
             uri = "content://docs/2",
             name = "invoice.pdf",
@@ -33,10 +33,13 @@ class DocumentMaintenanceTest {
         )
 
         val capability = MayraDocumentParserCatalog.capabilityFor(document)
+        val status = MayraDocumentParserCatalog.statusText(document)
 
         assertEquals("pdf", capability?.id)
-        assertEquals(ParserCapabilityState.FOUNDATION_ONLY, capability?.state)
-        assertTrue(MayraDocumentParserCatalog.statusText(document).contains("PDF"))
+        assertEquals(ParserCapabilityState.READY, capability?.state)
+        assertTrue(status.contains("100 pages"))
+        assertTrue(status.contains("50 MB"))
+        assertTrue(status.contains("OCR"))
     }
 
     @Test
