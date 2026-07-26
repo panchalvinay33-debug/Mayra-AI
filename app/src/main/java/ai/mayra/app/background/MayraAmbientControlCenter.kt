@@ -40,7 +40,10 @@ class AmbientPreferenceStore(context: Context) {
             .putBoolean(KEY_EVENING_BRIEFING, updated.eveningBriefingEnabled)
             .putBoolean(KEY_SENSITIVE_BRIEFINGS, updated.sensitiveContentInBriefings)
             .apply()
-        MayraBriefingScheduler.sync(preferencesContext)
+
+        // Saving the user's preference is authoritative. Rescheduling is best-effort and must not
+        // make the setting change fail when WorkManager is temporarily unavailable.
+        runCatching { MayraBriefingScheduler.sync(preferencesContext) }
         return updated
     }
 
