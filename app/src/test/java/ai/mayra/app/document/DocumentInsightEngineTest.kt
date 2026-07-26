@@ -115,12 +115,12 @@ class DocumentInsightEngineTest {
     }
 
     @Test
-    fun confidenceDoesNotCountSubstringOnlyMatches() {
+    fun confidenceIsZeroForSubstringOnlyMatches() {
         val confidence = DocumentInsightEngine.confidence(
             "date",
             listOf("The latest update was installed successfully.")
         )
 
-        assertEquals(1, confidence)
+        assertEquals(0, confidence)
     }
 }
