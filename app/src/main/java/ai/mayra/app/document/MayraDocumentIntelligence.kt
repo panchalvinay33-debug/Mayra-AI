@@ -156,6 +156,7 @@ object DocumentSearchEngine {
     ): List<DocumentSearchHit> {
         val terms = tokenizeQuery(query)
         if (terms.isEmpty()) return emptyList()
+        val phrase = terms.takeIf { it.size > 1 }?.joinToString(" ")
 
         return documents.mapNotNull { document ->
             val name = document.name.lowercase(Locale.ROOT)
@@ -164,22 +165,44 @@ object DocumentSearchEngine {
             val normalizedContent = originalContent.lowercase(Locale.ROOT)
             var score = 0
             var matchedContent = false
+            var matchedTerms = 0
 
             terms.forEach { term ->
-                if (name == term) score += 14
-                if (name.contains(term)) score += 8
-                if (mime.contains(term)) score += 2
-                val occurrences = normalizedContent.countOccurrences(term).coerceAtMost(8)
+                var termMatched = false
+                if (name == term) {
+                    score += 14
+                    termMatched = true
+                }
+                if (name.contains(term)) {
+                    score += 8
+                    termMatched = true
+                }
+                if (mime.contains(term)) {
+                    score += 2
+                    termMatched = true
+                }
+                val occurrences = normalizedContent.countWholeTermOccurrences(term).coerceAtMost(8)
                 if (occurrences > 0) {
                     score += 3 + occurrences
                     matchedContent = true
+                    termMatched = true
+                }
+                if (termMatched) matchedTerms++
+            }
+
+            if (phrase != null) {
+                if (name.contains(phrase)) score += 12
+                if (normalizedContent.contains(phrase)) {
+                    score += 6
+                    matchedContent = true
                 }
             }
+            if (matchedTerms == terms.size && terms.size > 1) score += 4
 
             if (score == 0) null else DocumentSearchHit(
                 document = document,
                 score = score,
-                snippet = if (matchedContent) contentSnippet(originalContent, terms) else document.name,
+                snippet = if (matchedContent) contentSnippet(originalContent, terms, phrase) else document.name,
                 matchedContent = matchedContent
             )
         }.sortedWith(
@@ -200,9 +223,11 @@ object DocumentSearchEngine {
         .take(12)
         .toList()
 
-    private fun contentSnippet(content: String, terms: List<String>): String {
+    private fun contentSnippet(content: String, terms: List<String>, phrase: String?): String {
         val normalized = content.lowercase(Locale.ROOT)
-        val firstIndex = terms.map { normalized.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: 0
+        val phraseIndex = phrase?.let(normalized::indexOf)?.takeIf { it >= 0 }
+        val termIndex = terms.mapNotNull { normalized.firstWholeTermIndex(it) }.minOrNull()
+        val firstIndex = phraseIndex ?: termIndex ?: 0
         val start = (firstIndex - 70).coerceAtLeast(0)
         val end = (firstIndex + 180).coerceAtMost(content.length)
         val prefix = if (start > 0) "…" else ""
@@ -210,21 +235,22 @@ object DocumentSearchEngine {
         return prefix + content.substring(start, end).replace(Regex("\\s+"), " ").trim() + suffix
     }
 
-    private fun String.countOccurrences(term: String): Int {
-        var count = 0
-        var index = indexOf(term)
-        while (index >= 0) {
-            count++
-            index = indexOf(term, index + term.length)
-        }
-        return count
-    }
+    private fun String.countWholeTermOccurrences(term: String): Int =
+        wholeTermRegex(term).findAll(this).count()
+
+    private fun String.firstWholeTermIndex(term: String): Int? =
+        wholeTermRegex(term).find(this)?.range?.first
+
+    private fun wholeTermRegex(term: String): Regex = Regex(
+        "(?<![\\p{L}\\p{N}_-])${Regex.escape(term)}(?![\\p{L}\\p{N}_-])"
+    )
 
     private val STOP_WORDS = setOf(
-        "the", "and", "for", "with", "from", "this", "that", "file", "files",
-        "document", "documents", "library", "mayra", "please", "show", "find", "tell",
-        "mera", "meri", "mere", "mein", "me", "hai", "ka", "ki", "ke", "ko", "kya",
-        "batao", "dikhao", "karo", "kar", "karna", "do", "de", "search"
+        "the", "and", "for", "with", "from", "this", "that", "my", "your", "our",
+        "in", "to", "of", "on", "about", "file", "files", "document", "documents",
+        "library", "mayra", "please", "show", "find", "tell", "mera", "meri", "mere",
+        "mein", "me", "hai", "ka", "ki", "ke", "ko", "kya", "batao", "dikhao",
+        "karo", "kar", "karna", "do", "de", "search"
     )
 }
 
