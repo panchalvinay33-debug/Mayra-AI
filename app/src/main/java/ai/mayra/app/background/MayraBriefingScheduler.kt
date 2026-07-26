@@ -125,7 +125,7 @@ class BriefingCache(context: Context) {
 object MayraBriefingNotifier {
     private const val CHANNEL_ID = "mayra_briefings"
 
-    @SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission", "NotificationPermission")
     fun show(context: Context, kind: BriefingKind, text: String) {
         val appContext = context.applicationContext
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
