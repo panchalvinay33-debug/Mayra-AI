@@ -5,6 +5,9 @@ import ai.mayra.app.core.MayraMessage
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.security.MessageDigest
 import java.util.Locale
 
@@ -33,48 +36,103 @@ class MayraDocumentTextExtractor(private val context: Context) {
     fun extract(document: MayraDocument): DocumentExtractionResult {
         val mimeType = document.mimeType.lowercase(Locale.ROOT)
         val name = document.name.lowercase(Locale.ROOT)
+        val isPdf = mimeType == PDF_MIME || name.endsWith(".pdf")
         val textCompatible = mimeType.startsWith("text/") ||
+            mimeType == "application/json" || mimeType == "application/xml" ||
             name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".csv") ||
             name.endsWith(".json") || name.endsWith(".xml") || name.endsWith(".log")
 
-        if (!textCompatible) {
-            return DocumentExtractionResult.Unsupported(
-                "Text extraction is currently available for plain-text documents. PDF and DOC parsing require a dedicated parser milestone."
+        return when {
+            isPdf -> extractPdf(document)
+            textCompatible -> extractPlainText(document)
+            else -> DocumentExtractionResult.Unsupported(
+                "Text extraction is available for plain-text and PDF documents. DOC/DOCX and OCR require dedicated parser milestones."
+            )
+        }
+    }
+
+    private fun extractPlainText(document: MayraDocument): DocumentExtractionResult = runCatching {
+        context.contentResolver.openInputStream(Uri.parse(document.uri))?.bufferedReader()?.use { reader ->
+            val buffer = CharArray(BUFFER_SIZE)
+            val output = StringBuilder()
+            var truncated = false
+            while (true) {
+                val read = reader.read(buffer)
+                if (read <= 0) break
+                val remaining = MAX_INDEXED_CHARS - output.length
+                if (remaining <= 0) {
+                    truncated = true
+                    break
+                }
+                output.append(buffer, 0, minOf(read, remaining))
+                if (output.length >= MAX_INDEXED_CHARS) {
+                    truncated = reader.read() >= 0
+                    break
+                }
+            }
+            DocumentExtractionResult.Success(
+                text = normalizeDocumentText(output.toString()),
+                truncated = truncated
+            )
+        } ?: DocumentExtractionResult.Failure("The document stream could not be opened.")
+    }.getOrElse {
+        DocumentExtractionResult.Failure(it.message ?: "Text extraction failed.")
+    }
+
+    private fun extractPdf(document: MayraDocument): DocumentExtractionResult {
+        if (document.sizeBytes > MAX_PDF_BYTES) {
+            return DocumentExtractionResult.Failure(
+                "This PDF is larger than the safe ${MAX_PDF_BYTES / 1_048_576} MB indexing limit."
             )
         }
 
         return runCatching {
-            context.contentResolver.openInputStream(Uri.parse(document.uri))?.bufferedReader()?.use { reader ->
-                val buffer = CharArray(BUFFER_SIZE)
-                val output = StringBuilder()
-                var truncated = false
-                while (true) {
-                    val read = reader.read(buffer)
-                    if (read <= 0) break
-                    val remaining = MAX_INDEXED_CHARS - output.length
-                    if (remaining <= 0) {
-                        truncated = true
-                        break
+            PDFBoxResourceLoader.init(context.applicationContext)
+            context.contentResolver.openInputStream(Uri.parse(document.uri))?.use { input ->
+                PDDocument.load(input).use { pdf ->
+                    if (pdf.isEncrypted) {
+                        return@use DocumentExtractionResult.Failure(
+                            "This PDF is password-protected or encrypted and cannot be indexed without a password."
+                        )
                     }
-                    output.append(buffer, 0, minOf(read, remaining))
-                    if (output.length >= MAX_INDEXED_CHARS) {
-                        truncated = reader.read() >= 0
-                        break
+
+                    val totalPages = pdf.numberOfPages
+                    if (totalPages <= 0) {
+                        return@use DocumentExtractionResult.Success(text = "", truncated = false)
                     }
+
+                    val indexedPages = minOf(totalPages, MAX_PDF_PAGES)
+                    val extracted = PDFTextStripper().apply {
+                        startPage = 1
+                        endPage = indexedPages
+                        sortByPosition = true
+                    }.getText(pdf)
+                    val normalized = normalizeDocumentText(extracted)
+                    val truncated = totalPages > indexedPages || normalized.length > MAX_INDEXED_CHARS
+                    DocumentExtractionResult.Success(
+                        text = normalized.take(MAX_INDEXED_CHARS),
+                        truncated = truncated
+                    )
                 }
-                DocumentExtractionResult.Success(
-                    text = normalizeDocumentText(output.toString()),
-                    truncated = truncated
-                )
-            } ?: DocumentExtractionResult.Failure("The document stream could not be opened.")
-        }.getOrElse {
-            DocumentExtractionResult.Failure(it.message ?: "Text extraction failed.")
+            } ?: DocumentExtractionResult.Failure("The PDF stream could not be opened.")
+        }.getOrElse { error ->
+            val message = error.message.orEmpty()
+            val reason = when {
+                message.contains("password", ignoreCase = true) ||
+                    message.contains("decrypt", ignoreCase = true) ->
+                    "This PDF is password-protected or encrypted and cannot be indexed without a password."
+                else -> message.ifBlank { "PDF text extraction failed. The file may be damaged or unsupported." }
+            }
+            DocumentExtractionResult.Failure(reason)
         }
     }
 
     private companion object {
         const val BUFFER_SIZE = 8_192
         const val MAX_INDEXED_CHARS = 500_000
+        const val MAX_PDF_PAGES = 100
+        const val MAX_PDF_BYTES = 50L * 1_048_576L
+        const val PDF_MIME = "application/pdf"
     }
 }
 
@@ -281,7 +339,7 @@ class DocumentAwareMayraAssistant(
 
             val hits = search.search(message, limit = 5)
             if (hits.isEmpty()) {
-                return@runCatching "I checked ${documents.size} document${if (documents.size == 1) "" else "s"} in your local Mayra Library, but found no matching title or indexed text. Plain-text files can be indexed now; PDF and DOC text extraction is a later parser milestone."
+                return@runCatching "I checked ${documents.size} document${if (documents.size == 1) "" else "s"} in your local Mayra Library, but found no matching title or indexed text. Plain-text and text-based PDF files can be indexed now; DOC/DOCX and OCR remain future parser milestones."
             }
 
             buildString {
