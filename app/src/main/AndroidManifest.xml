@@ -49,13 +49,8 @@
 
         <activity
             android:name=".document.MayraDocumentHealthActivity"
-            android:exported="true"
-            android:label="Mayra Library Health">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:label="Mayra Library Health" />
 
         <service
             android:name=".background.MayraNotificationListener"
