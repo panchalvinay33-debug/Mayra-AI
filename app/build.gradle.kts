@@ -18,23 +18,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildFeatures { compose = true }
+
     buildTypes {
         create("documentTest") {
-            initWith(getByName("debug"))
+            initWith(getByName("release"))
             applicationIdSuffix = ".documenttest"
-            versionNameSuffix = "-document-test"
             isDebuggable = false
             isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("debug")
-            matchingFallbacks += listOf("debug")
+            matchingFallbacks += listOf("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
-
-    buildFeatures { compose = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -78,6 +77,8 @@ dependencies {
     implementation("androidx.room:room-runtime:2.7.2")
     implementation("androidx.room:room-ktx:2.7.2")
     ksp("androidx.room:room-compiler:2.7.2")
+
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
