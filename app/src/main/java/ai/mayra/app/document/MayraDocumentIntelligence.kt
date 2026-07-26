@@ -112,6 +112,18 @@ class MayraDocumentContentStore(context: Context) {
         preferences.edit().remove(key(uri)).apply()
     }
 
+    /** Removes indexes whose documents no longer exist in the Mayra Library. */
+    fun removeExcept(uris: Set<String>): Int {
+        val retainedKeys = uris.mapTo(mutableSetOf(), ::key)
+        val orphanedKeys = preferences.all.keys.filterNot(retainedKeys::contains)
+        if (orphanedKeys.isEmpty()) return 0
+
+        preferences.edit().apply {
+            orphanedKeys.forEach(::remove)
+        }.apply()
+        return orphanedKeys.size
+    }
+
     private fun key(uri: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray())
         return Base64.encodeToString(digest, Base64.NO_WRAP or Base64.URL_SAFE)
