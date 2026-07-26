@@ -69,6 +69,31 @@ class DocumentInsightEngineTest {
     }
 
     @Test
+    fun answerDoesNotMatchQueryInsideLargerWords() {
+        val result = DocumentInsightEngine.answer(
+            "What is the date?",
+            "The latest update was installed successfully. No schedule is included here."
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun hindiAnswerPreservesCombiningMarksAndFindsGroundedEvidence() {
+        val result = DocumentInsightEngine.answer(
+            "भुगतान की तारीख क्या है?",
+            "इस चालान की भुगतान तारीख 15 अगस्त 2026 है। कार्यालय सोमवार को बंद रहेगा।"
+        )
+
+        assertNotNull(result)
+        val (answer, evidence) = result!!
+        assertEquals(1, evidence.size)
+        assertTrue(answer.contains("भुगतान तारीख"))
+        assertTrue(answer.contains("15 अगस्त 2026"))
+        assertFalse(answer.contains("कार्यालय सोमवार"))
+    }
+
+    @Test
     fun answerReturnsNullWhenTextHasNoGroundedMatch() {
         val result = DocumentInsightEngine.answer(
             "What is the cancellation policy?",
@@ -87,5 +112,15 @@ class DocumentInsightEngineTest {
 
         assertTrue(confidence >= 60)
         assertTrue(confidence <= 100)
+    }
+
+    @Test
+    fun confidenceDoesNotCountSubstringOnlyMatches() {
+        val confidence = DocumentInsightEngine.confidence(
+            "date",
+            listOf("The latest update was installed successfully.")
+        )
+
+        assertEquals(1, confidence)
     }
 }
