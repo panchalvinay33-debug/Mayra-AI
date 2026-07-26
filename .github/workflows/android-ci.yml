@@ -60,6 +60,32 @@ jobs:
           set -o pipefail
           gradle --no-daemon :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-debug.log
 
+      - name: Verify permission-minimal debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
+          test -n "$APK"
+          test -x "$AAPT"
+          "$AAPT" dump permissions "$APK" | tee build/ci/debug-apk-permissions.log
+
+          forbidden=(
+            android.permission.RECORD_AUDIO
+            android.permission.READ_CONTACTS
+            android.permission.CALL_PHONE
+            android.permission.SEND_SMS
+            android.permission.POST_NOTIFICATIONS
+            android.permission.SCHEDULE_EXACT_ALARM
+            android.permission.RECEIVE_BOOT_COMPLETED
+          )
+          for permission in "${forbidden[@]}"; do
+            if grep -Fq "$permission" build/ci/debug-apk-permissions.log; then
+              echo "Forbidden debug permission found: $permission" >&2
+              exit 1
+            fi
+          done
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
