@@ -10,7 +10,6 @@ data class DocumentMaintenanceReport(
     val failed: Int,
     val blank: Int,
     val truncated: Int,
-    val removedOrphanedIndexes: Int,
     val messages: List<String>
 ) {
     val completed: Int get() = indexed + unsupported + failed + blank
@@ -23,7 +22,6 @@ data class DocumentMaintenanceReport(
         if (unsupported > 0) append(", waiting for parser $unsupported")
         if (failed > 0) append(", failed $failed")
         if (truncated > 0) append(", safely limited $truncated")
-        if (removedOrphanedIndexes > 0) append(", cleaned $removedOrphanedIndexes old index${if (removedOrphanedIndexes == 1) "" else "es"}")
         append('.')
     }
 }
@@ -136,7 +134,6 @@ class MayraDocumentMaintenance(
             }
         }
 
-        val removed = contentStore.removeExcept(documents.mapTo(mutableSetOf()) { it.uri })
         return DocumentMaintenanceReport(
             totalDocuments = documents.size,
             indexed = indexed,
@@ -144,7 +141,6 @@ class MayraDocumentMaintenance(
             failed = failed,
             blank = blank,
             truncated = truncated,
-            removedOrphanedIndexes = removed,
             messages = messages.take(20)
         )
     }
