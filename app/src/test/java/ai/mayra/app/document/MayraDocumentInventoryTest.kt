@@ -51,6 +51,35 @@ class MayraDocumentInventoryTest {
     }
 
     @Test
+    fun freshnessCountsCurrentLegacyAndStaleIndexes() {
+        val current = document("content://docs/current", "current.pdf", "application/pdf")
+        val legacy = document("content://docs/legacy", "legacy.txt", "text/plain")
+        val sourceStale = document("content://docs/source-stale", "source.docx", DOCX_MIME)
+        val parserStale = document("content://docs/parser-stale", "parser.pdf", "application/pdf")
+        val documents = listOf(current, legacy, sourceStale, parserStale)
+
+        val inventory = MayraDocumentInventory.build(
+            documents = documents,
+            indexedUris = documents.mapTo(mutableSetOf()) { it.uri },
+            indexStates = mapOf(
+                current.uri to DocumentIndexState.CURRENT,
+                legacy.uri to DocumentIndexState.LEGACY,
+                sourceStale.uri to DocumentIndexState.STALE_SOURCE,
+                parserStale.uri to DocumentIndexState.STALE_PARSER
+            )
+        )
+
+        assertEquals(1, inventory.currentIndexes)
+        assertEquals(1, inventory.legacyIndexes)
+        assertEquals(1, inventory.staleSourceIndexes)
+        assertEquals(1, inventory.staleParserIndexes)
+        assertEquals(2, inventory.staleIndexes)
+        assertFalse(inventory.fullyIndexed)
+        assertTrue(inventory.userMessage().contains("1 legacy index"))
+        assertTrue(inventory.userMessage().contains("2 stale"))
+    }
+
+    @Test
     fun fullyIndexedRequiresAtLeastOneDocument() {
         val document = document("content://docs/one", "one.md", "text/markdown")
         val inventory = MayraDocumentInventory.build(listOf(document), setOf(document.uri))
@@ -59,6 +88,19 @@ class MayraDocumentInventoryTest {
         assertEquals(0, inventory.needsIndexing)
         assertTrue(inventory.userMessage().contains("1 saved document"))
         assertTrue(inventory.userMessage().contains("1 indexed"))
+    }
+
+    @Test
+    fun currentFingerprintKeepsFullyIndexedTrue() {
+        val document = document("content://docs/one", "one.md", "text/markdown")
+        val inventory = MayraDocumentInventory.build(
+            documents = listOf(document),
+            indexedUris = setOf(document.uri),
+            indexStates = mapOf(document.uri to DocumentIndexState.CURRENT)
+        )
+
+        assertTrue(inventory.fullyIndexed)
+        assertEquals(1, inventory.currentIndexes)
     }
 
     @Test
@@ -80,4 +122,9 @@ class MayraDocumentInventoryTest {
         sizeBytes = 100,
         addedAt = 1L
     )
+
+    private companion object {
+        const val DOCX_MIME =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    }
 }
