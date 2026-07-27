@@ -153,19 +153,16 @@ class MayraDocumentIndexMetadataStore(context: Context) {
             recordedAt,
             source.lastModifiedAt
         ).joinToString(SEPARATOR)
-        preferences.edit().putString(key(document.uri), encoded).apply()
-        return true
+        return preferences.edit().putString(key(document.uri), encoded).commit()
     }
 
-    fun remove(uri: String) {
-        preferences.edit().remove(key(uri)).apply()
-    }
+    fun remove(uri: String): Boolean = preferences.edit().remove(key(uri)).commit()
 
     fun removeExcept(uris: Set<String>): Int {
         val retainedKeys = uris.mapTo(mutableSetOf(), ::key)
         val orphaned = preferences.all.keys.filterNot(retainedKeys::contains)
         if (orphaned.isEmpty()) return 0
-        preferences.edit().apply { orphaned.forEach(::remove) }.apply()
+        preferences.edit().apply { orphaned.forEach(::remove) }.commit()
         return orphaned.size
     }
 
