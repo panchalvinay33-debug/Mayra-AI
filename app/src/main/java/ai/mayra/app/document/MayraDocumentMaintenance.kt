@@ -11,19 +11,27 @@ data class DocumentMaintenanceReport(
     val blank: Int,
     val truncated: Int,
     val removedOrphanedIndexes: Int,
-    val messages: List<String>
+    val messages: List<String>,
+    val skippedCurrent: Int = 0,
+    val refreshedLegacy: Int = 0,
+    val refreshedStale: Int = 0,
+    val removedOrphanedMetadata: Int = 0
 ) {
-    val completed: Int get() = indexed + unsupported + failed + blank
+    val completed: Int get() = indexed + unsupported + failed + blank + skippedCurrent
     val healthy: Boolean get() = failed == 0 && completed == totalDocuments
 
     fun userMessage(): String = buildString {
         append("Checked $totalDocuments document${if (totalDocuments == 1) "" else "s"}. ")
         append("Indexed $indexed")
+        if (skippedCurrent > 0) append(", already current $skippedCurrent")
+        if (refreshedLegacy > 0) append(", upgraded legacy indexes $refreshedLegacy")
+        if (refreshedStale > 0) append(", refreshed stale indexes $refreshedStale")
         if (blank > 0) append(", no readable text $blank")
         if (unsupported > 0) append(", waiting for parser $unsupported")
         if (failed > 0) append(", failed $failed")
         if (truncated > 0) append(", safely limited $truncated")
         if (removedOrphanedIndexes > 0) append(", removed stale indexes $removedOrphanedIndexes")
+        if (removedOrphanedMetadata > 0) append(", removed stale metadata $removedOrphanedMetadata")
         append('.')
     }
 }
@@ -104,37 +112,74 @@ object MayraDocumentParserCatalog {
 class MayraDocumentMaintenance(
     private val documentStore: MayraDocumentStore,
     private val contentStore: MayraDocumentContentStore,
-    private val extractor: MayraDocumentTextExtractor
+    private val extractor: MayraDocumentTextExtractor,
+    private val metadataStore: MayraDocumentIndexMetadataStore? = null
 ) {
-    fun rebuildAll(): DocumentMaintenanceReport {
+    /**
+     * Rebuilds only missing, legacy or stale indexes by default. Set [force] to true for a full
+     * parser verification pass. Existing stale content is removed if refresh fails, preventing
+     * outdated evidence from being returned by search or grounded Q&A.
+     */
+    fun rebuildAll(force: Boolean = false): DocumentMaintenanceReport {
         val documents = documentStore.list()
-        val removedOrphanedIndexes = contentStore.removeExcept(documents.mapTo(mutableSetOf()) { it.uri })
+        val currentUris = documents.mapTo(mutableSetOf()) { it.uri }
+        val removedOrphanedIndexes = contentStore.removeExcept(currentUris)
+        val removedOrphanedMetadata = metadataStore?.removeExcept(currentUris) ?: 0
         var indexed = 0
         var unsupported = 0
         var failed = 0
         var blank = 0
         var truncated = 0
+        var skippedCurrent = 0
+        var refreshedLegacy = 0
+        var refreshedStale = 0
         val messages = mutableListOf<String>()
 
         documents.forEach { document ->
+            val existing = contentStore.get(document.uri)
+            val state = metadataStore?.state(document, existing != null)
+                ?: if (existing == null) DocumentIndexState.MISSING else DocumentIndexState.LEGACY
+
+            if (!force && state == DocumentIndexState.CURRENT) {
+                skippedCurrent++
+                return@forEach
+            }
+
+            if (state == DocumentIndexState.UNSUPPORTED) {
+                contentStore.remove(document.uri)
+                metadataStore?.remove(document.uri)
+                unsupported++
+                messages += "${document.name}: ${MayraDocumentParserCatalog.statusText(document)}"
+                return@forEach
+            }
+
             when (val result = extractor.extract(document)) {
                 is DocumentExtractionResult.Success -> {
                     if (result.text.isBlank()) {
                         contentStore.remove(document.uri)
+                        metadataStore?.remove(document.uri)
                         blank++
                         messages += "${document.name}: no readable text; scanned PDFs may require OCR"
                     } else {
                         contentStore.put(document.uri, result.text, result.truncated)
+                        metadataStore?.record(document)
                         indexed++
+                        if (state == DocumentIndexState.LEGACY) refreshedLegacy++
+                        if (state == DocumentIndexState.STALE_SOURCE || state == DocumentIndexState.STALE_PARSER) {
+                            refreshedStale++
+                        }
                         if (result.truncated) truncated++
                     }
                 }
                 is DocumentExtractionResult.Unsupported -> {
                     contentStore.remove(document.uri)
+                    metadataStore?.remove(document.uri)
                     unsupported++
                     messages += "${document.name}: ${result.reason}"
                 }
                 is DocumentExtractionResult.Failure -> {
+                    contentStore.remove(document.uri)
+                    metadataStore?.remove(document.uri)
                     failed++
                     messages += "${document.name}: ${result.reason}"
                 }
@@ -149,7 +194,11 @@ class MayraDocumentMaintenance(
             blank = blank,
             truncated = truncated,
             removedOrphanedIndexes = removedOrphanedIndexes,
-            messages = messages.take(20)
+            messages = messages.take(20),
+            skippedCurrent = skippedCurrent,
+            refreshedLegacy = refreshedLegacy,
+            refreshedStale = refreshedStale,
+            removedOrphanedMetadata = removedOrphanedMetadata
         )
     }
 }
