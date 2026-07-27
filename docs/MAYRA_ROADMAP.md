@@ -16,15 +16,15 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 | Track | Status | Progress signal | Next gate |
 |---|---|---:|---|
-| Product blueprint and backup discipline | DONE | Canonical blueprint, roadmap, latest snapshot and update policy added | Keep updated every batch |
-| Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred to separate milestones |
-| Core routing and capability registry | IN_PROGRESS | Existing router foundation plus global status registry | Expand deterministic routing/tool selection |
+| Product blueprint and backup discipline | DONE | Canonical blueprint, roadmap, rolling snapshot, immutable snapshot and update policy | Keep updated every batch |
+| Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred |
+| Core routing and capability registry | IN_PROGRESS | Global registry DONE; typed routing outcomes next | Add answer/retrieve/act/clarify/unsupported result model |
 | Personal memory | PLANNED | No completion claim | Data model, consent, edit/delete, freshness |
 | Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations, freshness, failure policy |
 | Actions and automations | PLANNED | Existing foundations require audited scope | Confirmation, transaction log, rollback/result model |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation plan and device validation |
 | Privacy/safety center | IN_PROGRESS | Least-privilege CI and isolated APK audits exist | User-facing controls and audit history |
-| Release/recovery | IN_PROGRESS | Android CI and isolated test APKs exist | Versioning, migration tests, reproducible release checklist |
+| Release/recovery | IN_PROGRESS | Android CI, isolated APKs and snapshot discipline exist | Versioning, migration tests, reproducible release checklist |
 
 ## Track A — Document intelligence
 
@@ -63,6 +63,11 @@ Document foundation should not block progress on broader Mayra modules. Only dev
 
 ## Track B — Core assistant and routing
 
+### DONE
+
+1. Global capability registry and machine-testable module status snapshot
+2. Registry uniqueness, count integrity and critical-state regression tests
+
 ### Existing foundation
 
 - Intent engine and query router files exist
@@ -71,13 +76,12 @@ Document foundation should not block progress on broader Mayra modules. Only dev
 
 ### Next implementation sequence
 
-1. Global capability registry and module status snapshot
-2. Typed routing outcome: answer, retrieve, act, clarify, unsupported
-3. Provider/tool eligibility rules
-4. Confidence and fallback reasons
-5. Hindi/Hinglish routing regression corpus
-6. Action confirmation boundary
-7. End-to-end assistant runtime tests
+1. Typed routing outcome: answer, retrieve, act, clarify, unsupported
+2. Provider/tool eligibility rules
+3. Confidence and fallback reasons
+4. Hindi/Hinglish routing regression corpus
+5. Action confirmation boundary
+6. End-to-end assistant runtime tests
 
 ## Track C — Personal memory
 
@@ -132,6 +136,13 @@ This remains a separate controlled milestone. Do not add speech packages or repl
 6. Maintain rollback/migration tests for persisted data
 7. Keep permissions and background components auditable
 
+## Latest completed governance milestone
+
+- Global registry implementation head: `3d829bfa57851141b64fe7933f54b9d0e21ced9e`
+- Authoritative Android CI: #1275, full pipeline passed
+- Artifacts: `mayra-document-test-apk-1275`, `android-reports-1275`
+- APK artifact ZIP SHA-256: `d72817f2eb98a8831aed56cede243cd7b2b2ac5a5ac9a13940b5df497316789b`
+
 ## Immediate next coding priority
 
-Move beyond documents into **Core assistant routing and capability governance** while retaining PR #12 as Draft. The first step is a machine-testable global capability registry and roadmap consistency tests. After that, typed routing outcomes should be implemented in a separate focused milestone/PR when branch strategy is approved.
+Implement **typed routing outcomes** in the core assistant: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, and `UNSUPPORTED`, with explicit reason/confidence fields and compatibility tests for existing routes. Keep PR #12 Draft/unmerged; use a separate focused branch/PR for the next major module when explicitly approved.
