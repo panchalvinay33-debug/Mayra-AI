@@ -55,6 +55,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember(context) { MayraDocumentStore(context) }
     val contentStore = remember(context) { MayraDocumentContentStore(context) }
+    val metadataStore = remember(context) { MayraDocumentIndexMetadataStore(context) }
     val extractor = remember(context) { MayraDocumentTextExtractor(context) }
     val searchEngine = remember(context) { MayraDocumentSearch(store, contentStore) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -83,19 +84,29 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
             is DocumentExtractionResult.Success -> {
                 if (result.text.isBlank()) {
                     contentStore.remove(document.uri)
+                    metadataStore.remove(document.uri)
                     "No readable text was found. This may be a scanned PDF that needs OCR."
                 } else {
                     contentStore.put(document.uri, result.text, result.truncated)
+                    metadataStore.record(document)
                     val suffix = if (result.truncated) {
                         " The index was safely limited to 500,000 characters or 100 PDF pages."
                     } else {
                         ""
                     }
-                    "Indexed ${result.text.length} characters locally.$suffix"
+                    "Indexed ${result.text.length} characters locally. Index state is current.$suffix"
                 }
             }
-            is DocumentExtractionResult.Unsupported -> result.reason
-            is DocumentExtractionResult.Failure -> result.reason
+            is DocumentExtractionResult.Unsupported -> {
+                contentStore.remove(document.uri)
+                metadataStore.remove(document.uri)
+                result.reason
+            }
+            is DocumentExtractionResult.Failure -> {
+                contentStore.remove(document.uri)
+                metadataStore.remove(document.uri)
+                result.reason
+            }
         }
     }
 
@@ -155,7 +166,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Keep selected documents available to Mayra on this device. Plain-text and text-based PDF files are indexed locally for search and chat; nothing is uploaded by this feature."
+                "Keep selected documents available to Mayra on this device. Plain text, text-based PDF and DOCX files are indexed locally for search and chat; nothing is uploaded by this feature."
             )
 
             Button(
@@ -203,11 +214,16 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
             } else {
                 documents.forEach { hit ->
                     val indexed = contentStore.get(hit.document.uri)
+                    val indexState = metadataStore.state(
+                        document = hit.document,
+                        hasIndexedContent = indexed != null
+                    )
                     val isIndexing = hit.document.uri in indexingUris
                     DocumentCard(
                         document = hit.document,
                         snippet = if (search.isNotBlank()) hit.snippet else indexed?.text.orEmpty().take(220),
                         indexedContent = indexed,
+                        indexState = indexState,
                         isIndexing = isIndexing,
                         onIndex = { startIndex(hit.document) },
                         onOpen = {
@@ -230,9 +246,10 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                         },
                         onRemove = {
                             contentStore.remove(hit.document.uri)
+                            metadataStore.remove(hit.document.uri)
                             store.remove(hit.document.uri)
                             refresh++
-                            notice = "Document and its local text index were removed."
+                            notice = "Document, local text index and index metadata were removed."
                         }
                     )
                 }
@@ -245,7 +262,7 @@ private fun DocumentLibraryScreen(onClose: () -> Unit) {
                 ) {
                     Text("Document intelligence status", fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Ready: persistent library access, metadata, full-text search, plain-text and text-based PDF extraction, snippets, summaries and grounded document Q&A. Pending: DOC/DOCX parsing and OCR for scanned PDFs.",
+                        "Ready: persistent library access, metadata, full-text search, plain-text, text-based PDF and DOCX extraction, index freshness, snippets, summaries and grounded document Q&A. Pending: legacy DOC parsing and OCR for scanned pages.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -274,6 +291,7 @@ private fun DocumentCard(
     document: MayraDocument,
     snippet: String,
     indexedContent: IndexedDocumentContent?,
+    indexState: DocumentIndexState,
     isIndexing: Boolean,
     onIndex: () -> Unit,
     onOpen: () -> Unit,
@@ -295,12 +313,23 @@ private fun DocumentCard(
             Text(
                 when {
                     isIndexing -> "Indexing locally…"
-                    indexedContent == null -> "Text not indexed"
-                    indexedContent.truncated -> "Indexed locally (${indexedContent.text.length} characters, limited)"
-                    else -> "Indexed locally (${indexedContent.text.length} characters)"
+                    indexState == DocumentIndexState.CURRENT && indexedContent?.truncated == true ->
+                        "Current index (${indexedContent.text.length} characters, safely limited)"
+                    indexState == DocumentIndexState.CURRENT && indexedContent != null ->
+                        "Current index (${indexedContent.text.length} characters)"
+                    indexState == DocumentIndexState.LEGACY -> "Legacy index — refresh recommended"
+                    indexState == DocumentIndexState.STALE_SOURCE -> "Source changed — refresh required"
+                    indexState == DocumentIndexState.STALE_PARSER -> "Parser updated — refresh required"
+                    indexState == DocumentIndexState.UNSUPPORTED -> "Parser not available for this format"
+                    else -> "Text not indexed"
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = if (indexedContent == null && !isIndexing) {
+                color = if (
+                    !isIndexing && indexState !in setOf(
+                        DocumentIndexState.CURRENT,
+                        DocumentIndexState.UNSUPPORTED
+                    )
+                ) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.primary
@@ -315,14 +344,17 @@ private fun DocumentCard(
                 )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onIndex, enabled = !isIndexing) {
-                    Text(
-                        when {
-                            isIndexing -> "Indexing…"
-                            indexedContent == null -> "Index text"
-                            else -> "Re-index"
-                        }
-                    )
+                if (indexState != DocumentIndexState.UNSUPPORTED) {
+                    TextButton(onClick = onIndex, enabled = !isIndexing) {
+                        Text(
+                            when {
+                                isIndexing -> "Indexing…"
+                                indexState == DocumentIndexState.CURRENT -> "Re-index"
+                                indexState == DocumentIndexState.MISSING -> "Index text"
+                                else -> "Refresh index"
+                            }
+                        )
+                    }
                 }
                 TextButton(onClick = onRemove, enabled = !isIndexing) { Text("Remove") }
                 TextButton(onClick = onOpen, enabled = !isIndexing) { Text("Open") }
