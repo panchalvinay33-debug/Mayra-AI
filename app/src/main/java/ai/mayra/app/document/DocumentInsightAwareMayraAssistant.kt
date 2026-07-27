@@ -18,8 +18,9 @@ class DocumentInsightAwareMayraAssistant(
 ) : MayraAssistant {
     private val documentStore = MayraDocumentStore(context)
     private val contentStore = MayraDocumentContentStore(context)
-    private val search = MayraDocumentSearch(documentStore, contentStore)
-    private val insights = MayraDocumentInsights(documentStore, contentStore)
+    private val metadataStore = MayraDocumentIndexMetadataStore(context)
+    private val currentIndexPolicy = MayraCurrentIndexPolicy(contentStore, metadataStore)
+    private val insights = MayraDocumentInsights(documentStore, contentStore, currentIndexPolicy)
 
     override suspend fun reply(
         message: String,
@@ -36,7 +37,7 @@ class DocumentInsightAwareMayraAssistant(
                 return@runCatching "Your Mayra Library is empty. Open Mayra Library and add a document first."
             }
 
-            val hits = search.search(message, limit = 5)
+            val hits = searchCurrent(message, documents, limit = 5)
             val intent = DocumentInsightEngine.detectIntent(message)
             when (intent) {
                 DocumentQueryIntent.SEARCH -> searchReply(documents.size, hits)
@@ -46,17 +47,24 @@ class DocumentInsightAwareMayraAssistant(
         }
     }
 
+    private fun searchCurrent(
+        query: String,
+        documents: List<MayraDocument>,
+        limit: Int
+    ): List<DocumentSearchHit> {
+        val indexed = documents.associateWith(currentIndexPolicy::currentText)
+        return DocumentSearchEngine.search(documents, indexed, query, limit)
+    }
+
     private fun searchReply(totalDocuments: Int, hits: List<DocumentSearchHit>): String {
-        if (hits.isEmpty()) {
-            return noMatchReply(totalDocuments)
-        }
+        if (hits.isEmpty()) return noMatchReply(totalDocuments)
         return buildString {
             append("I found ${hits.size} local document match${if (hits.size == 1) "" else "es"}:\n")
             hits.forEachIndexed { index, hit ->
                 append("\n${index + 1}. ${hit.document.name}")
                 if (hit.matchedContent && hit.snippet.isNotBlank()) append("\n   ${hit.snippet}")
             }
-            append("\n\nThese results came from your on-device Mayra Library.")
+            append("\n\nThese results came only from current indexes in your on-device Mayra Library.")
         }
     }
 
@@ -71,12 +79,12 @@ class DocumentInsightAwareMayraAssistant(
             ?: return "Please include the document name or a topic so I know which local document to summarize."
 
         val summary = insights.summarize(target)
-            ?: return "${target.name} is in your library, but it has no searchable text index yet. Re-index it from Mayra Library. PDF and DOC page parsing still require the dedicated parser milestone."
+            ?: return "${target.name} has no current searchable index. Refresh it from Mayra Library or Library Health before asking for a summary."
 
         return buildString {
             append("Local summary of ${target.name}:\n\n")
             append(summary)
-            append("\n\nThis is an extractive summary built only from the text indexed on your device.")
+            append("\n\nThis extractive summary used only the current text index stored on your device.")
         }
     }
 
@@ -94,12 +102,12 @@ class DocumentInsightAwareMayraAssistant(
         if (answers.isEmpty()) return noMatchReply(documents.size)
 
         return buildString {
-            append("I found this in your local documents:\n")
+            append("I found this in your current local document indexes:\n")
             answers.forEachIndexed { index, answer ->
                 append("\n${index + 1}. ${answer.document.name} (${answer.confidence}% term coverage)\n")
                 append(answer.answer)
             }
-            append("\n\nI used only indexed on-device text. I did not fill gaps with guesses.")
+            append("\n\nI used only current on-device evidence and did not fill gaps with guesses.")
         }
     }
 
@@ -114,5 +122,5 @@ class DocumentInsightAwareMayraAssistant(
     }
 
     private fun noMatchReply(totalDocuments: Int): String =
-        "I checked $totalDocuments local document${if (totalDocuments == 1) "" else "s"}, but found no grounded answer in the indexed text. Try a document name or more specific keywords. Plain-text compatible files can be indexed now; reliable PDF and DOC parsing is the next parser milestone."
+        "I checked $totalDocuments local document${if (totalDocuments == 1) "" else "s"}, but found no grounded answer in a current index. Refresh legacy or stale indexes from Mayra Library Health, then try again."
 }
