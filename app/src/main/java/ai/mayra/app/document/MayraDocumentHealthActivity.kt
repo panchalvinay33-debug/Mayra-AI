@@ -112,6 +112,7 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
                     "legacy or stale documents; nothing is uploaded."
             )
 
+            DocumentRoadmapCard(MayraDocumentModuleRoadmap.readiness)
             LibraryInventoryCard(inventory)
 
             Button(
@@ -147,6 +148,37 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
 
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                 Text("Close")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DocumentRoadmapCard(readiness: DocumentModuleReadiness) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Text("Document foundation progress", fontWeight = FontWeight.SemiBold)
+            Text(readiness.summary())
+            Text(
+                "Remaining code milestones: on-device OCR and legacy DOC parsing.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            readiness.features.forEach { feature ->
+                val status = when (feature.stage) {
+                    DocumentFeatureStage.COMPLETE -> "Done"
+                    DocumentFeatureStage.IMPLEMENTED_NEEDS_DEVICE_TEST -> "Phone test"
+                    DocumentFeatureStage.PLANNED -> "Planned"
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(feature.label, modifier = Modifier.weight(1f))
+                    Text(status, style = MaterialTheme.typography.labelMedium)
+                }
+                if (feature.stage != DocumentFeatureStage.COMPLETE) {
+                    Text(feature.note, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }
