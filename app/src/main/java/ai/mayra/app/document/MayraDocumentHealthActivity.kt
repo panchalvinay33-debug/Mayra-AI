@@ -49,26 +49,49 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val documentStore = remember(context) { MayraDocumentStore(context) }
     val contentStore = remember(context) { MayraDocumentContentStore(context) }
+    val metadataStore = remember(context) { MayraDocumentIndexMetadataStore(context) }
     val maintenance = remember(context) {
         MayraDocumentMaintenance(
             documentStore = documentStore,
             contentStore = contentStore,
-            extractor = MayraDocumentTextExtractor(context)
+            extractor = MayraDocumentTextExtractor(context),
+            metadataStore = metadataStore
         )
     }
     var inventoryRefresh by remember { mutableIntStateOf(0) }
     val inventory = remember(inventoryRefresh) {
         val documents = documentStore.list()
+        val indexedUris = documents.mapNotNullTo(mutableSetOf()) { document ->
+            document.uri.takeIf { contentStore.get(it) != null }
+        }
         MayraDocumentInventory.build(
             documents = documents,
-            indexedUris = documents.mapNotNullTo(mutableSetOf()) { document ->
-                document.uri.takeIf { contentStore.get(it) != null }
+            indexedUris = indexedUris,
+            indexStates = documents.associate { document ->
+                document.uri to metadataStore.state(document, document.uri in indexedUris)
             }
         )
     }
     var report by remember { mutableStateOf<DocumentMaintenanceReport?>(null) }
-    var running by remember { mutableStateOf(false) }
+    var runningMode by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    fun runMaintenance(force: Boolean) {
+        if (runningMode != null) return
+        runningMode = if (force) "force" else "smart"
+        error = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { maintenance.rebuildAll(force = force) }
+            }.onSuccess {
+                report = it
+                inventoryRefresh++
+            }.onFailure {
+                error = it.message ?: "Library maintenance failed."
+            }
+            runningMode = null
+        }
+    }
 
     Scaffold { padding ->
         Column(
@@ -85,34 +108,32 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Review parser readiness and rebuild the private on-device document index. " +
-                    "This operation does not upload document content."
+                "Review parser readiness and index freshness. Smart refresh opens only missing, " +
+                    "legacy or stale documents; nothing is uploaded."
             )
 
             LibraryInventoryCard(inventory)
 
             Button(
-                onClick = {
-                    if (running) return@Button
-                    running = true
-                    error = null
-                    scope.launch {
-                        runCatching {
-                            withContext(Dispatchers.IO) { maintenance.rebuildAll() }
-                        }.onSuccess {
-                            report = it
-                            inventoryRefresh++
-                        }.onFailure {
-                            error = it.message ?: "Library maintenance failed."
-                        }
-                        running = false
-                    }
-                },
-                enabled = !running,
+                onClick = { runMaintenance(force = false) },
+                enabled = runningMode == null,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (running) "Checking…" else "Re-index complete library")
+                Text(if (runningMode == "smart") "Refreshing required indexes…" else "Refresh required indexes")
             }
+
+            OutlinedButton(
+                onClick = { runMaintenance(force = true) },
+                enabled = runningMode == null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (runningMode == "force") "Rebuilding every index…" else "Force rebuild every index")
+            }
+
+            Text(
+                "Force rebuild is slower and is intended for parser verification or troubleshooting.",
+                style = MaterialTheme.typography.bodySmall
+            )
 
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
@@ -143,6 +164,19 @@ private fun LibraryInventoryCard(inventory: DocumentLibraryInventory) {
             if (inventory.totalDocuments == 0) {
                 Text("Add a document from Mayra Library to begin local indexing.")
             } else {
+                if (inventory.legacyIndexes > 0) {
+                    Text(
+                        "Legacy indexes will be upgraded once by Smart refresh.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (inventory.staleIndexes > 0) {
+                    Text(
+                        "${inventory.staleIndexes} index${if (inventory.staleIndexes == 1) " is" else "es are"} stale and should be refreshed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 val labels = MayraDocumentParserCatalog.capabilities.associate { it.id to it.label }
                 inventory.formatCounts.forEach { (id, count) ->
                     Text(
@@ -167,10 +201,9 @@ private fun MaintenanceReportCard(report: DocumentMaintenanceReport) {
                 fontWeight = FontWeight.SemiBold
             )
             Text(report.userMessage())
-            if (report.removedOrphanedIndexes > 0) {
+            if (report.removedOrphanedIndexes > 0 || report.removedOrphanedMetadata > 0) {
                 Text(
-                    "Removed ${report.removedOrphanedIndexes} stale local index" +
-                        if (report.removedOrphanedIndexes == 1) "." else "es.",
+                    "Removed orphaned local index data that no longer belongs to a saved document.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
