@@ -125,6 +125,7 @@ class MayraDocumentMaintenance(
         val currentUris = documents.mapTo(mutableSetOf()) { it.uri }
         val removedOrphanedIndexes = contentStore.removeExcept(currentUris)
         val removedOrphanedMetadata = metadataStore?.removeExcept(currentUris) ?: 0
+        val coordinator = metadataStore?.let { MayraDocumentIndexCoordinator(contentStore, it) }
         var indexed = 0
         var unsupported = 0
         var failed = 0
@@ -146,8 +147,7 @@ class MayraDocumentMaintenance(
             }
 
             if (state == DocumentIndexState.UNSUPPORTED) {
-                contentStore.remove(document.uri)
-                metadataStore?.remove(document.uri)
+                coordinator?.remove(document.uri) ?: contentStore.remove(document.uri)
                 unsupported++
                 messages += "${document.name}: ${MayraDocumentParserCatalog.statusText(document)}"
                 return@forEach
@@ -156,30 +156,32 @@ class MayraDocumentMaintenance(
             when (val result = extractor.extract(document)) {
                 is DocumentExtractionResult.Success -> {
                     if (result.text.isBlank()) {
-                        contentStore.remove(document.uri)
-                        metadataStore?.remove(document.uri)
+                        coordinator?.remove(document.uri) ?: contentStore.remove(document.uri)
                         blank++
                         messages += "${document.name}: no readable text; scanned PDFs may require OCR"
                     } else {
-                        contentStore.put(document.uri, result.text, result.truncated)
-                        metadataStore?.record(document)
-                        indexed++
-                        if (state == DocumentIndexState.LEGACY) refreshedLegacy++
-                        if (state == DocumentIndexState.STALE_SOURCE || state == DocumentIndexState.STALE_PARSER) {
-                            refreshedStale++
+                        val committed = coordinator?.commit(document, result.text, result.truncated)
+                        if (committed is DocumentIndexCommitResult.Failure) {
+                            failed++
+                            messages += "${document.name}: ${committed.reason}"
+                        } else {
+                            if (coordinator == null) contentStore.put(document.uri, result.text, result.truncated)
+                            indexed++
+                            if (state == DocumentIndexState.LEGACY) refreshedLegacy++
+                            if (state == DocumentIndexState.STALE_SOURCE || state == DocumentIndexState.STALE_PARSER) {
+                                refreshedStale++
+                            }
+                            if (result.truncated) truncated++
                         }
-                        if (result.truncated) truncated++
                     }
                 }
                 is DocumentExtractionResult.Unsupported -> {
-                    contentStore.remove(document.uri)
-                    metadataStore?.remove(document.uri)
+                    coordinator?.remove(document.uri) ?: contentStore.remove(document.uri)
                     unsupported++
                     messages += "${document.name}: ${result.reason}"
                 }
                 is DocumentExtractionResult.Failure -> {
-                    contentStore.remove(document.uri)
-                    metadataStore?.remove(document.uri)
+                    coordinator?.remove(document.uri) ?: contentStore.remove(document.uri)
                     failed++
                     messages += "${document.name}: ${result.reason}"
                 }
