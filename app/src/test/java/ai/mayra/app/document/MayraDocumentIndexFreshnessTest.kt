@@ -39,12 +39,69 @@ class MayraDocumentIndexFreshnessTest {
     }
 
     @Test
+    fun matchingSizeAndModifiedTimeIsCurrent() {
+        val fingerprint = DocumentIndexFingerprint(
+            parserId = "pdf",
+            parserVersion = 1,
+            sourceSizeBytes = 1_024,
+            recordedAt = 10L,
+            sourceLastModifiedAt = 500L
+        )
+
+        assertEquals(
+            DocumentIndexState.CURRENT,
+            MayraDocumentIndexFreshness.evaluate(
+                document = pdf,
+                hasIndexedContent = true,
+                fingerprint = fingerprint,
+                currentSource = DocumentSourceSnapshot(1_024, 500L)
+            )
+        )
+    }
+
+    @Test
     fun changedSourceSizeMakesIndexStale() {
         val fingerprint = DocumentIndexFingerprint("pdf", 1, 900, 10L)
 
         assertEquals(
             DocumentIndexState.STALE_SOURCE,
             MayraDocumentIndexFreshness.evaluate(pdf, hasIndexedContent = true, fingerprint)
+        )
+    }
+
+    @Test
+    fun changedModifiedTimeMakesSameSizeFileStale() {
+        val fingerprint = DocumentIndexFingerprint(
+            parserId = "pdf",
+            parserVersion = 1,
+            sourceSizeBytes = 1_024,
+            recordedAt = 10L,
+            sourceLastModifiedAt = 500L
+        )
+
+        assertEquals(
+            DocumentIndexState.STALE_SOURCE,
+            MayraDocumentIndexFreshness.evaluate(
+                document = pdf,
+                hasIndexedContent = true,
+                fingerprint = fingerprint,
+                currentSource = DocumentSourceSnapshot(1_024, 700L)
+            )
+        )
+    }
+
+    @Test
+    fun oldFingerprintWithoutModifiedTimeIsLegacyWhenProviderNowReportsIt() {
+        val oldFingerprint = DocumentIndexFingerprint("pdf", 1, 1_024, 10L)
+
+        assertEquals(
+            DocumentIndexState.LEGACY,
+            MayraDocumentIndexFreshness.evaluate(
+                document = pdf,
+                hasIndexedContent = true,
+                fingerprint = oldFingerprint,
+                currentSource = DocumentSourceSnapshot(1_024, 700L)
+            )
         )
     }
 
@@ -59,13 +116,18 @@ class MayraDocumentIndexFreshnessTest {
     }
 
     @Test
-    fun unknownSourceSizeDoesNotCreateFalseStaleResult() {
+    fun unknownSourceMetadataDoesNotCreateFalseStaleResult() {
         val unknownSize = pdf.copy(sizeBytes = -1)
         val fingerprint = DocumentIndexFingerprint("pdf", 1, -1, 10L)
 
         assertEquals(
             DocumentIndexState.CURRENT,
-            MayraDocumentIndexFreshness.evaluate(unknownSize, hasIndexedContent = true, fingerprint)
+            MayraDocumentIndexFreshness.evaluate(
+                document = unknownSize,
+                hasIndexedContent = true,
+                fingerprint = fingerprint,
+                currentSource = DocumentSourceSnapshot(-1, -1)
+            )
         )
     }
 
