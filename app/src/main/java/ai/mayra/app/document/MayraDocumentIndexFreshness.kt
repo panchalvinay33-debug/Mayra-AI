@@ -1,6 +1,9 @@
 package ai.mayra.app.document
 
 import android.content.Context
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.util.Base64
 import java.security.MessageDigest
 
@@ -8,7 +11,17 @@ data class DocumentIndexFingerprint(
     val parserId: String,
     val parserVersion: Int,
     val sourceSizeBytes: Long,
-    val recordedAt: Long
+    val recordedAt: Long,
+    val sourceLastModifiedAt: Long = UNKNOWN_METADATA
+) {
+    companion object {
+        const val UNKNOWN_METADATA = -1L
+    }
+}
+
+data class DocumentSourceSnapshot(
+    val sizeBytes: Long,
+    val lastModifiedAt: Long
 )
 
 enum class DocumentIndexState {
@@ -41,7 +54,11 @@ object MayraDocumentIndexFreshness {
     fun evaluate(
         document: MayraDocument,
         hasIndexedContent: Boolean,
-        fingerprint: DocumentIndexFingerprint?
+        fingerprint: DocumentIndexFingerprint?,
+        currentSource: DocumentSourceSnapshot = DocumentSourceSnapshot(
+            sizeBytes = document.sizeBytes,
+            lastModifiedAt = DocumentIndexFingerprint.UNKNOWN_METADATA
+        )
     ): DocumentIndexState {
         val parser = MayraDocumentParserVersions.parserFor(document)
             ?: return DocumentIndexState.UNSUPPORTED
@@ -51,9 +68,22 @@ object MayraDocumentIndexFreshness {
             return DocumentIndexState.STALE_PARSER
         }
         if (
-            document.sizeBytes >= 0 &&
+            currentSource.sizeBytes >= 0 &&
             fingerprint.sourceSizeBytes >= 0 &&
-            document.sizeBytes != fingerprint.sourceSizeBytes
+            currentSource.sizeBytes != fingerprint.sourceSizeBytes
+        ) {
+            return DocumentIndexState.STALE_SOURCE
+        }
+        if (
+            currentSource.lastModifiedAt >= 0 &&
+            fingerprint.sourceLastModifiedAt < 0
+        ) {
+            return DocumentIndexState.LEGACY
+        }
+        if (
+            currentSource.lastModifiedAt >= 0 &&
+            fingerprint.sourceLastModifiedAt >= 0 &&
+            currentSource.lastModifiedAt != fingerprint.sourceLastModifiedAt
         ) {
             return DocumentIndexState.STALE_SOURCE
         }
@@ -61,34 +91,67 @@ object MayraDocumentIndexFreshness {
     }
 }
 
+/** Metadata-only resolver. It never opens document content. */
+class MayraDocumentSourceMetadataResolver(context: Context) {
+    private val resolver = context.applicationContext.contentResolver
+
+    fun snapshot(document: MayraDocument): DocumentSourceSnapshot {
+        var size = document.sizeBytes
+        var modified = DocumentIndexFingerprint.UNKNOWN_METADATA
+        val uri = Uri.parse(document.uri)
+        runCatching {
+            resolver.query(
+                uri,
+                arrayOf(OpenableColumns.SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
+                    val modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                    if (modifiedIndex >= 0 && !cursor.isNull(modifiedIndex)) {
+                        modified = cursor.getLong(modifiedIndex)
+                    }
+                }
+            }
+        }
+        return DocumentSourceSnapshot(sizeBytes = size, lastModifiedAt = modified)
+    }
+}
+
 /** Stores only index provenance metadata; document text remains in MayraDocumentContentStore. */
 class MayraDocumentIndexMetadataStore(context: Context) {
-    private val preferences = context.applicationContext.getSharedPreferences(
-        FILE_NAME,
-        Context.MODE_PRIVATE
-    )
+    private val appContext = context.applicationContext
+    private val preferences = appContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+    private val sourceResolver = MayraDocumentSourceMetadataResolver(appContext)
 
     fun get(uri: String): DocumentIndexFingerprint? {
         val raw = preferences.getString(key(uri), null) ?: return null
         val parts = raw.split(SEPARATOR)
-        if (parts.size != 4) return null
+        if (parts.size !in 4..5) return null
         return runCatching {
             DocumentIndexFingerprint(
                 parserId = parts[0],
                 parserVersion = parts[1].toInt(),
                 sourceSizeBytes = parts[2].toLong(),
-                recordedAt = parts[3].toLong()
+                recordedAt = parts[3].toLong(),
+                sourceLastModifiedAt = parts.getOrNull(4)?.toLong()
+                    ?: DocumentIndexFingerprint.UNKNOWN_METADATA
             )
         }.getOrNull()
     }
 
     fun record(document: MayraDocument, recordedAt: Long = System.currentTimeMillis()): Boolean {
         val parser = MayraDocumentParserVersions.parserFor(document) ?: return false
+        val source = sourceResolver.snapshot(document)
         val encoded = listOf(
             parser.first,
             parser.second,
-            document.sizeBytes,
-            recordedAt
+            source.sizeBytes,
+            recordedAt,
+            source.lastModifiedAt
         ).joinToString(SEPARATOR)
         preferences.edit().putString(key(document.uri), encoded).apply()
         return true
@@ -107,7 +170,12 @@ class MayraDocumentIndexMetadataStore(context: Context) {
     }
 
     fun state(document: MayraDocument, hasIndexedContent: Boolean): DocumentIndexState =
-        MayraDocumentIndexFreshness.evaluate(document, hasIndexedContent, get(document.uri))
+        MayraDocumentIndexFreshness.evaluate(
+            document = document,
+            hasIndexedContent = hasIndexedContent,
+            fingerprint = get(document.uri),
+            currentSource = sourceResolver.snapshot(document)
+        )
 
     private fun key(uri: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray())
