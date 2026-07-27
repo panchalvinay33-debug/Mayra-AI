@@ -154,16 +154,19 @@ object DocumentInsightEngine {
 
 class MayraDocumentInsights(
     private val documentStore: MayraDocumentStore,
-    private val contentStore: MayraDocumentContentStore
+    private val contentStore: MayraDocumentContentStore,
+    private val currentIndexPolicy: MayraCurrentIndexPolicy? = null
 ) {
     fun summarize(document: MayraDocument): String? {
-        val content = contentStore.get(document.uri)?.text.orEmpty()
+        val content = currentIndexPolicy?.currentText(document)
+            ?: contentStore.get(document.uri)?.text.orEmpty()
         return DocumentInsightEngine.summarize(content).takeIf(String::isNotBlank)
     }
 
     fun answer(question: String, candidates: List<MayraDocument>): List<DocumentAnswer> = candidates
         .mapNotNull { document ->
-            val content = contentStore.get(document.uri)?.text.orEmpty()
+            val content = currentIndexPolicy?.currentText(document)
+                ?: contentStore.get(document.uri)?.text.orEmpty()
             val (answer, evidence) = DocumentInsightEngine.answer(question, content) ?: return@mapNotNull null
             DocumentAnswer(
                 document = document,
