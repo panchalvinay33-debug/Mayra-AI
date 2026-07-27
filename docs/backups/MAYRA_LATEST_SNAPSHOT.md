@@ -3,20 +3,30 @@
 Snapshot date: 2026-07-27
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Last fully verified head before this governance batch: `fba3753cbea8a93c1e239d141fbdd72698332900`
-Last authoritative CI before this governance batch: Android CI #1260
+Latest code-and-governance head validated before documentation finalization: `3d829bfa57851141b64fe7933f54b9d0e21ced9e`
+Authoritative CI: Android CI #1275
+APK artifact: `mayra-document-test-apk-1275`
+Reports artifact: `android-reports-1275`
+APK artifact ZIP SHA-256: `d72817f2eb98a8831aed56cede243cd7b2b2ac5a5ac9a13940b5df497316789b`
 
 ## Purpose
 
-This is the rolling recovery snapshot. Update it in every coding batch. Significant milestones should also create an immutable dated snapshot beside this file.
+This is the rolling recovery snapshot. It must be updated in every coding batch. Significant milestones also receive an immutable dated snapshot beside this file.
 
 ## Product state
 
-- Canonical product blueprint established.
-- Canonical execution roadmap established.
-- Document intelligence foundation: 16 of 18 tracked features implemented.
-- Document work is no longer the default active module; only physical-device defects should return immediately.
-- Next active program track: core assistant routing and capability governance.
+- Canonical product blueprint exists at `docs/MAYRA_BLUEPRINT.md`.
+- Canonical execution roadmap exists at `docs/MAYRA_ROADMAP.md`.
+- Mandatory update policy exists at `docs/BLUEPRINT_UPDATE_POLICY.md`.
+- Immutable document-foundation snapshot is preserved.
+- Global machine-testable `MayraCapabilityRegistry` is implemented and validated.
+- Document intelligence foundation remains 16 of 18 implemented features.
+- Document work is not the default active module; only device-found defects should return immediately.
+- Next active program track: typed core assistant routing outcomes.
+
+## Global capability registry state
+
+The registry tracks 13 top-level capabilities across Core assistant, Documents, Memory, Search, Actions, Voice, Privacy, Release and Governance. It uses `DONE`, `DEVICE_VERIFY`, `IN_PROGRESS`, `PLANNED`, and `DEFERRED`, enforces unique IDs, validates complete counts, and keeps OCR/legacy DOC explicitly deferred rather than allowing them to block broader development.
 
 ## Verified document capabilities
 
@@ -50,13 +60,20 @@ Not yet independently verified on phone:
 - On-device OCR for scanned pages and images
 - Legacy binary `.doc` parsing
 
-## Governance added in current batch
+## Completed in this governance batch
 
-- `docs/MAYRA_BLUEPRINT.md`
-- `docs/MAYRA_ROADMAP.md`
-- this rolling latest snapshot
-- immutable snapshot/update discipline
-- machine-testable global capability registry (pending final CI in this batch)
+- Added canonical product blueprint
+- Added full multi-module execution roadmap
+- Added rolling latest recovery snapshot
+- Added immutable document-foundation milestone snapshot
+- Added mandatory blueprint/roadmap/backup update policy
+- Added global capability registry
+- Added registry uniqueness/count/status regression tests
+- Passed compile, complete tests, Android lint, R8 isolated APK assembly and zero-permission/component audit in CI #1275
+
+## Current documentation-finalization head
+
+The roadmap and this snapshot were updated after CI #1275, producing a documentation-only newer head. A final CI run on that latest head is required before it becomes the authoritative latest-head proof.
 
 ## Recovery instructions
 
@@ -69,4 +86,4 @@ Not yet independently verified on phone:
 
 ## Next step
 
-Complete the global capability registry and consistency tests, run full Android CI, then record the new verified head/run/artifact here and in the roadmap.
+Run final CI on the documentation-finalization head, then begin a focused typed-routing milestone only after confirming branch/PR strategy. The routing model should distinguish `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, and `UNSUPPORTED` with explicit reason and confidence metadata.
