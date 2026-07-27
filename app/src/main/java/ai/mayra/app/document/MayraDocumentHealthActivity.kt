@@ -20,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,11 +47,23 @@ class MayraDocumentHealthActivity : ComponentActivity() {
 private fun DocumentHealthScreen(onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val documentStore = remember(context) { MayraDocumentStore(context) }
+    val contentStore = remember(context) { MayraDocumentContentStore(context) }
     val maintenance = remember(context) {
         MayraDocumentMaintenance(
-            documentStore = MayraDocumentStore(context),
-            contentStore = MayraDocumentContentStore(context),
+            documentStore = documentStore,
+            contentStore = contentStore,
             extractor = MayraDocumentTextExtractor(context)
+        )
+    }
+    var inventoryRefresh by remember { mutableIntStateOf(0) }
+    val inventory = remember(inventoryRefresh) {
+        val documents = documentStore.list()
+        MayraDocumentInventory.build(
+            documents = documents,
+            indexedUris = documents.mapNotNullTo(mutableSetOf()) { document ->
+                document.uri.takeIf { contentStore.get(it) != null }
+            }
         )
     }
     var report by remember { mutableStateOf<DocumentMaintenanceReport?>(null) }
@@ -76,6 +89,8 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
                     "This operation does not upload document content."
             )
 
+            LibraryInventoryCard(inventory)
+
             Button(
                 onClick = {
                     if (running) return@Button
@@ -86,6 +101,7 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
                             withContext(Dispatchers.IO) { maintenance.rebuildAll() }
                         }.onSuccess {
                             report = it
+                            inventoryRefresh++
                         }.onFailure {
                             error = it.message ?: "Library maintenance failed."
                         }
@@ -110,6 +126,30 @@ private fun DocumentHealthScreen(onClose: () -> Unit) {
 
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                 Text("Close")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryInventoryCard(inventory: DocumentLibraryInventory) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("Current library", fontWeight = FontWeight.SemiBold)
+            Text(inventory.userMessage())
+            if (inventory.totalDocuments == 0) {
+                Text("Add a document from Mayra Library to begin local indexing.")
+            } else {
+                val labels = MayraDocumentParserCatalog.capabilities.associate { it.id to it.label }
+                inventory.formatCounts.forEach { (id, count) ->
+                    Text(
+                        "${labels[id] ?: "Unknown format"}: $count",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }
