@@ -13,11 +13,11 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical validation |
 | Concrete runtime integration | DEVICE_VERIFY | Full-app composition, Activity History and main-chat Confirm/Cancel UX are CI-verified | Physical-device validation |
-| Personal memory | PLANNED | No completion claim | Consent-first schema, provenance and controls |
+| Personal memory | IN_PROGRESS | Consent-first schema, privacy policy, approval, provenance, expiry, edit/delete, retrieval and Android persistence implemented | User-facing memory controls and chat proposal UX |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
-| Actions and automations | IN_PROGRESS | Safe file-picker action plus confirmation/idempotency foundation | Calendar/email/reminder adapters |
+| Actions and automations | DEVICE_VERIFY | Safe file-picker action plus confirmation/idempotency/chat UX implemented | Physical validation and reviewed calendar/email/reminder adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
-| Privacy and release | IN_PROGRESS | CI audits, local history, clear/export and confirmation UX | Broader privacy center and production release |
+| Privacy and release | IN_PROGRESS | CI audits, local history, confirmation UX and memory exclusions | Broader privacy center and production release |
 
 ## Document intelligence
 
@@ -65,9 +65,36 @@ DEFERRED: on-device OCR and legacy binary `.doc` parsing.
 5. Process-death persistence for pending confirmations is not implemented
 6. End-to-end physical-device validation
 
+## Personal memory
+
+### IMPLEMENTED FOUNDATION
+
+1. Memory candidate, persisted-memory and provenance models
+2. Explicit proposal and one-time approval flow; proposing never writes to storage
+3. Rejection flow and replay-safe proposal handling
+4. Prohibited-memory exclusions for passwords, PIN/OTP, cards/CVV, Aadhaar and cryptographic recovery secrets
+5. Sensitive-memory exclusions for health, religion/caste/politics/sexual orientation and salary/bank-account data
+6. Source type, source reference and capture timestamp provenance
+7. Optional expiry with automatic pruning
+8. User-controlled update, delete and clear operations
+9. Revision counter and stable identity for corrected same-key memories
+10. Deterministic key/value retrieval with relevance scoring and stable tie-breaking
+11. Bounded Android SharedPreferences persistence with versioned codec
+12. Unicode/Hindi/Hinglish-safe Base64 fields
+13. Corrupt-record skipping, retention limit and readable local export
+14. Pure JVM and Robolectric privacy/persistence regressions
+
+### REMAINING
+
+1. User-facing Memory Center with view/edit/delete/clear/export
+2. Chat proposal parser and explicit Save/Not now dialog
+3. User-visible source/provenance and expiry controls
+4. Integration of relevant memories into answer context with transparent evidence
+5. Process-death persistence for pending approval proposals
+6. Owner-device validation
+
 ## Remaining product tracks
 
-- Personal memory: consent, provenance, sensitive-memory exclusions, edit/delete/expiry and retrieval tests.
 - Fresh search: provider interface, freshness, citations, privacy redaction, ranking and fallback.
 - Actions: calendar, email, reminders and reviewed device integrations.
 - Voice: controlled Hindi/Hinglish milestone; do not replace stable voice behavior casually.
@@ -83,13 +110,15 @@ DEFERRED: on-device OCR and legacy binary `.doc` parsing.
 
 ## Latest authoritative validation
 
-Android CI #1427 passed on `e9ab540a9b81e8d846a63d81890c839e6305b473`: compile, complete tests, Android lint, isolated R8 APK, zero-permission/component audit and artifact uploads passed.
+Android CI #1445 passed on `d4286a237a4be8d2f66577e2522ad8fa1fb52080`: compile, complete tests, Android lint, isolated R8 APK, zero-permission/component audit and artifact uploads passed.
+
+The first memory run #1443 exposed category-label relevance inflation in one retrieval regression. Retrieval was corrected to score only user-authored key/value evidence, and the full pipeline passed on #1445.
 
 Artifacts:
 
-- `mayra-document-test-apk-1427` — `sha256:794aa8a8bf2fb75ef27a7c7a8181af1d7de97773ac21ff9885cf34e5b05f9138`
-- `android-reports-1427` — `sha256:255a06851978858b322d58760189b620e61e897f80d080cebf87f541a8edcec2`
+- `mayra-document-test-apk-1445` — `sha256:ad83a12d5f712ed7d216b7ff0ebe971dcf95ba3d3bbdd61c52390e585ef624e5`
+- `android-reports-1445` — `sha256:afaf373e6b3e3f831fdff516bb3615f460eb67b1d6d9ef480ecc5094b503320c`
 
 ## Immediate next coding priority
 
-Begin the consent-first personal-memory foundation: explicit user approval, provenance, sensitive-memory exclusions, edit/delete/expiry and deterministic retrieval tests. PR #12 remains Draft and unmerged.
+Build the user-facing Memory Center and chat proposal/approval UX, then inject only approved, active and relevant memories into assistant context with visible provenance. PR #12 remains Draft and unmerged.
