@@ -16,39 +16,32 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 | Track | Status | Progress signal | Next gate |
 |---|---|---:|---|
-| Product blueprint and backup discipline | DONE | Blueprint, roadmap, rolling/immutable snapshots and update policy | Keep updated every batch |
-| Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred |
-| Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Keep compatibility regressions green |
-| Provider/tool eligibility | DONE | Runtime capability gates and auditable execution dispositions | Concrete adapter integration |
-| Audited routing runtime boundary | DONE | Typed results, handler isolation, idempotency, persistent audit and confirmation tokens | Wire real adapters |
-| Concrete runtime integration | IN_PROGRESS | Contracts and safety gates exist | Answer/document/action adapters and end-to-end wiring |
+| Blueprint and backup discipline | DONE | Canonical blueprint, roadmap and rolling snapshots | Keep updated every batch |
+| Document intelligence | DEVICE_VERIFY | 16/18 implemented | Phone verification; OCR and legacy DOC deferred |
+| Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
+| Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical/device validation |
+| Concrete runtime integration | IN_PROGRESS | Answer/document/action adapters and confirmed execution exist | Composition-root wiring and Activity History UI |
 | Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
-| Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations and freshness |
-| Actions and automations | IN_PROGRESS | Confirmation, idempotency, persistent audit model implemented | Confirmed action adapters and history UI |
+| Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
+| Actions and automations | IN_PROGRESS | Safe confirmed execution foundation | Real calendar/email/reminder adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
-| Privacy/safety center | IN_PROGRESS | Least-privilege CI audits exist | User-facing controls and audit history |
-| Release/recovery | IN_PROGRESS | CI, isolated APKs and snapshots exist | Versioning and migration/release checklist |
+| Privacy and release | IN_PROGRESS | CI audits and local activity history exist | User-facing privacy controls and production release |
 
-## Track A — Document intelligence
+## Document intelligence
 
 ### DONE
 
-1. Persistable local document library metadata
-2. Plain-text extraction
-3. Text-based PDF extraction
-4. DOCX extraction
-5. Unicode-aware Hindi/Hinglish/English search
-6. Search snippets
-7. Local summaries
-8. Grounded document Q&A
-9. Async IO indexing
-10. Parser safety limits
-11. Index freshness and parser versioning
-12. Current-only evidence policy
-13. Library Health inventory
-14. Smart refresh and force rebuild
-15. Transactional content + fingerprint commit/rollback
-16. Isolated zero-permission document-test APK and CI audit
+1. Persistable local document metadata
+2. Plain-text, text-based PDF and DOCX extraction
+3. Unicode Hindi/Hinglish/English search and snippets
+4. Local summaries and grounded Q&A
+5. Async indexing and parser safety limits
+6. Index freshness and parser versioning
+7. Current-only evidence policy
+8. Library Health inventory
+9. Smart refresh and force rebuild
+10. Transactional content/fingerprint commit and rollback
+11. Isolated zero-permission APK and CI audit
 
 ### DEVICE_VERIFY
 
@@ -59,98 +52,78 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 ### DEFERRED
 
-17. On-device OCR for scanned PDFs/images
-18. Legacy binary `.doc` parser
+- On-device OCR for scanned PDFs/images
+- Legacy binary `.doc` parsing
 
-## Track B — Core assistant and routing
+## Core assistant and runtime
 
 ### DONE
 
-1. Global capability registry and status snapshot
-2. Typed outcomes: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, `UNSUPPORTED`
-3. Explicit reason, bounded confidence and required-capability metadata
-4. Destructive-action confirmation flag
-5. Backward-compatible `DOCUMENTS`/`DELEGATE` route
-6. Hindi/English routing and unsupported OCR/legacy-DOC tests
-7. Runtime availability model and execution dispositions
-8. Capability-unavailable/deferred-feature blocking
-9. Typed runtime result envelope and handler boundary
-10. Confirmation/clarification/blocked plans never invoke handlers
-11. Missing-handler, empty-output and exception conversion to typed failures
-12. Deterministic action idempotency keys
-13. Duplicate successful/in-progress action blocking
-14. Failed-action reservation release for explicit retry
-15. Immutable activity record value model
-16. Thread-safe in-memory activity and idempotency stores
-17. SharedPreferences-backed versioned activity persistence
-18. Bounded retention, corrupt-row recovery, clear and export
-19. One-time expiring confirmation tokens
-20. Exact-action binding and replay protection
-21. Runtime, idempotency, persistence and confirmation regression suites
+1. Typed `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, `UNSUPPORTED` outcomes
+2. Explicit reason, confidence, capability and confirmation metadata
+3. Runtime capability eligibility and execution dispositions
+4. Typed handler boundary and failure conversion
+5. Deterministic action idempotency and duplicate prevention
+6. Persistent bounded activity history with Unicode-safe codec
+7. Corrupt-history recovery, clear and export
+8. One-time expiring confirmation tokens bound to exact actions
+9. Runtime `confirmAndDispatch()` with replay/mismatch blocking
+10. Concrete answer-provider adapter
+11. Current-only document-retrieval adapter
+12. Explicit optional device-action executor adapter
+13. Automated routing, persistence, confirmation and adapter tests
 
-### IN_PROGRESS — Concrete runtime integration
+### IN_PROGRESS
 
-1. Concrete normal-answer adapter
-2. Concrete Current-only document-retrieval adapter
-3. Confirmed device-action adapter
-4. User-visible activity/history screen
-5. End-to-end assistant runtime wiring tests
+1. App composition-root wiring
+2. User-visible Activity History screen
+3. Clear/export controls in UI
+4. Confirmed action UX
+5. End-to-end physical-device validation
 
-## Track C — Personal memory
+## Personal memory — PLANNED
 
 1. User-approved memory schema
 2. Provenance and timestamps
 3. Sensitive-memory exclusions
-4. View/edit/delete controls
-5. Expiry and correction
-6. Retrieval relevance tests
-7. Backup/export policy
+4. View/edit/delete and expiry controls
+5. Retrieval relevance and correction tests
+6. Backup/export policy
 
-## Track D — Search and knowledge
+## Search and knowledge — PLANNED
 
 1. Provider-neutral search interface
-2. Freshness requirements
-3. Citations and provenance
-4. Query privacy/redaction
-5. Offline fallback
-6. Ranking and deduplication
-7. Connected-source boundaries
-8. Search-to-answer tests
+2. Freshness and citation contracts
+3. Query privacy/redaction
+4. Offline fallback
+5. Ranking, deduplication and search-to-answer tests
 
-## Track E — Actions and automations
+## Actions and automations
 
-1. Typed action requests — IN_PROGRESS
-2. Confirmation policy — DONE foundation
-3. Permission/capability checks — DONE foundation
-4. Persistent transaction/result record — DONE foundation
-5. Partial-failure handling — DONE foundation
-6. Idempotency and duplicate prevention — DONE foundation
-7. Replay-safe confirmation tokens — DONE foundation
-8. User-visible history — IN_PROGRESS
-9. Calendar/email/reminder adapters — PLANNED
+- Typed requests, confirmation, capability checks, idempotency, persistent audit and partial-failure handling: DONE foundation
+- User-visible history and confirmed action UX: IN_PROGRESS
+- Calendar, email, reminders and app/device adapters: PLANNED
 
-## Track F — Voice intelligence
+## Voice intelligence
 
 Voice remains a separate controlled milestone. Do not add speech packages or replace stable voice behavior merely to advance this roadmap.
 
-## Track G — Release, recovery and governance
+## Governance rules
 
-1. Update blueprint/roadmap/latest snapshot every coding batch
-2. Add immutable snapshot at significant milestones
-3. Record verified head, CI and artifact digest
-4. Never claim physical validation without owner evidence
-5. Never merge or mark ready without explicit approval
-6. Maintain persisted-data migration/rollback tests
-7. Keep permissions/background components auditable
+1. Update blueprint/roadmap/latest snapshot every coding batch.
+2. Record verified head, CI and artifact digest.
+3. Never claim physical validation without owner evidence.
+4. Never merge or mark ready without explicit approval.
+5. Keep permissions and background components auditable.
 
 ## Current batch pending authoritative CI
 
-- Added versioned, bounded persistent runtime activity history.
-- Added Unicode-safe field encoding, corrupt-row skipping, clear and export.
-- Added one-time confirmation tokens with expiry, exact-action binding and replay protection.
-- Added persistence/retention/corruption/Unicode/expiry/binding/replay tests.
-- Updated capability registry and rolling backup.
+- Integrated one-time confirmation tokens into runtime execution.
+- Added replay-safe `confirmAndDispatch()` and exact-action enforcement.
+- Added concrete answer, Current-only document and optional action adapters.
+- Added confirmation execution/replay/mismatch and adapter regression tests.
+- Updated rolling backup and this roadmap.
 
 ## Immediate next coding priority
 
-Run full Android CI. After green validation, connect concrete normal-answer and Current-only document-retrieval adapters, then confirmed device-action execution and a user-visible activity screen. PR #12 remains Draft and unmerged.
+Run full Android CI. After green validation, wire adapters into the application composition root and add a user-visible Activity History screen with clear/export controls. PR #12 remains Draft and unmerged.
