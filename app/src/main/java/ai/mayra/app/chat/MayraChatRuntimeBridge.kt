@@ -6,6 +6,7 @@ import ai.mayra.app.core.MayraRoutingRuntime
 import ai.mayra.app.core.MayraRoutingRuntimeResult
 import ai.mayra.app.memory.MayraMemoryChatController
 import ai.mayra.app.memory.MayraMemoryChatResult
+import ai.mayra.app.memory.PendingMemoryApproval
 
 /** Pending approval retained by ChatViewModel across configuration changes. */
 data class PendingChatConfirmation(
@@ -24,6 +25,7 @@ sealed interface MayraChatBridgeResult {
     data object DelegateToAssistant : MayraChatBridgeResult
     data class Reply(val text: String) : MayraChatBridgeResult
     data class NeedsConfirmation(val pending: PendingChatConfirmation) : MayraChatBridgeResult
+    data class NeedsMemoryApproval(val pending: PendingMemoryApproval) : MayraChatBridgeResult
 }
 
 /**
@@ -41,6 +43,7 @@ class MayraChatRuntimeBridge(
 
         when (val memoryResult = memoryChat?.handle(normalized)) {
             is MayraMemoryChatResult.Reply -> return MayraChatBridgeResult.Reply(memoryResult.text)
+            is MayraMemoryChatResult.NeedsApproval -> return MayraChatBridgeResult.NeedsMemoryApproval(memoryResult.pending)
             MayraMemoryChatResult.NotHandled, null -> Unit
         }
 
@@ -54,6 +57,18 @@ class MayraChatRuntimeBridge(
         MayraChatBridgeResult.Reply(
             runtime.confirmAndDispatch(pending.message, pending.token).userText()
         )
+
+    fun approveMemory(pending: PendingMemoryApproval): MayraChatBridgeResult.Reply =
+        MayraChatBridgeResult.Reply(
+            memoryChat?.approve(pending.proposalId)?.text ?: "Personal memory is unavailable."
+        )
+
+    fun cancelMemory(pending: PendingMemoryApproval): MayraChatBridgeResult.Reply =
+        MayraChatBridgeResult.Reply(
+            memoryChat?.cancel(pending.proposalId)?.text ?: "Personal memory is unavailable."
+        )
+
+    fun restoredMemoryApproval(): PendingMemoryApproval? = memoryChat?.restoreLatestPending()
 
     private fun MayraRoutingRuntimeResult.toChatResult(message: String): MayraChatBridgeResult = when (this) {
         is MayraRoutingRuntimeResult.ConfirmationRequired -> {
