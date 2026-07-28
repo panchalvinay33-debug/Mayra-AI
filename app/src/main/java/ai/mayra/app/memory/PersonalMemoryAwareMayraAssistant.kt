@@ -20,10 +20,10 @@ class PersonalMemoryAwareMayraAssistant(
         }
         val groundedMessage = "$message\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n$context"
         return delegate.reply(groundedMessage, conversation).map { answer ->
-            val encodedKeys = relevant.joinToString(",") { key ->
-                Base64.encodeToString(key.key.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            val encodedKeys = relevant.joinToString(",") { record ->
+                Base64.encodeToString(record.key.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             }
-            "$answer\n$USAGE_MARKER$encodedKeys"
+            "$answer\n$USAGE_MARKER$encodedKeys$USAGE_SUFFIX"
         }
     }
 
