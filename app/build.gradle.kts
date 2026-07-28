@@ -21,6 +21,15 @@ android {
     buildFeatures { compose = true }
 
     buildTypes {
+        create("fullTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".fulltest"
+            versionNameSuffix = "-fulltest"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("debug")
+        }
         create("documentTest") {
             initWith(getByName("release"))
             applicationIdSuffix = ".documenttest"
