@@ -54,11 +54,9 @@ class LocalCommandEngine(
         return when {
             normalized.isGreeting() -> greeting()
             normalized.containsAny("who are you", "tum kaun", "aap kaun", "तुम कौन", "आप कौन") ->
-                "I’m Mayra, your personal AI assistant. I can already chat, accept voice input, remember the current conversation, understand common phone commands, and work offline."
+                "I’m Mayra, your private on-device assistant. I can chat offline, accept voice input, use approved personal memory, search imported documents, and safely prepare supported phone actions."
 
-            normalized.containsAny("help", "what can you do", "kya kar sakti", "क्या कर सकती", "madad", "मदद") ->
-                "You can ask for the date or time, use voice input, or say commands such as open an app, call someone, send a message, create a reminder, check battery, or clear chat. Device actions are being connected safely with confirmation."
-
+            normalized.isCapabilityQuestion() -> capabilitySummary()
             normalized.containsAny("date", "today", "aaj", "tarikh", "आज", "तारीख") -> currentDate()
             normalized.containsAny("thank", "thanks", "dhanyavad", "shukriya", "धन्यवाद", "शुक्रिया") ->
                 "You’re welcome 😊"
@@ -69,6 +67,18 @@ class LocalCommandEngine(
             else -> contextualFallback(message, recentMessages)
         }
     }
+
+    private fun capabilitySummary(): String =
+        """
+        Abhi main ye kaam kar sakti hoon:
+        • Hindi/Hinglish text aur voice input samajhna.
+        • Aapki approval ke baad personal baatein local memory mein save, use, edit aur delete karna.
+        • TXT, PDF aur DOCX documents import karke unmein search, summary aur grounded answers dena.
+        • Time/date batana aur supported phone actions—app kholna, contact call, message draft, reminder—safe confirmation ke saath prepare karna.
+        • Activity History, Device readiness aur privacy controls dikhana.
+
+        Abhi internet-based general AI aur fresh web knowledge connected nahi hai, isliye open-ended questions par meri offline intelligence limited rahegi.
+        """.trimIndent()
 
     private fun greeting(): String {
         val hour = timeProvider().hour
@@ -98,14 +108,22 @@ class LocalCommandEngine(
             ?.text
 
         return if (previousUserMessage == null) {
-            "I understood: “$message”. My offline brain is active, but a full AI provider is not connected yet."
+            "I understood: “$message”. Main abhi offline mode mein hoon; general AI provider connected nahi hai. Aap voice, memory, documents, time/date ya supported device actions try kar sakte hain."
         } else {
-            "I understood: “$message”. I’m keeping our recent conversation in context, including “$previousUserMessage”, while the full AI provider is being connected."
+            "I understood: “$message”. Main recent context—“$previousUserMessage”—yaad rakh rahi hoon, lekin general AI provider connected nahi hone se open-ended answer limited hai."
         }
     }
 
     private fun String.isGreeting(): Boolean =
         trim() in setOf("hi", "hello", "hey", "namaste", "नमस्ते", "good morning", "good evening")
+
+    private fun String.isCapabilityQuestion(): Boolean =
+        containsAny(
+            "help", "what can you do", "what are your capabilities", "your capabilities", "capability",
+            "capabilities", "kya kar sakti", "kya kya kar sakti", "kya kya kar sakte", "tum kya kar sakti",
+            "tm kya kar sakti", "tumhari capability", "tmhari capability", "aap kya kar sakte", "madad", "मदद",
+            "क्या कर सकती", "क्या क्या कर सकती", "क्षमता", "खासियत"
+        )
 
     private fun String.containsAny(vararg values: String): Boolean = values.any(::contains)
 }
