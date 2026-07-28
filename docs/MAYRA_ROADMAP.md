@@ -31,12 +31,12 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 9. Plain HTTP settings are rejected without overwriting the previous valid configuration.
 10. No INTERNET permission or automatic production composition has been introduced.
 
-## Validation truth
+## Full-app verification truth
 
-Android CI #1601 compiled debug sources successfully but failed while compiling unit tests because `MayraProviderCredentialSource` was a normal interface while tests used Kotlin SAM lambdas. It is now a `fun interface`; runtime behavior is unchanged.
+Android CI #1617 compiled application sources and executed the complete unit-test suite, but one assertion failed: a disabled remote provider correctly avoided opening a connection yet changed its health state from `DISABLED` to `PERMANENT_FAILURE`. The provider now preserves `DISABLED` while still returning a non-success outcome to the resilient offline-fallback layer.
 
-The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass. No physical-device or live-provider claim has been made.
+The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass. A downloadable CI APK is authoritative only after that full chain succeeds. No physical-device or live-provider claim has been made.
 
 ## Immediate next priority
 
-Stabilize the newest governed CI. Then implement an audited network-enabled release flavor, secure runtime credential integration, provider composition/health diagnostics and Hindi/Hinglish evaluation. PR #12 remains Draft and unmerged.
+Run the full governed app verification chain on the repaired head. If green, use its isolated APK for owner-device smoke testing of launch, chat, documents, Memory Center, provider settings and safety controls. PR #12 remains Draft and unmerged.
