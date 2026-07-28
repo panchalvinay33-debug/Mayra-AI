@@ -19,6 +19,8 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 8. Model-independent safety: memory writes and consequential device actions must be controlled by deterministic code and typed receipts, never by a model claim alone.
 9. Durable approval: a pending owner decision may survive process death only in bounded local storage, with expiry, replay protection and visible review.
 10. Conflict honesty: a new fact that contradicts an approved fact must show both values and must never silently overwrite the existing record.
+11. Memory transparency: whenever approved personal memory influences an answer, the owner must receive a visible indication of which memory keys were used.
+12. Owner control: approved and pending memories must be searchable, reviewable, editable or rejectable without relying on the conversational model.
 
 ## System architecture
 
@@ -28,7 +30,8 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 - Voice intelligence remains separately controlled
 - Clear action and memory confirmations
 - Visual Save/Not now and Replace/Not now review surfaces
-- Deterministic owner commands for memory, safety and recovery paths
+- Searchable/filterable Memory Center with direct owner controls
+- Visible disclosure when personal memory influenced an answer
 
 ### 2. Intent and reasoning layer
 - Query routing and intent classification
@@ -42,6 +45,7 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 - Private local document library and Current-only indexed evidence
 - Approved personal memory with proposal, provenance, revision, expiry and owner controls
 - Bounded persistent pending-memory proposals
+- Deterministic search and category filtering over approved records
 - Approved web/search providers and connected account retrieval
 - Source freshness and provenance
 
@@ -59,6 +63,7 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 - Migration, rollback, backup and recovery paths
 - Process-death restoration for pending memory approvals
 - Stale-conflict rejection when approved state changes before confirmation
+- Protected-storage migration must preserve backward-compatible recovery
 
 ## Major product modules
 
@@ -66,7 +71,7 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 |---|---|---|
 | Core assistant and query routing | Understand requests and route them safely | Foundation present; expansion planned |
 | Document intelligence | Private local files, search, summaries, grounded Q&A | Foundation 16/18 implemented |
-| Personal memory | Remember useful user-approved context with controls | Durable approval, conflict review and answer-context foundation implemented; validation and advanced controls pending |
+| Personal memory | Remember useful user-approved context with controls | Durable approval, conflict review, context transparency and owner-management foundation implemented; validation/protected storage pending |
 | Search and knowledge tools | Fresh public and connected-source retrieval with citations | Planned/needs provider architecture |
 | Actions and automations | Execute explicit tasks safely and report outcomes | Foundation/planned |
 | Voice intelligence | Natural Hindi/Hinglish speech interaction | Separate controlled milestone |
@@ -78,7 +83,7 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 
 Mayra may store or replace a personal fact only after deterministic privacy classification and explicit owner approval. Conversation text is never silently promoted into memory. Prohibited secrets and sensitive categories are rejected before approval. Pending proposals are bounded, local, expiring and replay-safe; they may survive process death so the owner can finish an interrupted decision. Same-key contradictory values require a visual comparison of current and proposed values. If the existing memory changes before approval, the stale proposal is rejected.
 
-Approved memories carry provenance, revision and optional expiry. Retrieval excludes expired or unapproved records. Chat commands are handled locally before model delegation. Normal answers may receive only approved, active and query-relevant memory as read-only context. The assistant must not treat injected memory as proof beyond the stored value, and future UI must make memory use visible to the owner.
+Approved memories carry provenance, revision and optional expiry. Retrieval excludes expired or unapproved records. Chat commands are handled locally before model delegation. Normal answers may receive only approved, active and query-relevant memory as read-only context. The assistant must not treat injected memory as proof beyond the stored value. Answers influenced by memory must visibly disclose the relevant memory keys. Memory Center operations must reapply privacy classification before accepting edited values.
 
 ## Document intelligence boundary
 
