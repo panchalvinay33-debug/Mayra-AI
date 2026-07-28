@@ -26,20 +26,22 @@ class ChatViewModel(
             )
         }
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ChatUiState())
+    private val _uiState = MutableStateFlow(
+        ChatUiState(pendingMemoryApproval = runtimeBridge?.restoredMemoryApproval())
+    )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     fun updateInput(value: String) = _uiState.update { it.copy(input = value, error = null) }
     fun dismissError() = _uiState.update { it.copy(error = null) }
 
     fun clearConversation() {
-        if (_uiState.value.isThinking) return
+        if (_uiState.value.isThinking || hasPendingApproval()) return
         _uiState.value = ChatUiState()
     }
 
     fun sendMessage() {
         val text = _uiState.value.input.trim()
-        if (text.isEmpty() || _uiState.value.isThinking || _uiState.value.pendingConfirmation != null) return
+        if (text.isEmpty() || _uiState.value.isThinking || hasPendingApproval()) return
         val userMessage = MayraMessage(text, MayraMessage.Sender.USER)
         val conversation = _uiState.value.messages + userMessage
         _uiState.update { it.copy(messages = conversation, input = "", isThinking = true, error = null) }
@@ -55,6 +57,17 @@ class ChatViewModel(
                         messages = it.messages + MayraMessage(bridgeResult.pending.prompt, MayraMessage.Sender.MAYRA),
                         isThinking = false,
                         pendingConfirmation = bridgeResult.pending
+                    )
+                }
+                is MayraChatBridgeResult.NeedsMemoryApproval -> _uiState.update {
+                    it.copy(
+                        messages = it.messages + MayraMessage(
+                            if (bridgeResult.pending.previousValue == null) "Please review this memory before saving it."
+                            else "This changes an existing memory. Please compare both values before replacing it.",
+                            MayraMessage.Sender.MAYRA
+                        ),
+                        isThinking = false,
+                        pendingMemoryApproval = bridgeResult.pending
                     )
                 }
             }
@@ -89,6 +102,40 @@ class ChatViewModel(
         }
     }
 
+    fun savePendingMemory() {
+        val pending = _uiState.value.pendingMemoryApproval ?: return
+        val bridge = runtimeBridge ?: return
+        if (_uiState.value.isThinking) return
+        _uiState.update { it.copy(isThinking = true, error = null) }
+        viewModelScope.launch {
+            val reply = withContext(Dispatchers.Default) { bridge.approveMemory(pending).text }
+            _uiState.update {
+                it.copy(
+                    messages = it.messages + MayraMessage(reply, MayraMessage.Sender.MAYRA),
+                    isThinking = false,
+                    pendingMemoryApproval = null
+                )
+            }
+        }
+    }
+
+    fun cancelPendingMemory() {
+        val pending = _uiState.value.pendingMemoryApproval ?: return
+        val bridge = runtimeBridge ?: return
+        if (_uiState.value.isThinking) return
+        val reply = bridge.cancelMemory(pending).text
+        _uiState.update {
+            it.copy(
+                messages = it.messages + MayraMessage(reply, MayraMessage.Sender.MAYRA),
+                pendingMemoryApproval = null,
+                error = null
+            )
+        }
+    }
+
+    private fun hasPendingApproval(): Boolean =
+        _uiState.value.pendingConfirmation != null || _uiState.value.pendingMemoryApproval != null
+
     private suspend fun replyWithAssistant(text: String, conversation: List<MayraMessage>) {
         assistant.reply(text, conversation).onSuccess(::appendMayraReply).onFailure { error ->
             _uiState.update { it.copy(isThinking = false, error = error.message ?: "Something went wrong") }
@@ -100,7 +147,8 @@ class ChatViewModel(
             it.copy(
                 messages = it.messages + MayraMessage(reply, MayraMessage.Sender.MAYRA),
                 isThinking = false,
-                pendingConfirmation = null
+                pendingConfirmation = null,
+                pendingMemoryApproval = null
             )
         }
     }
