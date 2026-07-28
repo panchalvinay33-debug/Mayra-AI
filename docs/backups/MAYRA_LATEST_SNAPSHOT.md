@@ -3,15 +3,17 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest batch head before validation: `d45ae034c71b381cf9bf1351cfeb7f39f1b3833b`
-Authoritative CI for this batch: pending
+Latest verified head: `452e6d5240cb8875362ae049696b1400e8216d9e`
+Authoritative CI: Android CI #1367
+APK artifact: `mayra-document-test-apk-1367`
+APK artifact ZIP SHA-256: `c5a3c0de8b8f2720c83b954311eb64149bdd7146919eac2e2727e8952999fc1f`
 
 ## Product state
 
 - Document foundation remains 16/18 implemented; OCR and legacy DOC are deferred.
 - Typed routing, provider eligibility, audited runtime, idempotency and persistent history are implemented.
-- Replay-safe confirmation is now integrated into runtime execution.
-- Concrete answer, Current-only document retrieval and optional device-action adapters are implemented.
+- Replay-safe confirmation is integrated into runtime execution.
+- Concrete answer, Current-only document retrieval and optional device-action adapters are implemented and CI-verified.
 - App composition-root wiring and a user-visible Activity History screen remain active work.
 
 ## Completed in this batch
@@ -20,11 +22,26 @@ Authoritative CI for this batch: pending
 - Added `confirmAndDispatch()` for exact-action approval and execution.
 - Mismatched, expired or replayed tokens are blocked before the action handler.
 - Confirmed actions still pass through atomic idempotency protection.
-- Added `MayraConcreteRuntimeAdapters` for normal answers, Current-only local document retrieval and explicit device actions.
-- Blank answer-provider output becomes a deterministic reliability message.
-- Empty document libraries and no-current-match states return grounded deterministic responses.
-- Added end-to-end confirmation execution/replay tests and concrete-adapter tests.
+- Added concrete normal-answer, Current-only document-retrieval and explicit optional device-action adapters.
+- Added confirmation execution/replay/mismatch and adapter regression tests.
 - Updated roadmap and rolling recovery backup.
+
+## Validation
+
+Android CI #1367 passed on `452e6d5240cb8875362ae049696b1400e8216d9e`:
+
+- Kotlin compile passed
+- complete unit-test suite passed
+- Android lint passed
+- isolated R8 APK assembly passed
+- manifest/permission/component audit passed
+- requested Android permissions: none
+- APK and reports upload passed
+
+Artifacts:
+
+- `mayra-document-test-apk-1367` — `sha256:c5a3c0de8b8f2720c83b954311eb64149bdd7146919eac2e2727e8952999fc1f`
+- `android-reports-1367` — `sha256:7f5aae8e80da350d04c29f9455debee52cb1c64ccdc3c54358ba9baa0c84af72`
 
 ## Safety contract
 
@@ -34,14 +51,6 @@ A destructive action requires capability eligibility, a one-time exact-action co
 
 Owner verified APK installation/launch and PDF selection/metadata persistence. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance, persistent history and confirmed-action flows remain unverified on phone.
 
-## Recovery instructions
-
-1. Read `docs/MAYRA_BLUEPRINT.md` and `docs/MAYRA_ROADMAP.md`.
-2. Confirm PR #12 remains Draft/unmerged.
-3. Use only the newest fully green CI head as authoritative.
-4. Do not overclaim physical validation.
-5. Update this file after every coding batch.
-
 ## Next step
 
-Run full CI. Then wire the concrete adapters into the app composition root and add a user-visible Activity History screen with clear/export controls.
+Wire adapters into the application composition root and add a user-visible Activity History screen with clear/export controls.
