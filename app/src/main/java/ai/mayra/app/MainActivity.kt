@@ -136,6 +136,8 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         devicePermissionsLauncher.launch(runtimePermissionNames())
     }
 
+    val interactionEnabled = !state.isThinking && state.pendingConfirmation == null
+
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -150,6 +152,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     Text(
                         when {
                             state.isThinking -> "Thinking…"
+                            state.pendingConfirmation != null -> "Waiting for confirmation"
                             voiceState.isListening -> "Listening…"
                             else -> "● Ready to help"
                         }
@@ -165,7 +168,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     label = { Text("Device") }
                 )
                 if (state.messages.isNotEmpty()) {
-                    TextButton(onClick = viewModel::clearConversation, enabled = !state.isThinking) {
+                    TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) {
                         Text("Clear")
                     }
                 }
@@ -199,7 +202,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 onValueChange = viewModel::updateInput,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Ask Mayra anything…") },
-                enabled = !state.isThinking,
+                enabled = interactionEnabled,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() })
@@ -210,19 +213,47 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     onClick = {
                         if (voiceState.isListening) voiceAssistant.stopListening() else startVoice()
                     },
+                    enabled = interactionEnabled,
                     modifier = Modifier.weight(1f).height(52.dp)
                 ) {
                     Text(if (voiceState.isListening) "Stop" else "🎙 Voice")
                 }
                 Button(
                     onClick = viewModel::sendMessage,
-                    enabled = state.input.isNotBlank() && !state.isThinking,
+                    enabled = state.input.isNotBlank() && interactionEnabled,
                     modifier = Modifier.weight(2f).height(52.dp)
                 ) {
                     Text(if (state.isThinking) "Thinking…" else "Send to Mayra")
                 }
             }
         }
+    }
+
+    state.pendingConfirmation?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelPendingAction,
+            title = { Text("Confirm action") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(pending.prompt)
+                    Text(pending.message, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Only this exact request can use the one-time confirmation token.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = viewModel::confirmPendingAction, enabled = !state.isThinking) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showReadiness) {
