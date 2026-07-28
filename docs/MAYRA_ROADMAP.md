@@ -18,8 +18,9 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 |---|---|---:|---|
 | Product blueprint and backup discipline | DONE | Blueprint, roadmap, rolling/immutable snapshots and update policy | Keep updated every batch |
 | Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred |
-| Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Runtime adapter integration |
-| Provider/tool eligibility | DONE | Runtime capability gates and auditable execution dispositions implemented | Connect plans to providers/actions |
+| Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Keep compatibility regressions green |
+| Provider/tool eligibility | DONE | Runtime capability gates and auditable execution dispositions | Concrete adapter integration |
+| Routing runtime boundary | IN_PROGRESS | Typed results, handler isolation and controlled failures implemented | Idempotency, activity records and real adapters |
 | Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
 | Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | PLANNED | No completion claim | Typed execution, confirmation and history |
@@ -66,27 +67,30 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 1. Global capability registry and status snapshot
 2. Registry integrity regression tests
-3. Typed routing outcomes: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, `UNSUPPORTED`
-4. Explicit reason and bounded confidence on every decision
+3. Typed outcomes: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, `UNSUPPORTED`
+4. Explicit reason and bounded confidence
 5. Required-capability metadata
 6. Destructive-action confirmation flag
 7. Backward-compatible `DOCUMENTS`/`DELEGATE` route
-8. Hindi/English document routing and unsupported OCR/legacy-DOC tests
+8. Hindi/English routing and unsupported OCR/legacy-DOC tests
 9. Runtime capability availability model
 10. Execution dispositions: `EXECUTE`, `CONFIRM`, `CLARIFY`, `FALLBACK`, `BLOCK`
-11. Capability-unavailable blocking
-12. Deferred OCR/legacy-DOC blocking
-13. Confirmation gate for destructive actions
-14. Routing-policy regression suite
+11. Capability-unavailable and deferred-feature blocking
+12. Confirmation gate for destructive actions
+13. Typed runtime result envelope
+14. Provider/action handler boundary
+15. Confirmation, clarification and blocked plans never invoke handlers
+16. Missing-handler, empty-result and thrown-handler failures become typed failures
+17. Runtime dispatch regression suite
 
 ### IN_PROGRESS — Runtime integration
 
-1. Typed runtime result envelope
-2. Provider/action adapter boundary
-3. No-op, blocked, confirmation-required and success records
-4. Idempotency key and duplicate-action prevention
-5. End-to-end assistant runtime tests
-6. User-visible activity/audit history foundation
+1. Idempotency key and duplicate-action prevention
+2. User-visible activity/audit record model
+3. Concrete normal-answer adapter
+4. Concrete document-retrieval adapter
+5. Confirmed device-action adapter
+6. End-to-end assistant runtime wiring tests
 
 ## Track C — Personal memory
 
@@ -136,11 +140,13 @@ Voice remains a separate controlled milestone. Do not add speech packages or rep
 
 ## Current batch pending authoritative CI
 
-- Routing policy: `2c1b66a10b1f26024b814d54ed8536b92ed05214`
-- Routing policy tests: `2667ec29043fc714b5b49de2154e0500ea65ce2e`
-- Capability registry advancement: `097ff5d671fe7797f9ddea2610c6d3548db0198f`
-- Registry regression update: `e3510335900344bd9a6df93e9599c181fef0c89c`
+- Removed a conflicting duplicate typed-router implementation after detecting a newer integrated branch version.
+- Added `MayraRoutingRuntime` typed dispatch boundary.
+- Added `Executed`, `ConfirmationRequired`, `ClarificationRequired`, `Blocked` and `Failed` runtime results.
+- Added answer/retrieve/action handler registry.
+- Added controlled missing-handler, empty-output and exception handling.
+- Added ten runtime safety and failure regression tests.
 
 ## Immediate next coding priority
 
-Run full Android CI on the latest documentation head. After green validation, implement an audited **runtime result envelope and provider/action adapter boundary**. PR #12 remains Draft and unmerged.
+Run full Android CI on the latest documentation head. After green validation, add action idempotency and immutable activity records, then connect concrete assistant/document adapters. PR #12 remains Draft and unmerged.
