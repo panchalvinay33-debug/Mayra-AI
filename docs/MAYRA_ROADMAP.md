@@ -7,13 +7,14 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 ## Overall program view
 
 | Track | Status | Progress signal | Next gate |
-|---|---|---:|---|
+|---|---|---|---|
 | Blueprint and backup discipline | DONE | Canonical blueprint, roadmap and rolling snapshots | Keep updated every batch |
 | Document intelligence | DEVICE_VERIFY | 16/18 implemented | Phone verification; OCR and legacy DOC deferred |
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical validation |
-| Personal memory | IN_PROGRESS | Durable approvals, protected migration, expiry, diagnostics and structured provenance foundation | Full CI, health UI and phone validation |
-| Search and fresh knowledge | PLANNED | No completion claim | Production provider interface, citations and freshness |
+| Personal memory | IN_PROGRESS | Protected storage, owner UI, health diagnostics and structured provenance implemented | Full CI and Motorola validation |
+| Conversational provider | FOUNDATION | Timeout/retry/cancellation/offline-fallback boundary committed | Concrete provider adapter and secure runtime configuration |
+| Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | DEVICE_VERIFY | Safe picker plus confirmation/idempotency/chat UX | Physical validation and reviewed adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
 | Privacy and release | IN_PROGRESS | Protected memory records, diagnostics and owner controls | Wider privacy center and production release |
@@ -23,40 +24,35 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 1. Explicit proposal/approval with prohibited-secret and sensitive-data exclusions.
 2. Approved and pending persistence, TTL pruning, replay safety and process-death restoration.
 3. Visual Save/Replace/Not now conflict review and stale-conflict rejection.
-4. Approved-only relevant answer context.
-5. Search, category filters, direct value edit, expiry presets and pending proposal management.
-6. AES-GCM Android Keystore protection for approved memories and pending proposals with separate aliases.
-7. Backward-compatible plaintext migration and failure-safe writes that preserve the previous record set.
-8. Read-only storage-health classification: `EMPTY`, `HEALTHY`, `MIGRATION_NEEDED` or `DEGRADED`.
-9. Health counters distinguish protected, legacy and unreadable approved/pending records without deleting data.
-10. Personal-memory usage now travels as machine-readable message metadata instead of visible marker text.
-11. Metadata uses URL-safe Base64 for Unicode keys, is stripped from visible answer text and is ignored when malformed.
-12. Regression tests cover protected storage health and structured provenance parsing.
+4. Search, category filters, direct edit, expiry presets and pending proposal management.
+5. AES-GCM Android Keystore protection for approved and pending records with separate aliases.
+6. Backward-compatible legacy migration and failure-safe write preservation.
+7. Read-only storage-health classification: EMPTY, HEALTHY, MIGRATION_NEEDED and DEGRADED.
+8. Memory Center health card with protected/legacy/unreadable counters.
+9. Owner-triggered `Retry safe migration`; no automatic key reset or destructive clearing.
+10. Structured memory-use metadata on `MayraMessage` and Compose provenance chips.
+11. Malformed metadata cannot become trusted provenance.
+12. Regression tests for storage health, metadata parsing, migration and rollback.
 13. No new Android permission, service, receiver or background component.
 
-## Remaining personal-memory gates
+## Conversational-provider foundation
 
-1. Full compile, complete unit tests, lint, R8 and component audit on the newest governed head.
-2. Memory Center health card and explicit non-destructive retry-migration control.
-3. Motorola validation for Keystore creation, migration, restart, Save/Replace, expiry and provenance display.
-4. Dedicated Compose provenance chip rendering from `usedPersonalMemoryKeys`.
-5. Key invalidation/device-lock recovery policy; never silently reset a key or erase unreadable records.
-6. Protected portable backup/export design; readable export remains an explicit owner action.
+1. `MayraConversationalProvider` is text-only and cannot execute actions or write memory.
+2. Provider requests are bounded to 100 conversation messages.
+3. Timeout is configurable and bounded to 1–60 seconds.
+4. Temporary failures receive at most three total attempts.
+5. Permanent failures immediately use the offline assistant.
+6. Exhausted temporary failures use the offline assistant.
+7. Coroutine cancellation propagates and is never converted into a fallback answer.
+8. Provider credentials are supplied through a runtime credential-source contract, never personal memory or source control.
+9. The remote provider is not enabled in production composition yet.
 
 ## Validation truth
 
-Latest fully green authoritative validation remains Android CI #1458 on `abfa2711f01bb526d1c6fdb93364aa8ea148c6af` until a newer complete governed-head pipeline succeeds.
+Android CI #1571 compiled successfully but failed one legacy disclosure assertion in `PersonalMemoryAwareMayraAssistantTest`; the test expected old appended text after the implementation moved to structured metadata. The assertion was corrected to parse and verify trusted metadata. fileciteturn135file0L1-L1
 
-Android CI #1545 was running for protected storage head `69292e7288c5a3b67c9d51050301cc0b3bfc5303`, but this diagnostics/provenance batch is newer and remains `IN_PROGRESS` until a full pipeline validates the newest governed head.
+The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass. No physical-device claim has been made.
 
-## Governance rules
+## Immediate next priority
 
-1. Update blueprint, roadmap and latest snapshot every coding batch.
-2. Never claim physical validation without owner evidence.
-3. Never merge or mark ready without explicit approval.
-4. Keep permissions, storage migrations and background components auditable.
-5. A failed migration or invalid key must preserve recoverable prior data rather than silently clearing it.
-
-## Immediate next coding priority
-
-Run and stabilize CI, render storage health and structured provenance in Compose, then begin the production conversational-provider boundary. PR #12 remains Draft and unmerged.
+Run and stabilize the latest governed CI. Then implement one concrete production provider adapter with secure runtime configuration, network eligibility checks, response-size limits and provider diagnostics. PR #12 remains Draft and unmerged.
