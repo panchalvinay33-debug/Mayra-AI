@@ -1,0 +1,96 @@
+package ai.mayra.app.memory
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.util.Base64
+import java.time.Instant
+
+class AndroidMayraPendingMemoryProposalStore(
+    context: Context,
+    private val maxRecords: Int = 20,
+    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+) : MayraPendingMemoryProposalStore {
+    init { require(maxRecords in 1..100) }
+
+    @Synchronized
+    override fun all(): List<MayraPendingMemoryProposal> = preferences.getStringSet(KEY_RECORDS, emptySet()).orEmpty()
+        .mapNotNull(MayraPendingMemoryProposalCodec::decode)
+        .sortedByDescending { it.createdAt }
+
+    @Synchronized
+    override fun put(proposal: MayraPendingMemoryProposal) {
+        val encoded = all().filterNot { it.id == proposal.id }.plus(proposal)
+            .sortedByDescending { it.createdAt }
+            .take(maxRecords)
+            .map(MayraPendingMemoryProposalCodec::encode)
+            .toSet()
+        check(preferences.edit().putStringSet(KEY_RECORDS, encoded).commit()) {
+            "Unable to persist pending Mayra memory approval."
+        }
+    }
+
+    @Synchronized
+    override fun remove(id: String): MayraPendingMemoryProposal? {
+        val records = all()
+        val removed = records.firstOrNull { it.id == id } ?: return null
+        val retained = records.filterNot { it.id == id }.map(MayraPendingMemoryProposalCodec::encode).toSet()
+        check(preferences.edit().putStringSet(KEY_RECORDS, retained).commit()) {
+            "Unable to remove pending Mayra memory approval."
+        }
+        return removed
+    }
+
+    @Synchronized
+    override fun clear() {
+        check(preferences.edit().remove(KEY_RECORDS).commit()) {
+            "Unable to clear pending Mayra memory approvals."
+        }
+    }
+
+    private companion object {
+        const val PREFS = "mayra_pending_memory_proposals_v1"
+        const val KEY_RECORDS = "records"
+    }
+}
+
+internal object MayraPendingMemoryProposalCodec {
+    private const val VERSION = "1"
+
+    fun encode(proposal: MayraPendingMemoryProposal): String = listOf(
+        VERSION,
+        b64(proposal.id),
+        b64(proposal.candidate.key),
+        b64(proposal.candidate.value),
+        proposal.candidate.category.name,
+        b64(proposal.candidate.provenance.sourceType),
+        b64(proposal.candidate.provenance.sourceReference),
+        proposal.candidate.provenance.capturedAt.toEpochMilli().toString(),
+        proposal.candidate.expiresAt?.toEpochMilli()?.toString().orEmpty(),
+        proposal.createdAt.toEpochMilli().toString(),
+        proposal.conflictingMemoryId?.let(::b64).orEmpty()
+    ).joinToString("|")
+
+    fun decode(raw: String): MayraPendingMemoryProposal? = runCatching {
+        val p = raw.split('|')
+        require(p.size == 11 && p[0] == VERSION)
+        MayraPendingMemoryProposal(
+            id = unb64(p[1]),
+            candidate = MayraMemoryCandidate(
+                key = unb64(p[2]),
+                value = unb64(p[3]),
+                category = MayraMemoryCategory.valueOf(p[4]),
+                provenance = MayraMemoryProvenance(
+                    sourceType = unb64(p[5]),
+                    sourceReference = unb64(p[6]),
+                    capturedAt = Instant.ofEpochMilli(p[7].toLong())
+                ),
+                expiresAt = p[8].takeIf(String::isNotEmpty)?.toLong()?.let(Instant::ofEpochMilli)
+            ),
+            createdAt = Instant.ofEpochMilli(p[9].toLong()),
+            conflictingMemoryId = p[10].takeIf(String::isNotEmpty)?.let(::unb64)
+        )
+    }.getOrNull()
+
+    private fun b64(value: String): String = Base64.encodeToString(value.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    private fun unb64(value: String): String = String(Base64.decode(value, Base64.NO_WRAP), Charsets.UTF_8)
+}
