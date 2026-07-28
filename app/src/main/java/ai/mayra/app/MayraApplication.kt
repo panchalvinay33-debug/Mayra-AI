@@ -18,6 +18,8 @@ import ai.mayra.app.brain.registerBuiltInDeviceSkills
 import ai.mayra.app.core.ActionDispatcher
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
+import ai.mayra.app.core.MayraAndroidRuntimeComposition
+import ai.mayra.app.core.MayraAnswerProvider
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
@@ -29,15 +31,23 @@ class MayraApplication : Application() {
         super.onCreate()
 
         val actionExecutor = AndroidActionExecutor(applicationContext)
-        val localAssistant = LocalMayraAssistant(
-            LocalCommandEngine(
-                actionDispatcher = ActionDispatcher(actionExecutor)
-            )
+        val localCommandEngine = LocalCommandEngine(
+            actionDispatcher = ActionDispatcher(actionExecutor)
         )
+        val localAssistant = LocalMayraAssistant(localCommandEngine)
         MayraRuntime.assistant = DocumentInsightAwareMayraAssistant(
             delegate = localAssistant,
             context = applicationContext
         )
+
+        val typedRuntime = MayraAndroidRuntimeComposition(
+            context = applicationContext,
+            answerProvider = MayraAnswerProvider { message ->
+                localCommandEngine.respond(message, emptyList())
+            },
+            enableSafeFilePickerAction = true
+        )
+        MayraRuntime.installTypedRuntime(typedRuntime)
 
         val eventBus = BrainEventBus()
         val skillRegistry = MayraSkillRegistry().apply {
@@ -106,6 +116,8 @@ object MayraRuntime {
     @Volatile
     var assistant: MayraAssistant = LocalMayraAssistant()
 
+    lateinit var typedRuntime: MayraAndroidRuntimeComposition
+        private set
     lateinit var brain: MayraBrainCoordinator
         private set
     lateinit var skills: MayraSkillRegistry
@@ -123,6 +135,12 @@ object MayraRuntime {
 
     val installed: Boolean
         get() = ::orchestrator.isInitialized
+    val typedRuntimeInstalled: Boolean
+        get() = ::typedRuntime.isInitialized
+
+    fun installTypedRuntime(runtime: MayraAndroidRuntimeComposition) {
+        typedRuntime = runtime
+    }
 
     fun install(
         brain: MayraBrainCoordinator,
