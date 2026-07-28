@@ -136,7 +136,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         devicePermissionsLauncher.launch(runtimePermissionNames())
     }
 
-    val interactionEnabled = !state.isThinking && state.pendingConfirmation == null
+    val interactionEnabled = !state.isThinking && state.pendingConfirmation == null && state.pendingMemoryApproval == null
 
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
@@ -152,6 +152,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     Text(
                         when {
                             state.isThinking -> "Thinking…"
+                            state.pendingMemoryApproval != null -> "Waiting to save memory"
                             state.pendingConfirmation != null -> "Waiting for confirmation"
                             voiceState.isListening -> "Listening…"
                             else -> "● Ready to help"
@@ -251,6 +252,39 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             dismissButton = {
                 TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    state.pendingMemoryApproval?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelPendingMemory,
+            title = { Text(if (pending.previousValue == null) "Save this memory?" else "Replace this memory?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(pending.key, fontWeight = FontWeight.Bold)
+                    pending.previousValue?.let {
+                        Text("Current: $it")
+                        HorizontalDivider()
+                    }
+                    Text("New: ${pending.newValue}")
+                    Text(
+                        if (pending.previousValue == null)
+                            "Mayra will store this locally only after you tap Save."
+                        else "Saving will replace the current value and increase its revision.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = viewModel::savePendingMemory, enabled = !state.isThinking) {
+                    Text(if (pending.previousValue == null) "Save" else "Replace")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) {
+                    Text("Not now")
                 }
             }
         )
