@@ -8,24 +8,35 @@ import java.time.Instant
 class AndroidMayraPersonalMemoryStore(
     context: Context,
     private val maxRecords: Int = 200,
-    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE),
+    private val protector: MayraMemoryRecordProtector = AndroidKeystoreMayraMemoryProtector()
 ) : MayraPersonalMemoryStore {
     init { require(maxRecords in 1..2_000) }
 
     @Synchronized
-    override fun all(): List<MayraPersonalMemory> = preferences.getStringSet(KEY_RECORDS, emptySet()).orEmpty()
-        .mapNotNull(MayraMemoryCodec::decode)
-        .sortedByDescending { it.updatedAt }
+    override fun all(): List<MayraPersonalMemory> {
+        val rawRecords = preferences.getStringSet(KEY_RECORDS, emptySet()).orEmpty()
+        var migrationNeeded = false
+        val decoded = rawRecords.mapNotNull { raw ->
+            val plaintext = when {
+                protector.isProtected(raw) -> protector.unprotect(raw)
+                else -> raw.also { migrationNeeded = true }
+            }
+            plaintext?.let(MayraMemoryCodec::decode)
+        }.sortedByDescending { it.updatedAt }
+
+        if (migrationNeeded && decoded.isNotEmpty()) {
+            runCatching { persist(decoded) }
+        }
+        return decoded
+    }
 
     @Synchronized
     override fun put(memory: MayraPersonalMemory) {
         val retained = all().filterNot { it.id == memory.id }.plus(memory)
             .sortedByDescending { it.updatedAt }
             .take(maxRecords)
-        val encoded = retained.map(MayraMemoryCodec::encode).toSet()
-        check(preferences.edit().putStringSet(KEY_RECORDS, encoded).commit()) {
-            "Unable to persist Mayra personal memory."
-        }
+        persist(retained)
     }
 
     @Synchronized
@@ -33,7 +44,8 @@ class AndroidMayraPersonalMemoryStore(
         val before = all()
         val after = before.filterNot { it.id == id }
         if (after.size == before.size) return false
-        return preferences.edit().putStringSet(KEY_RECORDS, after.map(MayraMemoryCodec::encode).toSet()).commit()
+        persist(after)
+        return true
     }
 
     @Synchronized
@@ -48,6 +60,14 @@ class AndroidMayraPersonalMemoryStore(
             append("Source: ").append(memory.provenance.sourceType).append(" / ").append(memory.provenance.sourceReference).append('\n')
             append("Updated: ").append(memory.updatedAt)
             memory.expiresAt?.let { append('\n').append("Expires: ").append(it) }
+        }
+    }
+
+    @Synchronized
+    private fun persist(records: List<MayraPersonalMemory>) {
+        val protectedRecords = records.map { protector.protect(MayraMemoryCodec.encode(it)) }.toSet()
+        check(preferences.edit().putStringSet(KEY_RECORDS, protectedRecords).commit()) {
+            "Unable to persist protected Mayra personal memory."
         }
     }
 
