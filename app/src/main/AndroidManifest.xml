@@ -14,6 +14,7 @@
         <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
         <activity android:name=".document.MayraDocumentActivity" android:exported="true" android:label="Mayra Library"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
         <activity android:name=".memory.MayraMemoryCenterActivity" android:exported="true" android:label="Mayra Memory Center"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
+        <activity android:name=".core.MayraProviderSettingsActivity" android:exported="true" android:label="Mayra Remote Provider"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
         <activity android:name=".document.MayraDocumentHealthActivity" android:exported="false" android:label="Mayra Library Health" />
         <activity android:name=".core.MayraActivityHistoryActivity" android:exported="false" android:label="Mayra Activity History" />
         <service android:name=".background.MayraNotificationListener" android:exported="false" android:label="Mayra notification intelligence" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
