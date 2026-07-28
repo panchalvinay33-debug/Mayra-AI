@@ -81,27 +81,15 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     var lastSpokenMessageId by remember { mutableStateOf<Long?>(null) }
     var showReadiness by remember { mutableStateOf(false) }
     var readinessRefresh by remember { mutableIntStateOf(0) }
-    val voiceAssistant = remember {
-        AndroidVoiceAssistant(context) { newState -> voiceState = newState }
-    }
-
-    val permissionReader = remember(context, readinessRefresh) {
-        AndroidDevicePermissionStateReader(context)
-    }
-    val permissionSnapshot = remember(permissionReader, readinessRefresh) {
-        DevicePermissionSnapshotProvider(permissionReader).snapshot()
-    }
-    val installedAppsCount = remember(context, readinessRefresh) {
-        runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0)
-    }
-    val microphoneReady = remember(context, readinessRefresh) {
-        MicrophonePermission.isGranted(context)
-    }
+    val voiceAssistant = remember { AndroidVoiceAssistant(context) { newState -> voiceState = newState } }
+    val permissionReader = remember(context, readinessRefresh) { AndroidDevicePermissionStateReader(context) }
+    val permissionSnapshot = remember(permissionReader, readinessRefresh) { DevicePermissionSnapshotProvider(permissionReader).snapshot() }
+    val installedAppsCount = remember(context, readinessRefresh) { runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0) }
+    val microphoneReady = remember(context, readinessRefresh) { MicrophonePermission.isGranted(context) }
 
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
     }
-
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
         val latest = state.messages.lastOrNull()
@@ -110,262 +98,98 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             voiceAssistant.speak(latest.text)
         }
     }
-
     DisposableEffect(Unit) { onDispose { voiceAssistant.release() } }
 
-    val microphoneLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
+    val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         readinessRefresh++
-        if (granted) voiceAssistant.startListening()
-        else voiceState = VoiceState(error = "Microphone permission is required for voice input")
+        if (granted) voiceAssistant.startListening() else voiceState = VoiceState(error = "Microphone permission is required for voice input")
     }
-
-    val devicePermissionsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        readinessRefresh++
-    }
-
+    val devicePermissionsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { readinessRefresh++ }
     fun startVoice() {
-        if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening()
-        else microphoneLauncher.launch(MicrophonePermission.permission)
+        if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening() else microphoneLauncher.launch(MicrophonePermission.permission)
     }
-
-    fun requestDevicePermissions() {
-        devicePermissionsLauncher.launch(runtimePermissionNames())
-    }
+    fun requestDevicePermissions() { devicePermissionsLauncher.launch(runtimePermissionNames()) }
 
     val interactionEnabled = !state.isThinking && state.pendingConfirmation == null && state.pendingMemoryApproval == null
-
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = CircleShape, tonalElevation = 6.dp, modifier = Modifier.size(58.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("M", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    }
+                    Box(contentAlignment = Alignment.Center) { Text("M", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Mayra AI", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        when {
-                            state.isThinking -> "Thinking…"
-                            state.pendingMemoryApproval != null -> "Waiting to save memory"
-                            state.pendingConfirmation != null -> "Waiting for confirmation"
-                            voiceState.isListening -> "Listening…"
-                            else -> "● Ready to help"
-                        }
-                    )
+                    Text(when {
+                        state.isThinking -> "Thinking…"
+                        state.pendingConfirmation != null || state.pendingMemoryApproval != null -> "Waiting for confirmation"
+                        voiceState.isListening -> "Listening…"
+                        else -> "● Ready to help"
+                    })
                 }
-                AssistChip(
-                    onClick = { context.startActivity(Intent(context, MayraActivityHistoryActivity::class.java)) },
-                    label = { Text("History") }
-                )
+                AssistChip(onClick = { context.startActivity(Intent(context, MayraActivityHistoryActivity::class.java)) }, label = { Text("History") })
                 Spacer(Modifier.width(6.dp))
-                AssistChip(
-                    onClick = { showReadiness = true },
-                    label = { Text("Device") }
-                )
-                if (state.messages.isNotEmpty()) {
-                    TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) {
-                        Text("Clear")
-                    }
-                }
+                AssistChip(onClick = { showReadiness = true }, label = { Text("Device") })
+                if (state.messages.isNotEmpty()) TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) { Text("Clear") }
             }
-
             Spacer(Modifier.height(20.dp))
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (state.messages.isEmpty()) item {
-                    Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium)
-                }
+            LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (state.messages.isEmpty()) item { Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium) }
                 items(state.messages, key = { it.timestamp }) { message ->
                     val label = if (message.sender == MayraMessage.Sender.USER) "You" else "Mayra"
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(14.dp)) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(label, fontWeight = FontWeight.Bold)
                             Text(message.text)
+                            if (message.usedPersonalMemoryKeys.isNotEmpty()) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    message.usedPersonalMemoryKeys.take(3).forEach { key ->
+                                        AssistChip(onClick = {}, label = { Text("🧠 $key") })
+                                    }
+                                }
+                                if (message.usedPersonalMemoryKeys.size > 3) {
+                                    Text("+${message.usedPersonalMemoryKeys.size - 3} more approved memories", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                 }
             }
-
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             voiceState.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = state.input,
-                onValueChange = viewModel::updateInput,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Ask Mayra anything…") },
-                enabled = interactionEnabled,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() })
-            )
+            OutlinedTextField(value = state.input, onValueChange = viewModel::updateInput, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Ask Mayra anything…") }, enabled = interactionEnabled, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() }))
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (voiceState.isListening) voiceAssistant.stopListening() else startVoice()
-                    },
-                    enabled = interactionEnabled,
-                    modifier = Modifier.weight(1f).height(52.dp)
-                ) {
-                    Text(if (voiceState.isListening) "Stop" else "🎙 Voice")
-                }
-                Button(
-                    onClick = viewModel::sendMessage,
-                    enabled = state.input.isNotBlank() && interactionEnabled,
-                    modifier = Modifier.weight(2f).height(52.dp)
-                ) {
-                    Text(if (state.isThinking) "Thinking…" else "Send to Mayra")
-                }
+                OutlinedButton(onClick = { if (voiceState.isListening) voiceAssistant.stopListening() else startVoice() }, enabled = interactionEnabled, modifier = Modifier.weight(1f).height(52.dp)) { Text(if (voiceState.isListening) "Stop" else "🎙 Voice") }
+                Button(onClick = viewModel::sendMessage, enabled = state.input.isNotBlank() && interactionEnabled, modifier = Modifier.weight(2f).height(52.dp)) { Text(if (state.isThinking) "Thinking…" else "Send to Mayra") }
             }
         }
     }
 
     state.pendingConfirmation?.let { pending ->
-        AlertDialog(
-            onDismissRequest = viewModel::cancelPendingAction,
-            title = { Text("Confirm action") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(pending.prompt)
-                    Text(pending.message, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Only this exact request can use the one-time confirmation token.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = viewModel::confirmPendingAction, enabled = !state.isThinking) {
-                    Text("Confirm")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) {
-                    Text("Cancel")
-                }
-            }
-        )
+        AlertDialog(onDismissRequest = viewModel::cancelPendingAction, title = { Text("Confirm action") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(pending.prompt); Text(pending.message, fontWeight = FontWeight.SemiBold); Text("Only this exact request can use the one-time confirmation token.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { Button(onClick = viewModel::confirmPendingAction, enabled = !state.isThinking) { Text("Confirm") } }, dismissButton = { TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) { Text("Cancel") } })
     }
-
     state.pendingMemoryApproval?.let { pending ->
-        AlertDialog(
-            onDismissRequest = viewModel::cancelPendingMemory,
-            title = { Text(if (pending.previousValue == null) "Save this memory?" else "Replace this memory?") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(pending.key, fontWeight = FontWeight.Bold)
-                    pending.previousValue?.let {
-                        Text("Current: $it")
-                        HorizontalDivider()
-                    }
-                    Text("New: ${pending.newValue}")
-                    Text(
-                        if (pending.previousValue == null)
-                            "Mayra will store this locally only after you tap Save."
-                        else "Saving will replace the current value and increase its revision.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = viewModel::savePendingMemory, enabled = !state.isThinking) {
-                    Text(if (pending.previousValue == null) "Save" else "Replace")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) {
-                    Text("Not now")
-                }
-            }
-        )
+        AlertDialog(onDismissRequest = viewModel::cancelPendingMemory, title = { Text(if (pending.previousValue == null) "Save this memory?" else "Replace this memory?") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(pending.key, fontWeight = FontWeight.Bold); pending.previousValue?.let { Text("Current: $it"); HorizontalDivider() }; Text("New: ${pending.newValue}"); Text(if (pending.previousValue == null) "Mayra will store this locally only after you tap Save." else "Saving will replace the current value and increase its revision.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { Button(onClick = viewModel::savePendingMemory, enabled = !state.isThinking) { Text(if (pending.previousValue == null) "Save" else "Replace") } }, dismissButton = { TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) { Text("Not now") } })
     }
-
-    if (showReadiness) {
-        DeviceReadinessDialog(
-            microphoneReady = microphoneReady,
-            grantedPermissions = permissionSnapshot.granted,
-            installedAppsCount = installedAppsCount,
-            onRequestPermissions = ::requestDevicePermissions,
-            onRefresh = { readinessRefresh++ },
-            onDismiss = { showReadiness = false }
-        )
-    }
+    if (showReadiness) DeviceReadinessDialog(microphoneReady, permissionSnapshot.granted, installedAppsCount, ::requestDevicePermissions, { readinessRefresh++ }, { showReadiness = false })
 }
 
 @Composable
-private fun DeviceReadinessDialog(
-    microphoneReady: Boolean,
-    grantedPermissions: Set<DevicePermission>,
-    installedAppsCount: Int,
-    onRequestPermissions: () -> Unit,
-    onRefresh: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val rows = listOf(
-        DevicePermission.READ_CONTACTS to "Find contacts",
-        DevicePermission.CALL_PHONE to "Start phone calls",
-        DevicePermission.SEND_MESSAGES to "Prepare messages",
-        DevicePermission.POST_NOTIFICATIONS to "Assistant notifications",
-        DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders",
-        DevicePermission.QUERY_APPS to "Open installed apps"
-    )
+private fun DeviceReadinessDialog(microphoneReady: Boolean, grantedPermissions: Set<DevicePermission>, installedAppsCount: Int, onRequestPermissions: () -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit) {
+    val rows = listOf(DevicePermission.READ_CONTACTS to "Find contacts", DevicePermission.CALL_PHONE to "Start phone calls", DevicePermission.SEND_MESSAGES to "Prepare messages", DevicePermission.POST_NOTIFICATIONS to "Assistant notifications", DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders", DevicePermission.QUERY_APPS to "Open installed apps")
     val readyCount = rows.count { it.first in grantedPermissions } + if (microphoneReady) 1 else 0
     val totalCount = rows.size + 1
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Device readiness") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("$readyCount of $totalCount capabilities ready")
-                Text("$installedAppsCount launchable apps detected")
-                HorizontalDivider()
-                ReadinessRow("Voice input", microphoneReady)
-                rows.forEach { (permission, label) ->
-                    ReadinessRow(label, permission in grantedPermissions)
-                }
-                Text(
-                    "Exact reminders may require enabling special access from Android settings.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = onRequestPermissions) { Text("Allow permissions") }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onRefresh) { Text("Refresh") }
-                TextButton(onClick = onDismiss) { Text("Close") }
-            }
-        }
-    )
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Device readiness") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("$readyCount of $totalCount capabilities ready"); Text("$installedAppsCount launchable apps detected"); HorizontalDivider(); ReadinessRow("Voice input", microphoneReady); rows.forEach { (permission, label) -> ReadinessRow(label, permission in grantedPermissions) }; Text("Exact reminders may require enabling special access from Android settings.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { Button(onClick = onRequestPermissions) { Text("Allow permissions") } }, dismissButton = { Row { TextButton(onClick = onRefresh) { Text("Refresh") }; TextButton(onClick = onDismiss) { Text("Close") } } })
 }
 
 @Composable
 private fun ReadinessRow(label: String, ready: Boolean) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, modifier = Modifier.weight(1f))
-        Text(if (ready) "Ready ✓" else "Permission needed")
-    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, modifier = Modifier.weight(1f)); Text(if (ready) "Ready ✓" else "Permission needed") }
 }
 
 private fun runtimePermissionNames(): Array<String> = buildList {
-    add(Manifest.permission.RECORD_AUDIO)
-    add(Manifest.permission.READ_CONTACTS)
-    add(Manifest.permission.CALL_PHONE)
-    add(Manifest.permission.SEND_SMS)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        add(Manifest.permission.POST_NOTIFICATIONS)
-    }
+    add(Manifest.permission.RECORD_AUDIO); add(Manifest.permission.READ_CONTACTS); add(Manifest.permission.CALL_PHONE); add(Manifest.permission.SEND_SMS)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
 }.toTypedArray()
