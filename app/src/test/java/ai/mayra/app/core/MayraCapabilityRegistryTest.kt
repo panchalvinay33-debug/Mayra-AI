@@ -32,13 +32,14 @@ class MayraCapabilityRegistryTest {
     }
 
     @Test
-    fun routingPolicyAndAuditedRuntimeBoundaryAreDone() {
+    fun routingRuntimeActionsAndMemoryHaveHonestStates() {
         val byId = MayraCapabilityRegistry.capabilities.associateBy { it.id }
         assertEquals(MayraCapabilityStatus.DONE, byId.getValue("core.query-routing").status)
         assertEquals(MayraCapabilityStatus.DONE, byId.getValue("core.provider-eligibility").status)
         assertEquals(MayraCapabilityStatus.DONE, byId.getValue("core.runtime-boundary").status)
-        assertEquals(MayraCapabilityStatus.IN_PROGRESS, byId.getValue("core.runtime-integration").status)
-        assertEquals(MayraCapabilityStatus.IN_PROGRESS, byId.getValue("actions.typed-execution").status)
+        assertEquals(MayraCapabilityStatus.DEVICE_VERIFY, byId.getValue("core.runtime-integration").status)
+        assertEquals(MayraCapabilityStatus.DEVICE_VERIFY, byId.getValue("actions.typed-execution").status)
+        assertEquals(MayraCapabilityStatus.IN_PROGRESS, byId.getValue("memory.user-controlled").status)
     }
 
     @Test
