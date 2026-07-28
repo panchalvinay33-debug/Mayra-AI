@@ -3,7 +3,7 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest verified head: `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`
+Latest authoritative code-and-docs head: `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`
 Authoritative CI: Android CI #1369
 APK artifact: `mayra-document-test-apk-1369`
 APK artifact ZIP SHA-256: `dee0f978a4b3a54e8af09e578c7092bd9c271492538281b5a5602e5fcebef688`
@@ -18,25 +18,17 @@ APK artifact ZIP SHA-256: `dee0f978a4b3a54e8af09e578c7092bd9c271492538281b5a5602
 
 ## Completed in this batch
 
-- `ConfirmationRequired` now carries a one-time token.
-- Added `confirmAndDispatch()` for exact-action approval and execution.
-- Mismatched, expired or replayed tokens are blocked before the action handler.
+- `ConfirmationRequired` carries a one-time token.
+- `confirmAndDispatch()` validates and executes the exact approved action.
+- Mismatched, expired or replayed tokens are blocked before handlers.
 - Confirmed actions still pass through atomic idempotency protection.
-- Added concrete normal-answer, Current-only document-retrieval and explicit optional device-action adapters.
+- Added concrete normal-answer, Current-only document-retrieval and optional device-action adapters.
 - Added confirmation execution/replay/mismatch and adapter regression tests.
 - Updated roadmap and rolling recovery backup.
 
 ## Validation
 
-Android CI #1369 passed on `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`:
-
-- Kotlin compile passed
-- complete unit-test suite passed
-- Android lint passed
-- isolated R8 APK assembly passed
-- manifest/permission/component audit passed
-- requested Android permissions: none
-- APK and reports upload passed
+Android CI #1369 passed on `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`: compile, complete tests, lint, isolated R8 APK, manifest/permission/component audit and artifact uploads passed. Requested Android permissions: none.
 
 Artifacts:
 
