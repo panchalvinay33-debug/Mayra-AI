@@ -5,62 +5,50 @@ Status: Living source of truth
 
 ## Product vision
 
-Mayra is a private, user-controlled Android AI assistant and future mobile operating intelligence layer. It should understand Hindi/Hinglish/English requests, reason over trusted personal context, work with approved knowledge sources and local documents, understand device state, coordinate supported apps, and perform explicit user-approved actions without silently expanding permissions or background behavior.
+Mayra is a private, user-controlled Android AI assistant. It should understand Hindi/Hinglish/English requests, reason over trusted personal context, work with approved knowledge sources and local documents, understand device state, coordinate supported apps, and perform explicit user-approved actions without silently expanding permissions or background behavior.
 
 ## Non-negotiable principles
 
 1. Privacy first and least privilege.
-2. Grounded answers distinguish evidence, inference, stale data and unsupported claims.
-3. Consequential actions and personal-memory writes require deterministic owner-controlled approval.
-4. Conversation text is never silently promoted into memory.
-5. Conflicting facts must never silently overwrite.
-6. Memory use must be visible through trusted structured metadata, not model-written badge text.
-7. Protected-storage failure must not be presented as empty history.
-8. Keystore keys are never automatically reset as recovery.
-9. Remote conversational providers cannot execute actions or write memory through the answer boundary.
-10. Provider cancellation must propagate; timeout or provider failure may use deterministic offline fallback.
-11. Provider credentials never live in source control, conversation history or personal memory.
-12. Physical-device claims require actual owner/device evidence.
+2. Consequential actions and personal-memory writes remain deterministic and owner-approved.
+3. Memory use is visible through trusted structured metadata.
+4. Protected-storage failure is never presented as empty history and keys are never automatically reset.
+5. Remote conversational providers return text only and cannot execute actions or write memory.
+6. Provider cancellation propagates; bounded failure may use deterministic offline fallback.
+7. Provider configuration never comes from conversation history or personal memory.
+8. Remote endpoints must use HTTPS and be bounded by timeout, history, message and response-size limits.
+9. A concrete provider is not production-composed until owner configuration, network eligibility and full CI are complete.
+10. Physical-device and live-network claims require actual evidence.
 
 ## Architecture
 
 ### Interaction layer
 - Text and controlled voice interaction.
 - Visual action and memory confirmations.
-- Searchable/filterable Memory Center with edit, expiry, delete, export and pending-review controls.
-- Storage-health card with protected, legacy and unreadable counters.
-- Owner-triggered non-destructive migration retry.
-- Structured personal-memory provenance chips on Mayra messages.
-
-### Intent and reasoning layer
-- Typed query routing, safety policy and permission checks.
-- Model-independent memory commands.
-- Typed distinction between ordinary reply, device confirmation and memory approval.
+- Memory Center owner controls, storage health and safe migration retry.
+- Structured personal-memory provenance chips.
 
 ### Knowledge and protected-storage layer
-- Private local document library and Current-only indexed evidence.
-- Approved personal memory with provenance, revision and expiry.
-- Bounded pending proposals.
-- Per-record AES-GCM envelopes backed by Android Keystore.
-- Separate aliases for approved and pending records.
-- Backward-compatible legacy migration only after successful protected rewrite.
-- Read-only health classification: EMPTY, HEALTHY, MIGRATION_NEEDED and DEGRADED.
-- Degraded state is owner-visible and non-destructive.
+- Private document library and Current-only evidence.
+- Approved personal memory and bounded pending proposals.
+- AES-GCM Android Keystore protection, backward-compatible migration and non-destructive diagnostics.
 
 ### Conversational-provider layer
-- `MayraConversationalProvider` returns text only.
-- Requests are bounded by conversation count.
-- Timeout, retry count and retry delay are strictly bounded.
-- Temporary failures may retry; permanent failures do not.
-- Exhausted or permanent failures use the offline assistant.
-- Coroutine cancellation is never swallowed.
-- Credentials come from a dedicated runtime credential source.
-- A concrete network provider is not production-enabled until secure configuration, eligibility, diagnostics and full CI are complete.
+- `MayraConversationalProvider` is text-only.
+- `ResilientMayraProviderAssistant` owns timeout, retry, cancellation and offline fallback.
+- `MayraHttpConversationalProvider` supplies a concrete HTTPS POST transport but is not auto-installed.
+- Runtime authorization comes from a dedicated configuration source.
+- Owner configuration controls endpoint, model and enabled state.
+- Connect/read timeout, request history, message lengths and response bytes are bounded.
+- HTTP 408, 429 and 5xx are temporary; other non-success responses are permanent.
+- Successful JSON responses must contain a nonblank string field named `text`.
+- Provider health is explicit: DISABLED, MISSING_CREDENTIAL, READY, TEMPORARY_FAILURE or PERMANENT_FAILURE.
+- No network permission is silently introduced; release-flavor eligibility is a separate audited decision.
 
 ### Reliability layer
-- Compile, complete tests, lint, R8, component/permission audits and isolated APK artifacts.
-- Migration, rollback and recovery records.
-- No destructive automatic recovery from unreadable protected data.
+- Compile, complete tests, lint, R8, permission/component audits and isolated APK artifacts.
+- CI failures are diagnosed from exact logs or artifacts before code changes.
+- Offline behavior remains available when the remote provider is disabled or unavailable.
 
 ## Current module state
 
@@ -68,8 +56,8 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 |---|---|
 | Core assistant and routing | Foundation present; expansion planned |
 | Document intelligence | Foundation 16/18 implemented |
-| Personal memory | Protected storage, diagnostics, owner recovery UI and structured provenance implemented; CI/device validation pending |
-| Conversational provider | Audited reliability boundary implemented; concrete adapter pending |
+| Personal memory | Protected storage, diagnostics, recovery UI and structured provenance implemented; validation pending |
+| Conversational provider | Concrete bounded HTTPS transport implemented but not production-enabled |
 | Search and fresh knowledge | Provider architecture planned |
 | Actions and automations | Safety foundation present; expansion planned |
 | Voice intelligence | Separate controlled milestone |
@@ -77,8 +65,8 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 
 ## Milestone completion
 
-A milestone is complete only when implementation and important failure-path tests are committed; compile, lint and relevant minified build audits pass; roadmap and snapshot are current; and device claims come only from actual owner evidence.
+A milestone is complete only when implementation and important failure-path tests are committed; compile, lint and relevant minified build audits pass; roadmap and snapshot are current; and device or live-network claims come only from actual evidence.
 
 ## Change-control rule
 
-Every coding batch updates `docs/MAYRA_ROADMAP.md` and `docs/backups/MAYRA_LATEST_SNAPSHOT.md`. Architecture, privacy or scope changes also update this blueprint. Code with stale governance records is not a fully documented batch.
+Every coding batch updates `docs/MAYRA_ROADMAP.md` and `docs/backups/MAYRA_LATEST_SNAPSHOT.md`. Architecture, privacy or scope changes also update this blueprint.
