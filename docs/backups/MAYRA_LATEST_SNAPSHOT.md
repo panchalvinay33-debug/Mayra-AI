@@ -3,8 +3,8 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest implementation head before this snapshot: `041c6dbaab69ecd608343e4b8af8683d05461a07`
-CI #1287: compile and complete tests passed; externally cancelled during lint, therefore not authoritative.
+Latest batch documentation head: `1cb982d0f7fb6508ccd82bac0be9f4648023fcd8`
+Authoritative CI for this head: pending
 
 ## Purpose
 
@@ -15,36 +15,42 @@ This rolling recovery snapshot is updated in every coding batch. Significant mil
 - Canonical blueprint, roadmap and mandatory update policy are present.
 - Document foundation remains 16/18 implemented; OCR and legacy DOC are deferred.
 - Typed core routing is implemented.
-- Next active milestone: provider/tool eligibility gates.
+- Runtime provider/tool eligibility policy is implemented and awaiting full CI.
+- Next active milestone after validation: audited runtime result and adapter integration.
 
 ## Completed in this batch
 
-- Added typed outcomes: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, `UNSUPPORTED`.
-- Added explicit reason and confidence validation.
-- Added required-capability metadata.
-- Added destructive-action confirmation boundary.
-- Preserved backward compatibility with `DOCUMENTS` and `DELEGATE` consumers.
-- Routed blank input to clarification.
-- Routed document evidence requests to retrieval.
-- Routed normal conversation to answer.
-- Routed device/file commands to actions.
-- Routed unavailable scanned-PDF OCR and legacy DOC requests to explicit unsupported results.
-- Added English/Hindi and contract regression tests.
-- Updated global capability registry: typed routing DONE; provider eligibility IN_PROGRESS.
+- Added `MayraRuntimeCapabilities` as a deterministic availability snapshot.
+- Added route dispositions: `EXECUTE`, `CONFIRM`, `CLARIFY`, `FALLBACK`, `BLOCK`.
+- Added `MayraRoutingPolicy` after intent classification and before any provider/action execution.
+- Blocked document retrieval when the local library capability is unavailable.
+- Blocked device actions when action capability is unavailable.
+- Required explicit confirmation for destructive actions even when capability exists.
+- Kept unsupported OCR/legacy DOC requests blocked even if a runtime flag is accidentally enabled.
+- Preserved blank-input clarification and normal answer execution.
+- Added nine routing-policy regression tests.
+- Advanced `core.provider-eligibility` to DONE.
+- Added `core.runtime-integration` as the active IN_PROGRESS capability.
+- Updated execution roadmap and this rolling backup.
 
-## Current routing contract
+## Safety contract
 
-Every decision includes:
+The router classifies intent only. The policy layer only plans execution. Neither layer invokes providers, changes device state or bypasses confirmation.
 
-- compatibility route;
-- typed outcome;
-- confidence in the range 0–100;
-- human-readable reason;
-- matched deterministic signals;
-- required capability;
-- confirmation requirement for state-changing actions.
+A route may execute only when:
 
-The router classifies intent only. It does not execute tools or bypass confirmation.
+- its required capability is available;
+- it is not explicitly unsupported/deferred;
+- clarification is not required;
+- destructive action confirmation is not pending.
+
+## Current batch commits
+
+- `2c1b66a10b1f26024b814d54ed8536b92ed05214` — routing policy
+- `2667ec29043fc714b5b49de2154e0500ea65ce2e` — policy regressions
+- `097ff5d671fe7797f9ddea2610c6d3548db0198f` — capability registry advancement
+- `e3510335900344bd9a6df93e9599c181fef0c89c` — registry test advancement
+- `1cb982d0f7fb6508ccd82bac0be9f4648023fcd8` — roadmap update
 
 ## Verified document capabilities
 
@@ -62,13 +68,11 @@ The router classifies intent only. It does not execute tools or bypass confirmat
 
 Owner verified APK installation/launch and PDF selection/metadata persistence. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance and scanned-PDF behavior remain unverified on phone.
 
-## CI truth
+## Validation truth
 
-- CI #1287 is not authoritative because it was cancelled during lint.
-- Compile: passed.
-- Complete unit tests: passed.
-- Lint/R8/APK audit: not completed in that run.
-- A fresh full CI must pass on the latest snapshot head before artifact claims are updated.
+- Full Android CI on the latest snapshot head is required.
+- Do not treat earlier cancelled or earlier-head runs as proof for this batch.
+- After CI passes, record exact head, run, artifacts and digest without moving the code head again.
 
 ## Recovery instructions
 
@@ -81,4 +85,4 @@ Owner verified APK installation/launch and PDF selection/metadata persistence. P
 
 ## Next step
 
-Run full CI on the latest documentation head, then implement provider/tool eligibility: capability availability, permission/privacy, network/freshness and confirmation gates with deterministic fallback reasons.
+Run full CI, then implement a typed runtime result envelope, provider/action adapter boundary, idempotency and end-to-end assistant runtime tests.
