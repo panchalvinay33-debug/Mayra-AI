@@ -22,8 +22,10 @@ import ai.mayra.app.core.MayraAndroidRuntimeComposition
 import ai.mayra.app.core.MayraAnswerProvider
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
+import ai.mayra.app.memory.AndroidMayraPendingMemoryProposalStore
 import ai.mayra.app.memory.AndroidMayraPersonalMemoryStore
 import ai.mayra.app.memory.MayraPersonalMemoryManager
+import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import android.app.Application
 import java.util.Calendar
@@ -33,14 +35,28 @@ class MayraApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        val personalMemoryStore = AndroidMayraPersonalMemoryStore(applicationContext)
+        val pendingMemoryStore = AndroidMayraPendingMemoryProposalStore(applicationContext)
+        val personalMemory = MayraPersonalMemoryManager(
+            store = personalMemoryStore,
+            proposalStore = pendingMemoryStore
+        )
+        MayraRuntime.installPersonalMemory(personalMemoryStore, personalMemory)
+        personalMemory.activeMemories()
+        personalMemory.pendingProposals()
+
         val actionExecutor = AndroidActionExecutor(applicationContext)
         val localCommandEngine = LocalCommandEngine(
             actionDispatcher = ActionDispatcher(actionExecutor)
         )
         val localAssistant = LocalMayraAssistant(localCommandEngine)
-        MayraRuntime.assistant = DocumentInsightAwareMayraAssistant(
+        val documentAssistant = DocumentInsightAwareMayraAssistant(
             delegate = localAssistant,
             context = applicationContext
+        )
+        MayraRuntime.assistant = PersonalMemoryAwareMayraAssistant(
+            delegate = documentAssistant,
+            memory = personalMemory
         )
 
         val typedRuntime = MayraAndroidRuntimeComposition(
@@ -51,11 +67,6 @@ class MayraApplication : Application() {
             enableSafeFilePickerAction = true
         )
         MayraRuntime.installTypedRuntime(typedRuntime)
-
-        val personalMemoryStore = AndroidMayraPersonalMemoryStore(applicationContext)
-        val personalMemory = MayraPersonalMemoryManager(personalMemoryStore)
-        MayraRuntime.installPersonalMemory(personalMemoryStore, personalMemory)
-        personalMemory.activeMemories()
 
         val eventBus = BrainEventBus()
         val skillRegistry = MayraSkillRegistry().apply {
