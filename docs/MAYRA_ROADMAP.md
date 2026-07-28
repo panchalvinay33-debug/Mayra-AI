@@ -18,8 +18,8 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 |---|---|---:|---|
 | Product blueprint and backup discipline | DONE | Blueprint, roadmap, rolling/immutable snapshots and update policy | Keep updated every batch |
 | Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred |
-| Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Provider/tool eligibility gates |
-| Provider/tool eligibility | IN_PROGRESS | Capability registered; execution contract next | Availability, privacy, freshness and confirmation checks |
+| Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Runtime adapter integration |
+| Provider/tool eligibility | DONE | Runtime capability gates and auditable execution dispositions implemented | Connect plans to providers/actions |
 | Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
 | Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | PLANNED | No completion claim | Typed execution, confirmation and history |
@@ -72,21 +72,21 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 6. Destructive-action confirmation flag
 7. Backward-compatible `DOCUMENTS`/`DELEGATE` route
 8. Hindi/English document routing and unsupported OCR/legacy-DOC tests
+9. Runtime capability availability model
+10. Execution dispositions: `EXECUTE`, `CONFIRM`, `CLARIFY`, `FALLBACK`, `BLOCK`
+11. Capability-unavailable blocking
+12. Deferred OCR/legacy-DOC blocking
+13. Confirmation gate for destructive actions
+14. Routing-policy regression suite
 
-### IN_PROGRESS — Provider/tool eligibility
+### IN_PROGRESS — Runtime integration
 
-1. Runtime capability availability model
-2. Privacy and permission eligibility
-3. Freshness/network requirements
-4. Confirmation gate before action execution
-5. Deterministic fallback reason
-6. Provider selection tests
-
-### NEXT
-
-- Hindi/Hinglish routing corpus expansion
-- End-to-end assistant runtime integration
-- Typed action result/history contract
+1. Typed runtime result envelope
+2. Provider/action adapter boundary
+3. No-op, blocked, confirmation-required and success records
+4. Idempotency key and duplicate-action prevention
+5. End-to-end assistant runtime tests
+6. User-visible activity/audit history foundation
 
 ## Track C — Personal memory
 
@@ -134,12 +134,13 @@ Voice remains a separate controlled milestone. Do not add speech packages or rep
 6. Maintain persisted-data migration/rollback tests
 7. Keep permissions/background components auditable
 
-## Current milestone state
+## Current batch pending authoritative CI
 
-- Typed routing implementation head before documentation update: `041c6dbaab69ecd608343e4b8af8683d05461a07`
-- CI #1287: compile and complete tests passed; workflow was externally cancelled during lint, so it is not authoritative.
-- A fresh full CI is required on the latest documentation head.
+- Routing policy: `2c1b66a10b1f26024b814d54ed8536b92ed05214`
+- Routing policy tests: `2667ec29043fc714b5b49de2154e0500ea65ce2e`
+- Capability registry advancement: `097ff5d671fe7797f9ddea2610c6d3548db0198f`
+- Registry regression update: `e3510335900344bd9a6df93e9599c181fef0c89c`
 
 ## Immediate next coding priority
 
-Implement **provider/tool eligibility rules** so a typed route cannot execute unless its capability is available and its privacy, freshness, network and confirmation requirements are satisfied. PR #12 remains Draft and unmerged.
+Run full Android CI on the latest documentation head. After green validation, implement an audited **runtime result envelope and provider/action adapter boundary**. PR #12 remains Draft and unmerged.
