@@ -56,8 +56,19 @@ data class MayraPersonalMemory(
     fun isExpired(now: Instant): Boolean = expiresAt?.let { !it.isAfter(now) } == true
 }
 
+data class MayraPendingMemoryProposal(
+    val id: String,
+    val candidate: MayraMemoryCandidate,
+    val createdAt: Instant,
+    val conflictingMemoryId: String? = null
+)
+
 sealed interface MayraMemoryProposalResult {
-    data class ApprovalRequired(val proposalId: String, val candidate: MayraMemoryCandidate) : MayraMemoryProposalResult
+    data class ApprovalRequired(
+        val proposalId: String,
+        val candidate: MayraMemoryCandidate,
+        val conflictingMemory: MayraPersonalMemory? = null
+    ) : MayraMemoryProposalResult
     data class Rejected(val reason: String, val sensitivity: MayraMemorySensitivity) : MayraMemoryProposalResult
 }
 
@@ -102,6 +113,13 @@ interface MayraPersonalMemoryStore {
     fun clear()
 }
 
+interface MayraPendingMemoryProposalStore {
+    fun all(): List<MayraPendingMemoryProposal>
+    fun put(proposal: MayraPendingMemoryProposal)
+    fun remove(id: String): MayraPendingMemoryProposal?
+    fun clear()
+}
+
 class MayraInMemoryPersonalMemoryStore : MayraPersonalMemoryStore {
     private val records = ConcurrentHashMap<String, MayraPersonalMemory>()
     override fun all(): List<MayraPersonalMemory> = records.values.toList()
@@ -110,13 +128,24 @@ class MayraInMemoryPersonalMemoryStore : MayraPersonalMemoryStore {
     override fun clear() = records.clear()
 }
 
+class MayraInMemoryPendingMemoryProposalStore : MayraPendingMemoryProposalStore {
+    private val records = ConcurrentHashMap<String, MayraPendingMemoryProposal>()
+    override fun all(): List<MayraPendingMemoryProposal> = records.values.toList()
+    override fun put(proposal: MayraPendingMemoryProposal) { records[proposal.id] = proposal }
+    override fun remove(id: String): MayraPendingMemoryProposal? = records.remove(id)
+    override fun clear() = records.clear()
+}
+
 class MayraPersonalMemoryManager(
     private val store: MayraPersonalMemoryStore,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val proposalStore: MayraPendingMemoryProposalStore = MayraInMemoryPendingMemoryProposalStore(),
+    private val proposalTtlSeconds: Long = 86_400
 ) {
-    private val pending = ConcurrentHashMap<String, MayraMemoryCandidate>()
+    init { require(proposalTtlSeconds in 60..604_800) }
 
     fun propose(candidate: MayraMemoryCandidate): MayraMemoryProposalResult {
+        prunePending()
         val sensitivity = MayraMemoryPrivacyPolicy.classify(candidate)
         if (sensitivity != MayraMemorySensitivity.ALLOWED) {
             return MayraMemoryProposalResult.Rejected(
@@ -124,20 +153,30 @@ class MayraPersonalMemoryManager(
                 sensitivity
             )
         }
-        val proposalId = stableId("proposal|${candidate.key}|${candidate.value}|${candidate.provenance.sourceReference}|${clock.instant()}")
-        pending[proposalId] = candidate
-        return MayraMemoryProposalResult.ApprovalRequired(proposalId, candidate)
+        val normalizedKey = normalize(candidate.key)
+        val conflict = activeMemories().firstOrNull {
+            normalize(it.key) == normalizedKey && normalize(it.value) != normalize(candidate.value)
+        }
+        val now = clock.instant()
+        val proposalId = stableId("proposal|${candidate.key}|${candidate.value}|${candidate.provenance.sourceReference}|$now")
+        proposalStore.put(MayraPendingMemoryProposal(proposalId, candidate, now, conflict?.id))
+        return MayraMemoryProposalResult.ApprovalRequired(proposalId, candidate, conflict)
     }
 
     fun approve(proposalId: String): MayraMemoryApprovalResult {
-        val candidate = pending.remove(proposalId)
+        prunePending()
+        val proposal = proposalStore.remove(proposalId)
             ?: return MayraMemoryApprovalResult.Rejected("This memory proposal is missing, expired or already handled.")
+        val candidate = proposal.candidate
         val now = clock.instant()
         if (candidate.expiresAt?.let { !it.isAfter(now) } == true) {
             return MayraMemoryApprovalResult.Rejected("This memory proposal has already expired.")
         }
         val normalizedKey = normalize(candidate.key)
         val existing = activeMemories().firstOrNull { normalize(it.key) == normalizedKey }
+        if (proposal.conflictingMemoryId != null && existing?.id != proposal.conflictingMemoryId) {
+            return MayraMemoryApprovalResult.Rejected("The conflicting memory changed before approval. Please review it again.")
+        }
         val memory = if (existing == null) {
             MayraPersonalMemory(
                 id = stableId("memory|$normalizedKey|${candidate.provenance.sourceReference}|$now"),
@@ -164,7 +203,12 @@ class MayraPersonalMemoryManager(
         return MayraMemoryApprovalResult.Saved(memory)
     }
 
-    fun reject(proposalId: String): Boolean = pending.remove(proposalId) != null
+    fun reject(proposalId: String): Boolean = proposalStore.remove(proposalId) != null
+
+    fun pendingProposals(): List<MayraPendingMemoryProposal> {
+        prunePending()
+        return proposalStore.all().sortedByDescending { it.createdAt }
+    }
 
     fun update(id: String, newValue: String, provenance: MayraMemoryProvenance): MayraPersonalMemory? {
         require(newValue.isNotBlank())
@@ -182,7 +226,7 @@ class MayraPersonalMemoryManager(
     }
 
     fun delete(id: String): Boolean = store.delete(id)
-    fun clear() = store.clear()
+    fun clear() { store.clear(); proposalStore.clear() }
 
     fun activeMemories(): List<MayraPersonalMemory> {
         val now = clock.instant()
@@ -209,7 +253,12 @@ class MayraPersonalMemoryManager(
             .map { it.first }
     }
 
-    fun pendingCount(): Int = pending.size
+    fun pendingCount(): Int = pendingProposals().size
+
+    private fun prunePending() {
+        val cutoff = clock.instant().minusSeconds(proposalTtlSeconds)
+        proposalStore.all().filter { !it.createdAt.isAfter(cutoff) }.forEach { proposalStore.remove(it.id) }
+    }
 
     private fun normalize(value: String): String = value.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
     private fun tokenize(value: String): Set<String> = normalize(value)
