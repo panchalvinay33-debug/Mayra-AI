@@ -10,15 +10,16 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 ## Non-negotiable principles
 
 1. Privacy first and least privilege.
-2. Grounded answers must distinguish evidence, inference, stale data and unsupported claims.
+2. Grounded answers distinguish evidence, inference, stale data and unsupported claims.
 3. Consequential actions and personal-memory writes require deterministic owner-controlled approval.
 4. Conversation text is never silently promoted into personal memory.
-5. Conflicting facts must show current and proposed values and must never silently overwrite.
-6. Memory use must be visible to the owner.
-7. Pending decisions may survive process death only in bounded, expiring and replay-safe storage.
-8. Approved and pending personal-memory records must be protected at rest when platform capability is available.
-9. Storage migration must be backward-compatible and failure-safe; inability to protect a new record must not destroy the previous recoverable set.
-10. Physical-device claims require actual owner/device evidence.
+5. Conflicting facts show current and proposed values and never silently overwrite.
+6. Memory use is visible to the owner through structured message provenance.
+7. Pending decisions survive process death only in bounded, expiring and replay-safe storage.
+8. Approved and pending personal-memory records are protected at rest when platform capability is available.
+9. Storage migration is backward-compatible and failure-safe.
+10. Unreadable or invalid-key records are never silently treated as an empty history or automatically erased.
+11. Physical-device claims require actual owner/device evidence.
 
 ## Architecture
 
@@ -26,7 +27,7 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 - Text and controlled voice interaction.
 - Visual action confirmation and Save/Replace/Not now memory review.
 - Searchable/filterable Memory Center with edit, expiry, delete, clear, export and pending-review controls.
-- Visible disclosure when approved personal memory influences an answer.
+- Structured personal-memory provenance attached to Mayra messages for dedicated UI rendering.
 
 ### Intent and reasoning layer
 - Typed query routing, intent classification, safety policy and permission checks.
@@ -39,14 +40,21 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 - Bounded persistent pending proposals.
 - Approved web/search providers and connected retrieval as separate future capabilities.
 
-### Protected storage layer
-- Approved memory records use per-record AES-GCM envelopes backed by an Android Keystore AES key.
-- Pending proposals use a separate Keystore alias to isolate their protection lifecycle.
-- Every encrypted record contains a versioned envelope, random GCM IV and authenticated ciphertext.
-- Legacy plaintext codec records remain readable and are rewritten into protected form after successful decode.
-- Encryption is completed before replacing the stored record set, so protection failure preserves the previous data.
-- Corrupt, tampered, undecryptable or unsupported records are skipped without crashing application startup.
-- Keystore invalidation must be surfaced by future storage-health diagnostics; it must never be misreported as an empty user history without explanation.
+### Protected storage and health layer
+- Approved and pending records use separate Android Keystore-backed AES-GCM protection aliases.
+- Versioned encrypted envelopes contain random GCM IV and authenticated ciphertext.
+- Legacy plaintext records remain readable and migrate only after successful protection.
+- Encryption failure preserves the previous record set.
+- Read-only health diagnostics classify storage as `EMPTY`, `HEALTHY`, `MIGRATION_NEEDED` or `DEGRADED`.
+- Diagnostics count protected, legacy and unreadable approved/pending records without deleting or resetting anything.
+- Key invalidation recovery must require an explicit owner-visible decision; automatic destructive reset is prohibited.
+
+### Answer provenance layer
+- The memory-aware assistant emits machine-readable metadata separately from visible answer content.
+- Memory keys are URL-safe Base64 encoded to preserve Unicode and prevent delimiter ambiguity.
+- Chat parsing removes valid metadata from visible text and attaches decoded keys to `MayraMessage.usedPersonalMemoryKeys`.
+- Malformed metadata never becomes trusted provenance.
+- Compose may render chips from structured keys; model-generated plain text cannot impersonate trusted provenance unless it passes the internal marker protocol.
 
 ### Reliability layer
 - Compile, unit tests, lint, R8, permission/component audits and isolated APK artifacts.
@@ -55,7 +63,7 @@ Mayra is a private, user-controlled Android AI assistant and future mobile opera
 
 ## Personal memory boundary
 
-Mayra may store, replace or change expiry for a personal fact only after deterministic privacy classification and an explicit owner action. Approved retrieval excludes expired and unapproved records. Normal answers may receive only approved, active and query-relevant memory as read-only context, and must disclose the memory keys used.
+Mayra may store, replace or change expiry for a personal fact only after deterministic privacy classification and an explicit owner action. Approved retrieval excludes expired and unapproved records. Normal answers receive only approved, active and query-relevant memory as read-only context. Provenance is carried as structured message metadata rather than model-visible disclosure text.
 
 Readable export remains an explicit owner-triggered share-sheet action and is not equivalent to protected backup. A future protected export must define key portability, authentication and recovery separately.
 
@@ -65,7 +73,7 @@ Readable export remains an explicit owner-triggered share-sheet action and is no
 |---|---|
 | Core assistant and query routing | Foundation present; expansion planned |
 | Document intelligence | Foundation 16/18 implemented |
-| Personal memory | Durable approval, owner controls, expiry and protected migration implemented; CI/device validation pending |
+| Personal memory | Durable approval, protected migration, diagnostics and structured provenance foundation implemented; CI/device/UI validation pending |
 | Search and fresh knowledge | Provider architecture planned |
 | Actions and automations | Safety foundation present; expansion planned |
 | Voice intelligence | Separate controlled milestone |
