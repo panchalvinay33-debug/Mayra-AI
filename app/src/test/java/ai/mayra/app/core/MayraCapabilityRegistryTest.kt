@@ -32,6 +32,13 @@ class MayraCapabilityRegistryTest {
     }
 
     @Test
+    fun typedRoutingIsDoneAndProviderEligibilityIsNext() {
+        val byId = MayraCapabilityRegistry.capabilities.associateBy { it.id }
+        assertEquals(MayraCapabilityStatus.DONE, byId.getValue("core.query-routing").status)
+        assertEquals(MayraCapabilityStatus.IN_PROGRESS, byId.getValue("core.provider-eligibility").status)
+    }
+
+    @Test
     fun deferredDocumentFeaturesDoNotBlockBroaderRoadmap() {
         val deferred = MayraCapabilityRegistry.capabilities
             .filter { it.status == MayraCapabilityStatus.DEFERRED }
