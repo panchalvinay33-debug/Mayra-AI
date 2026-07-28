@@ -38,7 +38,8 @@ data class MayraCapabilitySnapshot(
 object MayraCapabilityRegistry {
     val capabilities: List<MayraCapability> = listOf(
         MayraCapability("core.query-routing", "Core assistant", "Typed deterministic query routing", MayraCapabilityStatus.DONE, "ANSWER, RETRIEVE, ACT, CLARIFY and UNSUPPORTED outcomes include reason, confidence, capability and confirmation policy."),
-        MayraCapability("core.provider-eligibility", "Core assistant", "Provider and tool eligibility rules", MayraCapabilityStatus.IN_PROGRESS, "Next milestone: capability availability, privacy and freshness gates before execution."),
+        MayraCapability("core.provider-eligibility", "Core assistant", "Provider and tool eligibility rules", MayraCapabilityStatus.DONE, "Runtime capability gates now produce EXECUTE, CONFIRM, CLARIFY, FALLBACK or BLOCK plans without executing providers."),
+        MayraCapability("core.runtime-integration", "Core assistant", "End-to-end routing runtime integration", MayraCapabilityStatus.IN_PROGRESS, "Next milestone: connect typed plans to assistant runtime adapters with audited results."),
         MayraCapability("core.capability-registry", "Core assistant", "Global capability and roadmap registry", MayraCapabilityStatus.DONE, "Single machine-testable status source for program reporting."),
         MayraCapability("documents.foundation", "Documents", "Private document intelligence foundation", MayraCapabilityStatus.DONE, "Sixteen of eighteen tracked foundation features are implemented."),
         MayraCapability("documents.device-validation", "Documents", "Latest PDF/DOCX/freshness maintenance phone validation", MayraCapabilityStatus.DEVICE_VERIFY, "CI is green; owner-device verification remains."),
