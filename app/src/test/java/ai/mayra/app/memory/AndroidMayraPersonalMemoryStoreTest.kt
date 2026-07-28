@@ -14,6 +14,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class AndroidMayraPersonalMemoryStoreTest {
     private lateinit var context: Context
+    private val protector = TestMemoryProtector()
 
     @Before fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -22,13 +23,13 @@ class AndroidMayraPersonalMemoryStoreTest {
 
     @Test fun survivesStoreRecreationWithUnicode() {
         val memory = memory("1", "भाषा", "हिंदी में जवाब पसंद है", 1)
-        AndroidMayraPersonalMemoryStore(context).put(memory)
-        val restored = AndroidMayraPersonalMemoryStore(context).all().single()
+        AndroidMayraPersonalMemoryStore(context, protector = protector).put(memory)
+        val restored = AndroidMayraPersonalMemoryStore(context, protector = protector).all().single()
         assertEquals(memory, restored)
     }
 
     @Test fun retentionKeepsNewestRecords() {
-        val store = AndroidMayraPersonalMemoryStore(context, maxRecords = 2)
+        val store = AndroidMayraPersonalMemoryStore(context, maxRecords = 2, protector = protector)
         store.put(memory("1", "one", "a", 1))
         store.put(memory("2", "two", "b", 2))
         store.put(memory("3", "three", "c", 3))
@@ -38,21 +39,21 @@ class AndroidMayraPersonalMemoryStoreTest {
     @Test fun corruptRecordsAreSkipped() {
         val prefs = context.getSharedPreferences("mayra_personal_memory_v1", Context.MODE_PRIVATE)
         prefs.edit().putStringSet("records", setOf("broken", MayraMemoryCodec.encode(memory("1", "city", "Indore", 1)))).commit()
-        assertEquals(1, AndroidMayraPersonalMemoryStore(context).all().size)
+        assertEquals(1, AndroidMayraPersonalMemoryStore(context, preferences = prefs, protector = protector).all().size)
     }
 
     @Test fun deleteAndClearPersist() {
-        val store = AndroidMayraPersonalMemoryStore(context)
+        val store = AndroidMayraPersonalMemoryStore(context, protector = protector)
         store.put(memory("1", "city", "Indore", 1))
         assertTrue(store.delete("1"))
         assertFalse(store.delete("1"))
         store.put(memory("2", "food", "poha", 2))
         store.clear()
-        assertTrue(AndroidMayraPersonalMemoryStore(context).all().isEmpty())
+        assertTrue(AndroidMayraPersonalMemoryStore(context, protector = protector).all().isEmpty())
     }
 
     @Test fun exportContainsProvenanceAndNoCodecPayload() {
-        val store = AndroidMayraPersonalMemoryStore(context)
+        val store = AndroidMayraPersonalMemoryStore(context, protector = protector)
         store.put(memory("1", "city", "Indore", 1))
         val export = store.exportText()
         assertTrue(export.contains("city: Indore"))
@@ -73,5 +74,12 @@ class AndroidMayraPersonalMemoryStoreTest {
             expiresAt = null,
             revision = 1
         )
+    }
+
+    private class TestMemoryProtector : MayraMemoryRecordProtector {
+        override fun protect(plaintext: String): String = "protected:" + plaintext.reversed()
+        override fun unprotect(payload: String): String? = payload.takeIf { it.startsWith("protected:") }
+            ?.removePrefix("protected:")?.reversed()
+        override fun isProtected(payload: String): Boolean = payload.startsWith("protected:")
     }
 }
