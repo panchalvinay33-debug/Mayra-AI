@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -95,8 +96,8 @@ class MayraRuntimePersistenceTest {
     private fun fixedClock(): Clock = Clock.fixed(Instant.parse("2026-07-28T00:00:00Z"), ZoneOffset.UTC)
 
     private class MutableClock(var now: Instant) : Clock() {
-        override fun getZone() = ZoneOffset.UTC
-        override fun withZone(zone: java.time.ZoneId?) = this
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId): Clock = this
         override fun instant(): Instant = now
     }
 }
