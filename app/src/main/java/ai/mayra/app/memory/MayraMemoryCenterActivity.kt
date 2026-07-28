@@ -51,6 +51,7 @@ class MayraMemoryCenterActivity : ComponentActivity() {
         var category by remember { mutableStateOf<MayraMemoryCategory?>(null) }
         var deleteId by remember { mutableStateOf<String?>(null) }
         var editMemory by remember { mutableStateOf<MayraPersonalMemory?>(null) }
+        var expiryMemory by remember { mutableStateOf<MayraPersonalMemory?>(null) }
         var clearAll by remember { mutableStateOf(false) }
         val allMemories = remember(refresh) { MayraRuntime.personalMemory.activeMemories() }
         val pending = remember(refresh) { MayraRuntime.personalMemory.pendingProposals() }
@@ -65,7 +66,7 @@ class MayraMemoryCenterActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text("Memory Center", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Only memories you explicitly approved are stored locally.")
+                Text("Only memories you explicitly approved are stored locally and protected on this device.")
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -109,6 +110,7 @@ class MayraMemoryCenterActivity : ComponentActivity() {
                                     proposal.conflictingMemoryId?.let { id ->
                                         allMemories.firstOrNull { it.id == id }?.let { Text("Current: ${it.value}") }
                                     }
+                                    proposal.candidate.expiresAt?.let { Text("Will expire ${format(it)}") }
                                     Text("Requested ${format(proposal.createdAt)}", style = MaterialTheme.typography.bodySmall)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Button(onClick = {
@@ -137,9 +139,13 @@ class MayraMemoryCenterActivity : ComponentActivity() {
                                     Text("Category: ${memory.category.name.lowercase()}", style = MaterialTheme.typography.bodySmall)
                                     Text("Source: ${memory.provenance.sourceType} · ${memory.provenance.sourceReference}", style = MaterialTheme.typography.bodySmall)
                                     Text("Revision ${memory.revision} · updated ${format(memory.updatedAt)}", style = MaterialTheme.typography.bodySmall)
-                                    memory.expiresAt?.let { Text("Expires ${format(it)}", style = MaterialTheme.typography.bodySmall) }
+                                    Text(
+                                        memory.expiresAt?.let { "Expires ${format(it)}" } ?: "No expiry",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         TextButton(onClick = { editMemory = memory }) { Text("Edit") }
+                                        TextButton(onClick = { expiryMemory = memory }) { Text("Expiry") }
                                         TextButton(onClick = { deleteId = memory.id }) { Text("Delete") }
                                     }
                                 }
@@ -179,6 +185,40 @@ class MayraMemoryCenterActivity : ComponentActivity() {
             )
         }
 
+        expiryMemory?.let { memory ->
+            AlertDialog(
+                onDismissRequest = { expiryMemory = null },
+                title = { Text("Set expiry for ${memory.key}") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Current: ${memory.expiresAt?.let(::format) ?: "No expiry"}")
+                        Text("Choose how long Mayra may keep using this memory.", style = MaterialTheme.typography.bodySmall)
+                    }
+                },
+                confirmButton = {
+                    Column {
+                        listOf("1 day" to 86_400L, "7 days" to 604_800L, "30 days" to 2_592_000L).forEach { (label, seconds) ->
+                            TextButton(onClick = {
+                                replaceExpiry(memory, Instant.now().plusSeconds(seconds))
+                                expiryMemory = null
+                                refresh++
+                            }) { Text(label) }
+                        }
+                    }
+                },
+                dismissButton = {
+                    Column {
+                        TextButton(onClick = {
+                            replaceExpiry(memory, null)
+                            expiryMemory = null
+                            refresh++
+                        }) { Text("Never expire") }
+                        TextButton(onClick = { expiryMemory = null }) { Text("Cancel") }
+                    }
+                }
+            )
+        }
+
         deleteId?.let { id ->
             AlertDialog(
                 onDismissRequest = { deleteId = null },
@@ -195,6 +235,21 @@ class MayraMemoryCenterActivity : ComponentActivity() {
             confirmButton = { Button(onClick = { MayraRuntime.personalMemory.clear(); clearAll = false; refresh++ }) { Text("Clear all") } },
             dismissButton = { TextButton(onClick = { clearAll = false }) { Text("Cancel") } }
         )
+    }
+
+    private fun replaceExpiry(memory: MayraPersonalMemory, expiresAt: Instant?) {
+        val proposal = MayraRuntime.personalMemory.propose(
+            MayraMemoryCandidate(
+                key = memory.key,
+                value = memory.value,
+                category = memory.category,
+                provenance = MayraMemoryProvenance("memory-center", "owner-expiry", Instant.now()),
+                expiresAt = expiresAt
+            )
+        )
+        if (proposal is MayraMemoryProposalResult.ApprovalRequired) {
+            MayraRuntime.personalMemory.approve(proposal.proposalId)
+        }
     }
 
     private fun share(text: String) {
