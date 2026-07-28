@@ -8,12 +8,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <uses-feature
-        android:name="android.hardware.microphone"
-        android:required="false" />
-    <uses-feature
-        android:name="android.hardware.telephony"
-        android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <queries>
         <intent>
@@ -28,9 +24,7 @@
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -52,6 +46,11 @@
             android:exported="false"
             android:label="Mayra Library Health" />
 
+        <activity
+            android:name=".core.MayraActivityHistoryActivity"
+            android:exported="false"
+            android:label="Mayra Activity History" />
+
         <service
             android:name=".background.MayraNotificationListener"
             android:exported="false"
@@ -60,12 +59,8 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
-            <meta-data
-                android:name="android.service.notification.default_filter_types"
-                android:value="conversations|alerting" />
-            <meta-data
-                android:name="android.service.notification.disabled_filter_types"
-                android:value="ongoing|silent" />
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="conversations|alerting" />
+            <meta-data android:name="android.service.notification.disabled_filter_types" android:value="ongoing|silent" />
         </service>
 
         <receiver
