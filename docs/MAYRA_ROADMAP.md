@@ -12,40 +12,31 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Document intelligence | DEVICE_VERIFY | 16/18 implemented | Phone verification; OCR and legacy DOC deferred |
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Personal memory | IN_PROGRESS | Protected storage, health/recovery UI and structured provenance implemented | Full CI and Motorola validation |
-| Conversational provider | IN_PROGRESS | Reliability boundary plus concrete bounded HTTPS transport committed | Secure owner config, network permission decision and production composition |
+| Conversational provider | IN_PROGRESS | Bounded HTTPS transport plus owner settings UI/store implemented | Full CI, audited network flavor and secure credential integration |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | DEVICE_VERIFY | Safe picker plus confirmation/idempotency/chat UX | Physical validation and reviewed adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
 | Privacy and release | IN_PROGRESS | Protected memory and provider credential boundaries | Wider privacy center and production release |
 
-## Personal memory — implemented
-
-1. Explicit proposal/approval, exclusions, conflict review and replay safety.
-2. Protected approved/pending persistence with migration, expiry and process recovery.
-3. Search, category filters, edit, pending management, health card and safe migration retry.
-4. Structured memory-use metadata and Compose provenance chips.
-5. No destructive key reset, silent clearing or hidden empty-history claim.
-
 ## Conversational provider — implemented foundation
 
 1. Text-only provider boundary cannot execute actions or write memory.
 2. Timeout, retry, cancellation and deterministic offline fallback are bounded.
-3. Concrete HTTPS POST transport using runtime bearer credentials.
-4. HTTPS-only endpoint validation and owner `enabled` gate.
-5. Connect/read timeout and maximum response-size enforcement.
-6. HTTP 408/429/5xx classify as temporary; other non-2xx classify as permanent.
-7. Provider response must expose a JSON string field named `text`.
-8. Provider health states: DISABLED, MISSING_CREDENTIAL, READY, TEMPORARY_FAILURE and PERMANENT_FAILURE.
-9. Conversation history and message sizes are bounded before serialization.
-10. Transport remains uninstalled by default; no INTERNET permission was added in this batch.
-11. Deterministic tests cover disabled/missing credential, success, HTTP classification and oversized responses.
+3. Concrete HTTPS POST transport with response-size and history limits.
+4. HTTP failures classify into temporary and permanent outcomes.
+5. Provider health states expose disabled, missing credential, ready and failure states.
+6. Owner settings store persists only non-secret endpoint/model/enable/limit configuration.
+7. Bearer credentials are intentionally excluded from SharedPreferences and UI persistence.
+8. Provider settings screen includes default-off toggle, validation, save status and emergency disable.
+9. Plain HTTP settings are rejected without overwriting the previous valid configuration.
+10. No INTERNET permission or automatic production composition has been introduced.
 
 ## Validation truth
 
-Android CI #1589 failed during debug compilation because `this` inside a Compose `Column` was passed where Android `Context` was required. The exact line was replaced with `LocalContext.current`; this was a source regression, not a platform failure.
+Android CI #1601 compiled debug sources successfully but failed while compiling unit tests because `MayraProviderCredentialSource` was a normal interface while tests used Kotlin SAM lambdas. It is now a `fun interface`; runtime behavior is unchanged.
 
 The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass. No physical-device or live-provider claim has been made.
 
 ## Immediate next priority
 
-Run and stabilize the newest governed CI. Then add secure owner-facing provider configuration and decide the audited INTERNET-permission/release-flavor strategy before production composition. PR #12 remains Draft and unmerged.
+Stabilize the newest governed CI. Then implement an audited network-enabled release flavor, secure runtime credential integration, provider composition/health diagnostics and Hindi/Hinglish evaluation. PR #12 remains Draft and unmerged.
