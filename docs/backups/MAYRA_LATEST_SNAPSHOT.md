@@ -3,10 +3,8 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest verified head: `f644969fcbe243f4952c66847f8cbd712734cc2b`
-Authoritative CI: Android CI #1337
-APK artifact: `mayra-document-test-apk-1337`
-APK artifact ZIP SHA-256: `c8c878ba0a4a87514c4a56d9ac0f7f7aced3735c5184371cc7c5ded96a089e8b`
+Latest batch head before validation: `431fb1e839a3b98560c7d834069fc271ff9c417e`
+Authoritative CI for this batch: pending
 
 ## Purpose
 
@@ -16,59 +14,44 @@ This rolling recovery snapshot is updated in every coding batch. Significant mil
 
 - Canonical blueprint, roadmap and mandatory update policy are present.
 - Document foundation remains 16/18 implemented; OCR and legacy DOC are deferred.
-- Typed routing, provider eligibility and audited runtime boundary are implemented.
-- Action idempotency, duplicate prevention and immutable activity records are implemented in-memory and CI-verified.
-- Concrete assistant/document/action adapters and persisted user-visible history remain active work.
+- Typed routing, provider eligibility, audited runtime boundary, idempotency and duplicate prevention are implemented.
+- Bounded persistent activity history and replay-safe confirmation tokens are now implemented and awaiting authoritative CI.
+- Concrete normal-answer/document/action adapters and user-facing history remain active work.
 
 ## Completed in this batch
 
-- Added deterministic SHA-256 action idempotency keys normalized for case and whitespace.
-- Added a thread-safe idempotency store using atomic reservation semantics.
-- Successful actions retain their reservation and duplicate execution is blocked before handler invocation.
-- Failed, blank-output and missing-handler actions release reservations so an explicit retry can proceed.
-- Confirmation-required actions do not reserve a key before approval.
-- Read-only answer and retrieval requests are not deduplicated.
-- Added immutable `MayraActivityRecord` values and a thread-safe in-memory activity log with defensive snapshots.
-- Added typed `DuplicateBlocked` runtime result.
-- Added idempotency/audit regression tests.
-- Updated capability registry, registry tests, execution roadmap and this rolling backup.
-
-## Validation
-
-Android CI #1337 passed on `f644969fcbe243f4952c66847f8cbd712734cc2b`:
-
-- Kotlin compile passed
-- complete unit-test suite passed
-- Android lint passed
-- isolated R8 APK assembly passed
-- manifest/permission/component audit passed
-- requested Android permissions: none
-- APK and reports upload passed
-
-Artifacts:
-
-- `mayra-document-test-apk-1337` — `sha256:c8c878ba0a4a87514c4a56d9ac0f7f7aced3735c5184371cc7c5ded96a089e8b`
-- `android-reports-1337` — `sha256:84eb551855efad7110840add4f1aead1f30bd74a008aa56d0409e3bbbefcd63e`
+- Added SharedPreferences-backed, versioned runtime activity persistence.
+- Added bounded retention from 1 to 2,000 records, defaulting to 200.
+- Added Unicode-safe Base64 field encoding and corrupt-row skipping.
+- Added history clear and human-readable export support.
+- Added one-time confirmation tokens bound to the exact action idempotency key.
+- Added configurable expiry with a strict maximum of one hour.
+- Added mismatch, unknown, expired and replay detection.
+- Confirmation tokens cannot be issued for non-destructive/safe actions.
+- Added persistence, retention, corruption, Unicode, expiry, binding and replay regression tests.
+- Updated the capability registry and this rolling backup.
 
 ## Safety contract
 
-The router classifies intent. The policy gates capability and confirmation. The runtime invokes only an executable handler.
-
-Action execution additionally requires an atomic idempotency reservation. A duplicate successful or in-progress action never reaches its handler. A failed action releases the reservation for a deliberate retry.
+- Persistent history stores routing/audit metadata and result detail; it does not grant execution permission.
+- A destructive action still requires capability eligibility, an explicit confirmation token and an atomic idempotency reservation.
+- A token is single-use, expires, and is bound to the exact normalized action.
+- Corrupt persisted rows are ignored instead of crashing runtime recovery.
+- History retention is bounded to prevent unbounded local growth.
 
 ## Physical-device truth
 
-Owner verified APK installation/launch and PDF selection/metadata persistence. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance and scanned-PDF behavior remain unverified on phone.
+Owner verified APK installation/launch and PDF selection/metadata persistence. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance, persistent runtime history and confirmation-token flows remain unverified on phone.
 
 ## Recovery instructions
 
 1. Read `docs/MAYRA_BLUEPRINT.md`.
 2. Read `docs/MAYRA_ROADMAP.md`.
 3. Confirm PR #12 remains Draft/unmerged.
-4. Use Android CI #1337 on head `f644969fcbe243f4952c66847f8cbd712734cc2b` as the latest authoritative proof.
+4. Use only the newest fully green CI head as authoritative.
 5. Do not overclaim physical validation.
 6. Update this file after every coding batch.
 
 ## Next step
 
-Add persisted activity history, confirmation-token lifecycle and concrete normal-answer, document-retrieval and confirmed-action adapters.
+Run full CI, then connect concrete normal-answer and Current-only document-retrieval adapters. After that, add confirmed action execution and a user-visible activity/history screen.
