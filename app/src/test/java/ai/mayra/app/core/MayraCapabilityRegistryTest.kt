@@ -32,10 +32,11 @@ class MayraCapabilityRegistryTest {
     }
 
     @Test
-    fun typedRoutingIsDoneAndProviderEligibilityIsNext() {
+    fun routingAndEligibilityAreDoneAndRuntimeIntegrationIsNext() {
         val byId = MayraCapabilityRegistry.capabilities.associateBy { it.id }
         assertEquals(MayraCapabilityStatus.DONE, byId.getValue("core.query-routing").status)
-        assertEquals(MayraCapabilityStatus.IN_PROGRESS, byId.getValue("core.provider-eligibility").status)
+        assertEquals(MayraCapabilityStatus.DONE, byId.getValue("core.provider-eligibility").status)
+        assertEquals(MayraCapabilityStatus.IN_PROGRESS, byId.getValue("core.runtime-integration").status)
     }
 
     @Test
