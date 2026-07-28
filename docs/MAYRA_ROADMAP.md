@@ -10,37 +10,51 @@ Owner-device checklist: `docs/MAYRA_FULL_APP_ACCEPTANCE.md`
 | Track | Status | Progress signal | Next gate |
 |---|---|---|---|
 | Blueprint and backup discipline | DONE | Canonical blueprint, roadmap and rolling snapshots | Keep updated every batch |
-| Document intelligence | DEVICE_VERIFY | 16/18 implemented | Phone verification; OCR and legacy DOC deferred |
+| Document intelligence | DEVICE_VERIFY | 16/18 implemented and CI-verified | Motorola verification; OCR and legacy DOC deferred |
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
-| Personal memory | IN_PROGRESS | Protected storage, health/recovery UI and structured provenance implemented | Full CI and Motorola validation |
-| Conversational provider | IN_PROGRESS | Bounded HTTPS transport plus owner settings UI/store implemented | Full CI, audited network flavor and secure credential integration |
+| Personal memory | DEVICE_VERIFY | Protected storage, health/recovery UI and provenance passed full CI | Motorola acceptance |
+| Conversational provider | FOUNDATION_VERIFIED | Bounded HTTPS transport and owner settings passed full CI | Audited network flavor and secure credential integration |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
-| Actions and automations | DEVICE_VERIFY | Safe picker plus confirmation/idempotency/chat UX | Physical validation and reviewed adapters |
-| Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
-| Privacy and release | IN_PROGRESS | Protected memory and provider credential boundaries | Wider privacy center and production release |
+| Actions and automations | DEVICE_VERIFY | Confirmation/idempotency/chat UX passed full CI | Physical validation and reviewed adapters |
+| Voice intelligence | DEVICE_VERIFY | Existing voice path compiles and packages | Hindi/Hinglish physical evaluation |
+| Privacy and release | IN_PROGRESS | Permission/component audit passed for isolated APK | Wider privacy center and production release |
 
-## Conversational provider — implemented foundation
+## Conversational provider — verified foundation
 
 1. Text-only provider boundary cannot execute actions or write memory.
 2. Timeout, retry, cancellation and deterministic offline fallback are bounded.
-3. Concrete HTTPS POST transport with response-size and history limits.
+3. Concrete HTTPS POST transport enforces response-size and history limits.
 4. HTTP failures classify into temporary and permanent outcomes.
-5. Provider health states expose disabled, missing credential, ready and failure states.
-6. Owner settings store persists only non-secret endpoint/model/enable/limit configuration.
-7. Bearer credentials are intentionally excluded from SharedPreferences and UI persistence.
-8. Provider settings screen includes default-off toggle, validation, save status and emergency disable.
-9. Plain HTTP settings are rejected without overwriting the previous valid configuration.
+5. Provider health exposes disabled, missing credential, ready and failure states.
+6. Owner settings persist only non-secret endpoint/model/enable/limit configuration.
+7. Bearer credentials are excluded from SharedPreferences and UI persistence.
+8. Provider settings include default-off behavior, validation and emergency disable.
+9. Plain HTTP settings are rejected without overwriting valid configuration.
 10. No INTERNET permission or automatic production composition has been introduced.
-11. Response reading is now bounded with an API-26-compatible loop instead of API-33-only `readNBytes`.
+11. Response reading uses an API-26-compatible bounded loop.
 
 ## Full-app verification truth
 
-Android CI #1623 passed debug source compilation and the complete unit-test suite. Android lint then found one compatibility error: `InputStream.readNBytes` requires API 33 while Mayra supports minSdk 26. The provider now uses a manual bounded read loop that preserves the same response-size cap and works on API 26+.
+Android CI #1631 completed successfully on governed head `edc349ac4870a832f3a8612683e3fd7ab584fb82`.
 
-The owner-device acceptance checklist is committed at `docs/MAYRA_FULL_APP_ACCEPTANCE.md` and covers installation, launch, chat, voice, memory approval, Memory Center, protected storage, document library, actions, provider settings, permissions and recovery evidence.
+Passed on the same head:
 
-The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass on the same head. A downloadable CI APK is authoritative only after that full chain succeeds. No physical-device or live-provider claim has been made.
+1. Debug source compilation.
+2. Complete unit-test suite.
+3. Android lint.
+4. Isolated minified document-test APK/R8 build.
+5. Manifest, permission and component audit.
+6. Reports and APK artifact upload.
+
+Artifacts:
+
+- `mayra-document-test-apk-1631`
+- `android-reports-1631`
+- APK artifact ZIP SHA-256: `88d224c33c968c1311cebd34c471153f5bc4960e3aa4094c1961e179761ff0ee`
+- Extracted APK SHA-256: `abe4b65073a32af823c39c45c5c8a1406279878d817cf8068f661a8965195b73`
+
+CI verification does not equal physical-device acceptance. No live remote-provider or Motorola behavior claim is made yet.
 
 ## Immediate next priority
 
-Run the full governed app verification chain on the API-26 repair head. If green, use its isolated APK for owner-device smoke testing with the committed acceptance checklist. PR #12 remains Draft and unmerged.
+Install CI #1631's APK on the owner Motorola device and execute `docs/MAYRA_FULL_APP_ACCEPTANCE.md` screen by screen. Record screenshots and exact reproduction steps for any failure. PR #12 remains Draft and unmerged.
