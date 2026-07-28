@@ -5,7 +5,8 @@ import ai.mayra.app.core.MayraMessage
 
 /**
  * Read-only context decorator. It never writes memory and only exposes approved, active,
- * query-relevant records to the downstream assistant.
+ * query-relevant records to the downstream assistant. When context is used, the owner receives
+ * a compact disclosure listing the memory keys that influenced the answer.
  */
 class PersonalMemoryAwareMayraAssistant(
     private val delegate: MayraAssistant,
@@ -26,6 +27,9 @@ class PersonalMemoryAwareMayraAssistant(
             append("\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n")
             append(context)
         }
-        return delegate.reply(groundedMessage, conversation)
+        return delegate.reply(groundedMessage, conversation).map { answer ->
+            val keys = relevant.joinToString { it.key }
+            "$answer\n\n🧠 Used approved personal memory: $keys"
+        }
     }
 }
