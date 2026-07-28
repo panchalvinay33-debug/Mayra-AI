@@ -1,7 +1,7 @@
 package ai.mayra.app.chat
 
 import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
-import android.util.Base64
+import java.util.Base64
 
 data class ParsedMayraReply(val text: String, val usedPersonalMemoryKeys: List<String>)
 
@@ -18,7 +18,7 @@ object MayraReplyMetadataParser {
             .filter(String::isNotBlank)
             .mapNotNull { encoded ->
                 runCatching {
-                    String(Base64.decode(encoded, Base64.NO_WRAP), Charsets.UTF_8).trim()
+                    String(Base64.getUrlDecoder().decode(encoded), Charsets.UTF_8).trim()
                 }.getOrNull()?.takeIf(String::isNotBlank)
             }
             .distinct()
