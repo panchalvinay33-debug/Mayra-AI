@@ -9,7 +9,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-internal interface MayraMemoryRecordProtector {
+interface MayraMemoryRecordProtector {
     fun protect(plaintext: String): String
     fun unprotect(payload: String): String?
     fun isProtected(payload: String): Boolean
@@ -23,11 +23,7 @@ internal class AndroidKeystoreMayraMemoryProtector(
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
-        return listOf(
-            ENVELOPE_VERSION,
-            b64(cipher.iv),
-            b64(ciphertext)
-        ).joinToString(DELIMITER)
+        return listOf(ENVELOPE_VERSION, b64(cipher.iv), b64(ciphertext)).joinToString(DELIMITER)
     }
 
     override fun unprotect(payload: String): String? = runCatching {
@@ -45,10 +41,7 @@ internal class AndroidKeystoreMayraMemoryProtector(
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
         generator.init(
-            KeyGenParameterSpec.Builder(
-                alias,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
+            KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setRandomizedEncryptionRequired(true)
