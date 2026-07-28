@@ -3,6 +3,7 @@
 Last updated: 2026-07-28
 Canonical blueprint: `docs/MAYRA_BLUEPRINT.md`
 Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
+Owner-device checklist: `docs/MAYRA_FULL_APP_ACCEPTANCE.md`
 
 ## Overall program view
 
@@ -30,13 +31,16 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 8. Provider settings screen includes default-off toggle, validation, save status and emergency disable.
 9. Plain HTTP settings are rejected without overwriting the previous valid configuration.
 10. No INTERNET permission or automatic production composition has been introduced.
+11. Response reading is now bounded with an API-26-compatible loop instead of API-33-only `readNBytes`.
 
 ## Full-app verification truth
 
-Android CI #1617 compiled application sources and executed the complete unit-test suite, but one assertion failed: a disabled remote provider correctly avoided opening a connection yet changed its health state from `DISABLED` to `PERMANENT_FAILURE`. The provider now preserves `DISABLED` while still returning a non-success outcome to the resilient offline-fallback layer.
+Android CI #1623 passed debug source compilation and the complete unit-test suite. Android lint then found one compatibility error: `InputStream.readNBytes` requires API 33 while Mayra supports minSdk 26. The provider now uses a manual bounded read loop that preserves the same response-size cap and works on API 26+.
 
-The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass. A downloadable CI APK is authoritative only after that full chain succeeds. No physical-device or live-provider claim has been made.
+The owner-device acceptance checklist is committed at `docs/MAYRA_FULL_APP_ACCEPTANCE.md` and covers installation, launch, chat, voice, memory approval, Memory Center, protected storage, document library, actions, provider settings, permissions and recovery evidence.
+
+The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass on the same head. A downloadable CI APK is authoritative only after that full chain succeeds. No physical-device or live-provider claim has been made.
 
 ## Immediate next priority
 
-Run the full governed app verification chain on the repaired head. If green, use its isolated APK for owner-device smoke testing of launch, chat, documents, Memory Center, provider settings and safety controls. PR #12 remains Draft and unmerged.
+Run the full governed app verification chain on the API-26 repair head. If green, use its isolated APK for owner-device smoke testing with the committed acceptance checklist. PR #12 remains Draft and unmerged.
