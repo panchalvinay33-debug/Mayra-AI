@@ -3,47 +3,42 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest source head before governance commits: `24fdd22aa1142d09c45734e3bc3d646881cf610f`
+Latest source head before governance commits: `94b9f295316ada0b5796a2b0473047fd83c957c6`
 Latest fully validated functional head: `abfa2711f01bb526d1c6fdb93364aa8ea148c6af`
 Authoritative previous green CI: Android CI #1458
 
 ## Validation truth
 
-Android CI #1589 failed during debug compilation. The exact error was in `MayraMemoryCenterActivity`: Compose `ColumnScope.this` was passed to `AndroidMayraMemoryStorageHealthReader`, which requires Android `Context`. The implementation now captures `LocalContext.current` and uses it for initial and retry diagnostics. A newer full pipeline is required before any green claim.
+Android CI #1601 compiled application sources successfully but failed compiling provider unit tests. The exact cause was Kotlin SAM construction against a normal `MayraProviderCredentialSource` interface. The contract is now a `fun interface`; runtime behavior is unchanged. A newer full pipeline is required before any green claim.
 
 ## Completed in this batch
 
-- Fixed the exact CI #1589 Compose-context compile regression.
-- Preserved the non-destructive Memory Center health and migration-retry UX.
-- Added `MayraHttpConversationalProvider`, a concrete HTTPS POST transport.
-- Added owner-controlled enabled state, HTTPS endpoint validation and model selection.
-- Added runtime authorization-source integration without storing authorization in memory or chat.
-- Added bounded connect/read timeouts and maximum response bytes.
-- Added bounded serialization of recent conversation and message text.
-- Added JSON escaping and extraction of a required string `text` response field.
-- Classified HTTP 408, 429 and 5xx as temporary; other non-2xx responses as permanent.
-- Added provider health states for disabled, missing authorization, ready, temporary failure and permanent failure.
-- Added tests for disabled/missing configuration, successful Unicode response, HTTP classification and oversized response rejection.
-- Kept the transport uninstalled by default and added no Android network permission in this batch.
+- Fixed the exact CI #1601 unit-test compilation regression.
+- Added non-secret owner provider settings model and Android SharedPreferences store.
+- Persisted endpoint, model, enable state and bounded transport limits only.
+- Explicitly excluded bearer tokens, authorization and secrets from settings persistence.
+- Added HTTPS validation with failure-safe preservation of the previous valid settings.
+- Added owner-facing Remote Provider screen.
+- Added default-off toggle, settings validation, save feedback and emergency disable.
+- Registered the settings activity without adding INTERNET permission.
+- Added Robolectric tests for defaults, persistence, secret exclusion, invalid-HTTP rollback and emergency disable.
+- Kept concrete remote provider uninstalled from `MayraApplication`.
 
 ## Safety contract
 
-- The network provider returns text only and cannot execute actions or write memory.
-- Remote use is owner-disabled by default.
-- Non-HTTPS endpoints are rejected at configuration construction.
-- Response bodies larger than the configured cap are rejected.
-- Missing runtime authorization prevents opening a connection.
-- Offline fallback remains owned by `ResilientMayraProviderAssistant`.
-- No live-provider or device validation is claimed.
+- Remote provider remains owner-disabled by default.
+- Credentials are supplied separately at runtime and are never stored by the settings screen.
+- Invalid settings cannot destroy the previous valid configuration.
+- Emergency disable preserves endpoint/model while switching remote use off.
+- No network permission, live-provider claim or physical-device claim is made.
 
 ## Known limitations
 
 - The newest source has not yet passed compile, complete tests, lint, R8 and component audit.
-- A production network permission/release-flavor strategy is not yet approved or implemented.
-- No owner-facing provider settings screen exists yet.
-- No concrete provider is installed into `MayraApplication`.
-- Live Hindi/Hinglish provider quality remains untested.
-- Motorola memory-health and provenance-chip validation remains pending.
+- No audited network-enabled release flavor exists yet.
+- No secure runtime credential implementation is installed.
+- Provider settings do not dynamically recompose the active assistant until restart/future runtime controller work.
+- Live Hindi/Hinglish quality and Motorola validation remain pending.
 
 ## Recovery instructions
 
@@ -51,10 +46,10 @@ Android CI #1589 failed during debug compilation. The exact error was in `MayraM
 2. Confirm PR #12 remains Draft and unmerged.
 3. Check the newest governed-head CI before claiming validation.
 4. Use CI #1458 as authoritative green evidence until superseded.
-5. Do not enable network composition or add permissions without an audited release decision.
-6. Keep runtime authorization outside source, chat and personal memory.
+5. Do not add INTERNET permission or provider composition without an audited release decision.
+6. Keep credentials outside source, chat, memory and ordinary preferences.
 7. Update this snapshot after every coding batch.
 
 ## Next step
 
-Stabilize the newest full CI. Then add secure owner-facing provider settings and an audited network-enabled release flavor, followed by live provider health checks and Hindi/Hinglish evaluation.
+Stabilize full CI, then add an audited network-enabled release flavor, secure runtime credentials, provider runtime composition/health controls and Hindi/Hinglish evaluation.
