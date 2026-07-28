@@ -12,7 +12,7 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Document intelligence | DEVICE_VERIFY | 16/18 implemented | Phone verification; OCR and legacy DOC deferred |
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical validation |
-| Concrete runtime integration | DEVICE_VERIFY | Android composition root, adapters and Activity History UI implemented | Phone validation and main-chat UX wiring |
+| Concrete runtime integration | DEVICE_VERIFY | Android composition root is installed in the full app; Activity History is reachable from chat | Confirmation dialog and typed chat bridge |
 | Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | IN_PROGRESS | Safe file-picker action plus confirmation/idempotency foundation | Calendar/email/reminder adapters |
@@ -43,18 +43,20 @@ DEFERRED: on-device OCR and legacy binary `.doc` parsing.
 10. Current-only document-retrieval adapter
 11. Explicit optional device-action executor adapter
 12. Android runtime composition root
-13. Limited permission-free system file-picker action executor
-14. User-visible Activity History screen
-15. Activity clear and Android share-sheet export controls
-16. Isolated APK manifest audit for the history component
-17. Automated routing, persistence, confirmation, adapter and composition tests
+13. Full-app `MayraApplication` installation of the typed runtime
+14. Limited permission-free system file-picker action executor
+15. User-visible Activity History screen
+16. Activity clear and Android share-sheet export controls
+17. Main-chat History navigation
+18. Isolated APK manifest audit for the history component
+19. Automated routing, persistence, confirmation, adapter and composition tests
 
 ### DEVICE_VERIFY / IN_PROGRESS
 
 1. Activity History screen on a physical phone
 2. System file-picker action on a physical phone
 3. Confirmation dialog/token UX in the main chat surface
-4. Main-chat composition wiring without blocking the existing suspend assistant path
+4. Non-blocking typed chat bridge while preserving the existing suspend assistant and voice path
 5. End-to-end physical-device validation
 
 ## Remaining product tracks
@@ -75,12 +77,13 @@ DEFERRED: on-device OCR and legacy binary `.doc` parsing.
 
 ## Current batch pending authoritative validation
 
-- Added Android runtime composition root.
-- Added a narrow permission-free system file-picker action executor.
-- Added Activity History UI with clear and share-sheet export.
-- Registered and audited the history activity in the isolated APK.
-- Added composition and safe-action regression tests.
+- Confirmed Android CI #1407 was fully green for the previous visible-runtime head.
+- Installed `MayraAndroidRuntimeComposition` in the full application container.
+- Reused the existing deterministic local command engine as the synchronous typed answer provider.
+- Preserved the existing suspend assistant, document wrapper and voice behavior.
+- Added a History chip to the main chat header.
+- Kept the first device action limited to Android's permission-free system file picker.
 
 ## Immediate next coding priority
 
-Run full CI on the latest governed head. After green validation, wire a non-blocking typed runtime bridge into the main chat UI and add confirmation dialog state. PR #12 remains Draft and unmerged.
+Run full CI on the latest governed head. After green validation, add confirmation-dialog state and a non-blocking typed runtime bridge to the main chat. PR #12 remains Draft and unmerged.
