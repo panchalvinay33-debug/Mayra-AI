@@ -98,6 +98,7 @@ jobs:
           done
 
           grep -Fq "ai.mayra.app.document.MayraDocumentActivity" build/ci/document-test-manifest-tree.log
+          grep -Fq "ai.mayra.app.core.MayraActivityHistoryActivity" build/ci/document-test-manifest-tree.log
           grep -Fq "ai.mayra.app.documenttest.DocumentTestApplication" build/ci/document-test-manifest-tree.log
 
       - name: Upload reports
