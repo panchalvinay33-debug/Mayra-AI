@@ -21,7 +21,9 @@ class MayraPersistentActivityLog(
     @Synchronized
     override fun append(record: MayraActivityRecord) {
         val updated = (snapshot() + record).takeLast(maxRecords)
-        preferences.edit().putString(KEY, updated.joinToString("\n", transform = MayraActivityCodec::encode)).commit()
+        preferences.edit()
+            .putString(KEY, updated.joinToString("\n", transform = MayraActivityCodec::encode))
+            .commit()
     }
 
     @Synchronized
@@ -30,8 +32,8 @@ class MayraPersistentActivityLog(
         .lineSequence()
         .filter(String::isNotBlank)
         .mapNotNull(MayraActivityCodec::decode)
-        .takeLast(maxRecords)
         .toList()
+        .takeLast(maxRecords)
 
     @Synchronized
     fun clear(): Boolean = preferences.edit().remove(KEY).commit()
