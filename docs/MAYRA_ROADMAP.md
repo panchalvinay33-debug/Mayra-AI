@@ -12,12 +12,12 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Document intelligence | DEVICE_VERIFY | 16/18 implemented | Phone verification; OCR and legacy DOC deferred |
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical validation |
-| Concrete runtime integration | DEVICE_VERIFY | Android composition root is installed in the full app; Activity History is reachable from chat | Confirmation dialog and typed chat bridge |
-| Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
+| Concrete runtime integration | DEVICE_VERIFY | Full-app composition, Activity History and main-chat Confirm/Cancel UX are CI-verified | Physical-device validation |
+| Personal memory | PLANNED | No completion claim | Consent-first schema, provenance and controls |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | IN_PROGRESS | Safe file-picker action plus confirmation/idempotency foundation | Calendar/email/reminder adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
-| Privacy and release | IN_PROGRESS | CI audits, local history, clear and export UI | Broader privacy center and production release |
+| Privacy and release | IN_PROGRESS | CI audits, local history, clear/export and confirmation UX | Broader privacy center and production release |
 
 ## Document intelligence
 
@@ -48,16 +48,22 @@ DEFERRED: on-device OCR and legacy binary `.doc` parsing.
 15. User-visible Activity History screen
 16. Activity clear and Android share-sheet export controls
 17. Main-chat History navigation
-18. Isolated APK manifest audit for the history component
-19. Automated routing, persistence, confirmation, adapter and composition tests
+18. Non-blocking typed chat bridge that preserves normal suspend-assistant answers
+19. Main-chat exact-action Confirm/Cancel dialog
+20. Pending confirmation retained in ViewModel state across configuration changes
+21. Typed retrieval/action/blocked/failure results added to the chat conversation
+22. Input, voice and duplicate sends locked while confirmation is pending
+23. Automated bridge, replay, adapter, composition and runtime tests
+24. Isolated APK zero-permission/component audit
 
-### DEVICE_VERIFY / IN_PROGRESS
+### DEVICE VERIFY / REMAINING
 
 1. Activity History screen on a physical phone
 2. System file-picker action on a physical phone
-3. Confirmation dialog/token UX in the main chat surface
-4. Non-blocking typed chat bridge while preserving the existing suspend assistant and voice path
-5. End-to-end physical-device validation
+3. Confirm/Cancel UX and action-result chat display on a physical phone
+4. Rotation/configuration-change confirmation retention on a physical phone
+5. Process-death persistence for pending confirmations is not implemented
+6. End-to-end physical-device validation
 
 ## Remaining product tracks
 
@@ -75,15 +81,15 @@ DEFERRED: on-device OCR and legacy binary `.doc` parsing.
 4. Never merge or mark ready without explicit approval.
 5. Keep permissions and background components auditable.
 
-## Current batch pending authoritative validation
+## Latest authoritative validation
 
-- Confirmed Android CI #1407 was fully green for the previous visible-runtime head.
-- Installed `MayraAndroidRuntimeComposition` in the full application container.
-- Reused the existing deterministic local command engine as the synchronous typed answer provider.
-- Preserved the existing suspend assistant, document wrapper and voice behavior.
-- Added a History chip to the main chat header.
-- Kept the first device action limited to Android's permission-free system file picker.
+Android CI #1427 passed on `e9ab540a9b81e8d846a63d81890c839e6305b473`: compile, complete tests, Android lint, isolated R8 APK, zero-permission/component audit and artifact uploads passed.
+
+Artifacts:
+
+- `mayra-document-test-apk-1427` — `sha256:794aa8a8bf2fb75ef27a7c7a8181af1d7de97773ac21ff9885cf34e5b05f9138`
+- `android-reports-1427` — `sha256:255a06851978858b322d58760189b620e61e897f80d080cebf87f541a8edcec2`
 
 ## Immediate next coding priority
 
-Run full CI on the latest governed head. After green validation, add confirmation-dialog state and a non-blocking typed runtime bridge to the main chat. PR #12 remains Draft and unmerged.
+Begin the consent-first personal-memory foundation: explicit user approval, provenance, sensitive-memory exclusions, edit/delete/expiry and deterministic retrieval tests. PR #12 remains Draft and unmerged.
