@@ -54,7 +54,12 @@ class MayraHttpConversationalProvider(
     fun health(): MayraProviderHealth = lastHealth
 
     override suspend fun answer(request: MayraProviderRequest): MayraProviderResult {
-        if (!config.enabled) return permanent("Remote provider is disabled by the owner.")
+        if (!config.enabled) {
+            return permanent(
+                "Remote provider is disabled by the owner.",
+                MayraProviderHealthState.DISABLED
+            )
+        }
         val token = credentials.bearerToken()?.trim().orEmpty()
         if (token.isEmpty()) return permanent("Remote provider credential is missing.", MayraProviderHealthState.MISSING_CREDENTIAL)
 
