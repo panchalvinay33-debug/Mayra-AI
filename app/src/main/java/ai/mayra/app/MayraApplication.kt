@@ -25,6 +25,7 @@ import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import android.app.Application
 import java.util.Calendar
+import kotlinx.coroutines.runBlocking
 
 class MayraApplication : Application() {
     override fun onCreate() {
@@ -43,7 +44,7 @@ class MayraApplication : Application() {
         val typedRuntime = MayraAndroidRuntimeComposition(
             context = applicationContext,
             answerProvider = MayraAnswerProvider { message ->
-                localCommandEngine.respond(message, emptyList())
+                runBlocking { localCommandEngine.respond(message, emptyList()) }
             },
             enableSafeFilePickerAction = true
         )
