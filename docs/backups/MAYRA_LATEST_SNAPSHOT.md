@@ -3,10 +3,10 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest verified head: `452e6d5240cb8875362ae049696b1400e8216d9e`
-Authoritative CI: Android CI #1367
-APK artifact: `mayra-document-test-apk-1367`
-APK artifact ZIP SHA-256: `c5a3c0de8b8f2720c83b954311eb64149bdd7146919eac2e2727e8952999fc1f`
+Latest verified head: `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`
+Authoritative CI: Android CI #1369
+APK artifact: `mayra-document-test-apk-1369`
+APK artifact ZIP SHA-256: `dee0f978a4b3a54e8af09e578c7092bd9c271492538281b5a5602e5fcebef688`
 
 ## Product state
 
@@ -28,7 +28,7 @@ APK artifact ZIP SHA-256: `c5a3c0de8b8f2720c83b954311eb64149bdd7146919eac2e2727e
 
 ## Validation
 
-Android CI #1367 passed on `452e6d5240cb8875362ae049696b1400e8216d9e`:
+Android CI #1369 passed on `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`:
 
 - Kotlin compile passed
 - complete unit-test suite passed
@@ -40,8 +40,8 @@ Android CI #1367 passed on `452e6d5240cb8875362ae049696b1400e8216d9e`:
 
 Artifacts:
 
-- `mayra-document-test-apk-1367` — `sha256:c5a3c0de8b8f2720c83b954311eb64149bdd7146919eac2e2727e8952999fc1f`
-- `android-reports-1367` — `sha256:7f5aae8e80da350d04c29f9455debee52cb1c64ccdc3c54358ba9baa0c84af72`
+- `mayra-document-test-apk-1369` — `sha256:dee0f978a4b3a54e8af09e578c7092bd9c271492538281b5a5602e5fcebef688`
+- `android-reports-1369` — `sha256:1e6eed7017aec7b81b0da99d10b596ce5d7d4eb190e378336d4662756c37bb65`
 
 ## Safety contract
 
