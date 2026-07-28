@@ -1,6 +1,6 @@
 # Mayra AI — Execution Roadmap
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 Canonical blueprint: `docs/MAYRA_BLUEPRINT.md`
 Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
@@ -16,15 +16,16 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 | Track | Status | Progress signal | Next gate |
 |---|---|---:|---|
-| Product blueprint and backup discipline | DONE | Canonical blueprint, roadmap, rolling snapshot, immutable snapshot and update policy | Keep updated every batch |
+| Product blueprint and backup discipline | DONE | Blueprint, roadmap, rolling/immutable snapshots and update policy | Keep updated every batch |
 | Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred |
-| Core routing and capability registry | IN_PROGRESS | Global registry DONE; typed routing outcomes next | Add answer/retrieve/act/clarify/unsupported result model |
-| Personal memory | PLANNED | No completion claim | Data model, consent, edit/delete, freshness |
-| Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations, freshness, failure policy |
-| Actions and automations | PLANNED | Existing foundations require audited scope | Confirmation, transaction log, rollback/result model |
-| Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation plan and device validation |
-| Privacy/safety center | IN_PROGRESS | Least-privilege CI and isolated APK audits exist | User-facing controls and audit history |
-| Release/recovery | IN_PROGRESS | Android CI, isolated APKs and snapshot discipline exist | Versioning, migration tests, reproducible release checklist |
+| Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Provider/tool eligibility gates |
+| Provider/tool eligibility | IN_PROGRESS | Capability registered; execution contract next | Availability, privacy, freshness and confirmation checks |
+| Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
+| Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations and freshness |
+| Actions and automations | PLANNED | No completion claim | Typed execution, confirmation and history |
+| Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
+| Privacy/safety center | IN_PROGRESS | Least-privilege CI audits exist | User-facing controls and audit history |
+| Release/recovery | IN_PROGRESS | CI, isolated APKs and snapshots exist | Versioning and migration/release checklist |
 
 ## Track A — Document intelligence
 
@@ -49,39 +50,43 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 ### DEVICE_VERIFY
 
-- PDF re-index and content search on the owner’s phone
+- PDF re-index and content search
 - DOCX add/index/search
 - freshness badge and changed-file behavior
 - Smart refresh and transactional maintenance UX
 
-### DEFERRED TO SEPARATE MILESTONES
+### DEFERRED
 
 17. On-device OCR for scanned PDFs/images
 18. Legacy binary `.doc` parser
-
-Document foundation should not block progress on broader Mayra modules. Only device-found bugs should return to this PR unless scope is explicitly reopened.
 
 ## Track B — Core assistant and routing
 
 ### DONE
 
-1. Global capability registry and machine-testable module status snapshot
-2. Registry uniqueness, count integrity and critical-state regression tests
+1. Global capability registry and status snapshot
+2. Registry integrity regression tests
+3. Typed routing outcomes: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, `UNSUPPORTED`
+4. Explicit reason and bounded confidence on every decision
+5. Required-capability metadata
+6. Destructive-action confirmation flag
+7. Backward-compatible `DOCUMENTS`/`DELEGATE` route
+8. Hindi/English document routing and unsupported OCR/legacy-DOC tests
 
-### Existing foundation
+### IN_PROGRESS — Provider/tool eligibility
 
-- Intent engine and query router files exist
-- Document-aware assistant integration exists
-- Deterministic local tests exist for current routes
+1. Runtime capability availability model
+2. Privacy and permission eligibility
+3. Freshness/network requirements
+4. Confirmation gate before action execution
+5. Deterministic fallback reason
+6. Provider selection tests
 
-### Next implementation sequence
+### NEXT
 
-1. Typed routing outcome: answer, retrieve, act, clarify, unsupported
-2. Provider/tool eligibility rules
-3. Confidence and fallback reasons
-4. Hindi/Hinglish routing regression corpus
-5. Action confirmation boundary
-6. End-to-end assistant runtime tests
+- Hindi/Hinglish routing corpus expansion
+- End-to-end assistant runtime integration
+- Typed action result/history contract
 
 ## Track C — Personal memory
 
@@ -97,52 +102,44 @@ Document foundation should not block progress on broader Mayra modules. Only dev
 
 1. Provider-neutral search interface
 2. Freshness requirements
-3. Source citations and provenance
+3. Citations and provenance
 4. Query privacy/redaction
-5. Offline/no-provider fallback
-6. Result ranking and deduplication
+5. Offline fallback
+6. Ranking and deduplication
 7. Connected-source boundaries
-8. Search-to-answer regression tests
+8. Search-to-answer tests
 
 ## Track E — Actions and automations
 
 1. Typed action requests
 2. Confirmation policy
-3. Permission and capability checks
+3. Permission/capability checks
 4. Transaction/result record
 5. Partial-failure handling
-6. Idempotency and duplicate prevention
-7. User-visible activity history
+6. Idempotency
+7. User-visible history
 8. Calendar/email/reminder adapters
 
 ## Track F — Voice intelligence
 
-This remains a separate controlled milestone. Do not add speech packages or replace stable voice behavior merely to advance the roadmap.
-
-1. Hindi/Hinglish utterance corpus
-2. Wake/listen state model
-3. Speech-to-text provider boundary
-4. Text-to-speech provider boundary
-5. Interruption/cancellation behavior
-6. Device and privacy evaluation
+Voice remains a separate controlled milestone. Do not add speech packages or replace stable voice behavior merely to advance this roadmap.
 
 ## Track G — Release, recovery and governance
 
-1. Keep blueprint, roadmap and latest snapshot updated every coding batch
-2. Add dated immutable snapshots at significant milestones
-3. Record verified head SHA, CI run and artifact digest
-4. Never mark physical tests passed without owner/device evidence
-5. Never merge or mark PR ready without explicit approval
-6. Maintain rollback/migration tests for persisted data
-7. Keep permissions and background components auditable
+1. Update blueprint/roadmap/latest snapshot every coding batch
+2. Add immutable snapshot at significant milestones
+3. Record verified head, CI and artifact digest
+4. Never claim physical validation without owner evidence
+5. Never merge or mark ready without explicit approval
+6. Maintain persisted-data migration/rollback tests
+7. Keep permissions/background components auditable
 
-## Latest completed governance milestone
+## Current milestone state
 
-- Global registry implementation head: `3d829bfa57851141b64fe7933f54b9d0e21ced9e`
-- Authoritative Android CI: #1275, full pipeline passed
-- Artifacts: `mayra-document-test-apk-1275`, `android-reports-1275`
-- APK artifact ZIP SHA-256: `d72817f2eb98a8831aed56cede243cd7b2b2ac5a5ac9a13940b5df497316789b`
+- Typed routing implementation head before documentation update: `041c6dbaab69ecd608343e4b8af8683d05461a07`
+- CI #1287: compile and complete tests passed; workflow was externally cancelled during lint, so it is not authoritative.
+- A fresh full CI is required on the latest documentation head.
 
 ## Immediate next coding priority
 
-Implement **typed routing outcomes** in the core assistant: `ANSWER`, `RETRIEVE`, `ACT`, `CLARIFY`, and `UNSUPPORTED`, with explicit reason/confidence fields and compatibility tests for existing routes. Keep PR #12 Draft/unmerged; use a separate focused branch/PR for the next major module when explicitly approved.
+Implement **provider/tool eligibility rules** so a typed route cannot execute unless its capability is available and its privacy, freshness, network and confirmation requirements are satisfied. PR #12 remains Draft and unmerged.
