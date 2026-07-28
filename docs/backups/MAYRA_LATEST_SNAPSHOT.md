@@ -3,57 +3,64 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest authoritative code head: `e9ab540a9b81e8d846a63d81890c839e6305b473`
-Authoritative CI: Android CI #1427
-APK artifact: `mayra-document-test-apk-1427`
-APK artifact ZIP SHA-256: `794aa8a8bf2fb75ef27a7c7a8181af1d7de97773ac21ff9885cf34e5b05f9138`
-Reports artifact SHA-256: `255a06851978858b322d58760189b620e61e897f80d080cebf87f541a8edcec2`
+Latest authoritative code head before this docs update: `d4286a237a4be8d2f66577e2522ad8fa1fb52080`
+Authoritative CI: Android CI #1445
+APK artifact: `mayra-document-test-apk-1445`
+APK artifact ZIP SHA-256: `ad83a12d5f712ed7d216b7ff0ebe971dcf95ba3d3bbdd61c52390e585ef624e5`
+Reports artifact SHA-256: `afaf373e6b3e3f831fdff516bb3615f460eb67b1d6d9ef480ecc5094b503320c`
 
 ## Product state
 
 - Document foundation remains 16/18 implemented; OCR and legacy DOC are deferred.
-- Typed routing, provider eligibility, audited runtime, idempotency and persistent history are implemented.
-- Android composition root, Activity History and main-chat typed bridge are implemented and CI-verified.
-- Exact-action Confirm/Cancel UX is implemented in the main chat.
-- Normal conversational answers still use the stable suspend assistant and voice path.
-- Personal memory, fresh cited search, calendar/email/reminders and controlled Hindi/Hinglish voice remain major product tracks.
+- Typed routing, provider eligibility, audited runtime, idempotency and persistent activity history are implemented.
+- Android composition root, Activity History and main-chat exact-action Confirm/Cancel UX are implemented and CI-verified.
+- Consent-first personal-memory foundation is implemented and automated-test verified.
+- Personal-memory user-facing controls and chat proposal UX remain active work.
+- Fresh cited search, broader calendar/email/reminder actions and controlled Hindi/Hinglish voice remain major product tracks.
 
 ## Completed in this batch
 
-- Added `MayraChatRuntimeBridge`.
-- Normal `ANSWER` outcomes delegate to the existing suspend assistant.
-- `RETRIEVE`, `ACT`, `CLARIFY` and `UNSUPPORTED` outcomes use the typed runtime.
-- Added pending-confirmation state to `ChatUiState` and `ChatViewModel`.
-- Pending state survives Android configuration changes because it is retained by the ViewModel.
-- Added main-chat Confirm/Cancel dialog showing the exact requested action.
-- Confirm consumes the one-time token and appends the typed execution result to chat.
-- Cancel clears the pending action and appends an explicit cancellation message.
-- Input, voice, clear and duplicate sends are locked while confirmation is pending.
-- Added bridge tests for stable-answer delegation, document retrieval, token creation, exact execution and replay blocking.
-- Android CI #1427 passed compile, complete tests, lint, R8 isolated APK, zero-permission/component audit and artifact upload.
+- Added personal-memory candidate, stored-memory, category, sensitivity and provenance models.
+- Added explicit proposal/approval flow; proposal creation does not write to persistent storage.
+- Added one-time proposal consumption and explicit rejection.
+- Added prohibited-memory exclusions for passwords, PIN/OTP, payment-card secrets, Aadhaar and cryptographic recovery secrets.
+- Added sensitive-memory exclusions for health, religion/caste/politics/sexual orientation and salary/bank-account data.
+- Added source type, source reference and capture-time provenance.
+- Added optional expiry and automatic expired-record pruning.
+- Added user-controlled update, delete and clear operations.
+- Added same-key correction with stable identity and revision increment.
+- Added deterministic relevance retrieval using only user-authored key/value evidence.
+- Added bounded Android SharedPreferences persistence with a versioned Unicode-safe codec.
+- Added corrupt-record skipping, configurable retention and readable export.
+- Added pure JVM and Robolectric tests covering consent, exclusions, expiry, revision, retrieval, persistence, corruption, Unicode and user deletion.
+- First CI #1443 found category-label relevance inflation; retrieval was corrected and full CI #1445 passed.
 
-## Safety contract
+## Memory safety contract
 
-- Persistent history is audit data, not execution permission.
-- Confirmation tokens remain bound to one normalized action and cannot be replayed.
-- Destructive operations remain unsupported by the first Android executor even after confirmation.
-- Document retrieval remains Current-index only.
-- Normal chat and voice behavior are preserved rather than replaced by the typed runtime.
-- Pending confirmation is configuration-safe but is not yet persisted across process death.
+- Mayra must not silently create personal memories from conversation text.
+- A memory is stored only after explicit approval of a concrete proposal.
+- Prohibited or sensitive candidates are rejected before a proposal can be approved.
+- Retrieval uses only active, approved records and never expired records.
+- Internal category labels do not count as user evidence during retrieval.
+- Provenance accompanies every record and changes when the record is corrected.
+- Delete and clear are direct user controls.
+- Pending proposals are currently in-memory and do not survive process death.
+- The Android store is local and permission-free; no network provider is introduced.
 
 ## Physical-device truth
 
-Owner verified APK installation/launch and PDF selection/metadata persistence in an earlier build. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance, Activity History, export/clear, system-picker action, main-chat Confirm/Cancel and rotation retention remain unverified on phone.
+Owner verified APK installation/launch and PDF selection/metadata persistence in an earlier build. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance, Activity History, export/clear, system-picker action, main-chat Confirm/Cancel, rotation retention and all personal-memory flows remain unverified on phone.
 
 ## Recovery instructions
 
 1. Read `docs/MAYRA_BLUEPRINT.md` and `docs/MAYRA_ROADMAP.md`.
 2. Confirm PR #12 remains Draft/unmerged.
-3. Use Android CI #1427 on `e9ab540a9b81e8d846a63d81890c839e6305b473` as the newest fully verified code head until a later full-green run exists.
+3. Use Android CI #1445 on `d4286a237a4be8d2f66577e2522ad8fa1fb52080` as the newest fully verified functional head until a later full-green run exists.
 4. Do not overclaim physical validation.
-5. Keep the first Android action executor narrow until each additional action receives explicit safety review and tests.
-6. Update this snapshot after every coding batch.
+5. Do not connect memory to chat context until Memory Center controls and explicit proposal UX are implemented.
+6. Keep sensitive-memory exclusions conservative.
+7. Update this snapshot after every coding batch.
 
 ## Next step
 
-Begin consent-first personal memory: explicit save approval, provenance, sensitive-memory exclusions, edit/delete/expiry, deterministic retrieval and user-facing controls.
+Build the Memory Center, chat Save/Not now proposal dialog, visible provenance/expiry controls and approved-memory context injection. Then run full CI on the latest governed head.
