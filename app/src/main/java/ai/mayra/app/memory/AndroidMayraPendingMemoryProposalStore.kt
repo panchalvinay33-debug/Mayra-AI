@@ -8,35 +8,39 @@ import java.time.Instant
 class AndroidMayraPendingMemoryProposalStore(
     context: Context,
     private val maxRecords: Int = 20,
-    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE),
+    private val protector: MayraMemoryRecordProtector = AndroidKeystoreMayraMemoryProtector(PENDING_KEY_ALIAS)
 ) : MayraPendingMemoryProposalStore {
     init { require(maxRecords in 1..100) }
 
     @Synchronized
-    override fun all(): List<MayraPendingMemoryProposal> = preferences.getStringSet(KEY_RECORDS, emptySet()).orEmpty()
-        .mapNotNull(MayraPendingMemoryProposalCodec::decode)
-        .sortedByDescending { it.createdAt }
+    override fun all(): List<MayraPendingMemoryProposal> {
+        val rawRecords = preferences.getStringSet(KEY_RECORDS, emptySet()).orEmpty()
+        var migrationNeeded = false
+        val decoded = rawRecords.mapNotNull { raw ->
+            val plaintext = when {
+                protector.isProtected(raw) -> protector.unprotect(raw)
+                else -> raw.also { migrationNeeded = true }
+            }
+            plaintext?.let(MayraPendingMemoryProposalCodec::decode)
+        }.sortedByDescending { it.createdAt }
+        if (migrationNeeded && decoded.isNotEmpty()) runCatching { persist(decoded) }
+        return decoded
+    }
 
     @Synchronized
     override fun put(proposal: MayraPendingMemoryProposal) {
-        val encoded = all().filterNot { it.id == proposal.id }.plus(proposal)
+        val records = all().filterNot { it.id == proposal.id }.plus(proposal)
             .sortedByDescending { it.createdAt }
             .take(maxRecords)
-            .map(MayraPendingMemoryProposalCodec::encode)
-            .toSet()
-        check(preferences.edit().putStringSet(KEY_RECORDS, encoded).commit()) {
-            "Unable to persist pending Mayra memory approval."
-        }
+        persist(records)
     }
 
     @Synchronized
     override fun remove(id: String): MayraPendingMemoryProposal? {
         val records = all()
         val removed = records.firstOrNull { it.id == id } ?: return null
-        val retained = records.filterNot { it.id == id }.map(MayraPendingMemoryProposalCodec::encode).toSet()
-        check(preferences.edit().putStringSet(KEY_RECORDS, retained).commit()) {
-            "Unable to remove pending Mayra memory approval."
-        }
+        persist(records.filterNot { it.id == id })
         return removed
     }
 
@@ -47,9 +51,19 @@ class AndroidMayraPendingMemoryProposalStore(
         }
     }
 
+    private fun persist(records: List<MayraPendingMemoryProposal>) {
+        val protectedRecords = records.map {
+            protector.protect(MayraPendingMemoryProposalCodec.encode(it))
+        }.toSet()
+        check(preferences.edit().putStringSet(KEY_RECORDS, protectedRecords).commit()) {
+            "Unable to persist protected pending Mayra memory approval."
+        }
+    }
+
     private companion object {
         const val PREFS = "mayra_pending_memory_proposals_v1"
         const val KEY_RECORDS = "records"
+        const val PENDING_KEY_ALIAS = "mayra.pending.memory.aes.v1"
     }
 }
 
