@@ -13,6 +13,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class AndroidMayraPendingMemoryProposalStoreTest {
     private lateinit var context: Context
+    private val protector = TestProtector()
 
     @Before fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -21,24 +22,25 @@ class AndroidMayraPendingMemoryProposalStoreTest {
 
     @Test fun proposalSurvivesStoreRecreation() {
         val proposal = proposal("p1", "भाषा", "हिंदी")
-        AndroidMayraPendingMemoryProposalStore(context).put(proposal)
-        assertEquals(proposal, AndroidMayraPendingMemoryProposalStore(context).all().single())
+        AndroidMayraPendingMemoryProposalStore(context, protector = protector).put(proposal)
+        assertEquals(proposal, AndroidMayraPendingMemoryProposalStore(context, protector = protector).all().single())
     }
 
     @Test fun removeAndClearPersist() {
-        val store = AndroidMayraPendingMemoryProposalStore(context)
+        val store = AndroidMayraPendingMemoryProposalStore(context, protector = protector)
         store.put(proposal("p1", "city", "Indore"))
         assertEquals("p1", store.remove("p1")?.id)
-        assertTrue(AndroidMayraPendingMemoryProposalStore(context).all().isEmpty())
+        assertTrue(AndroidMayraPendingMemoryProposalStore(context, protector = protector).all().isEmpty())
         store.put(proposal("p2", "food", "poha"))
         store.clear()
-        assertTrue(AndroidMayraPendingMemoryProposalStore(context).all().isEmpty())
+        assertTrue(AndroidMayraPendingMemoryProposalStore(context, protector = protector).all().isEmpty())
     }
 
-    @Test fun corruptEntriesAreSkipped() {
+    @Test fun corruptEntriesAreSkippedAndLegacyMigrates() {
         val prefs = context.getSharedPreferences("mayra_pending_memory_proposals_v1", Context.MODE_PRIVATE)
         prefs.edit().putStringSet("records", setOf("broken", MayraPendingMemoryProposalCodec.encode(proposal("p1", "city", "Indore")))).commit()
-        assertEquals(1, AndroidMayraPendingMemoryProposalStore(context).all().size)
+        assertEquals(1, AndroidMayraPendingMemoryProposalStore(context, preferences = prefs, protector = protector).all().size)
+        assertTrue(prefs.getStringSet("records", emptySet()).orEmpty().single().startsWith("pending:"))
     }
 
     private fun proposal(id: String, key: String, value: String): MayraPendingMemoryProposal {
@@ -46,12 +48,17 @@ class AndroidMayraPendingMemoryProposalStoreTest {
         return MayraPendingMemoryProposal(
             id = id,
             candidate = MayraMemoryCandidate(
-                key,
-                value,
-                MayraMemoryCategory.OTHER,
+                key, value, MayraMemoryCategory.OTHER,
                 MayraMemoryProvenance("chat", "owner-command", now)
             ),
             createdAt = now
         )
+    }
+
+    private class TestProtector : MayraMemoryRecordProtector {
+        override fun protect(plaintext: String): String = "pending:" + plaintext.reversed()
+        override fun unprotect(payload: String): String? = payload.takeIf { it.startsWith("pending:") }
+            ?.removePrefix("pending:")?.reversed()
+        override fun isProtected(payload: String): Boolean = payload.startsWith("pending:")
     }
 }
