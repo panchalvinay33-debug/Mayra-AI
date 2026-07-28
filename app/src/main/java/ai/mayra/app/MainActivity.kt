@@ -1,6 +1,7 @@
 package ai.mayra.app
 
 import ai.mayra.app.chat.ChatViewModel
+import ai.mayra.app.core.MayraActivityHistoryActivity
 import ai.mayra.app.core.MayraMessage
 import ai.mayra.app.core.actions.DevicePermission
 import ai.mayra.app.platform.device.AndroidDevicePermissionStateReader
@@ -11,6 +12,7 @@ import ai.mayra.app.voice.AndroidVoiceAssistant
 import ai.mayra.app.voice.MicrophonePermission
 import ai.mayra.app.voice.VoiceState
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -153,6 +155,11 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                         }
                     )
                 }
+                AssistChip(
+                    onClick = { context.startActivity(Intent(context, MayraActivityHistoryActivity::class.java)) },
+                    label = { Text("History") }
+                )
+                Spacer(Modifier.width(6.dp))
                 AssistChip(
                     onClick = { showReadiness = true },
                     label = { Text("Device") }
