@@ -50,7 +50,7 @@ class MayraAndroidRuntimeComposition(
         ),
         idempotencyStore = idempotency,
         activityRecorder = activityRecorder,
-        confirmationTokenStore = confirmationTokens
+        confirmationTokens = confirmationTokens
     )
 
     companion object {
