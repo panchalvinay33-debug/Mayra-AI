@@ -49,7 +49,7 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 
 ## Validation truth
 
-Android CI #1571 compiled successfully but failed one legacy disclosure assertion in `PersonalMemoryAwareMayraAssistantTest`; the test expected old appended text after the implementation moved to structured metadata. The assertion was corrected to parse and verify trusted metadata. fileciteturn135file0L1-L1
+Android CI #1571 compiled successfully but failed one legacy disclosure assertion in `PersonalMemoryAwareMayraAssistantTest`; the test expected old appended text after the implementation moved to structured metadata. The assertion was corrected to parse and verify trusted metadata.
 
 The newest governed head remains `IN_PROGRESS` until compile, complete unit tests, lint, R8 and permission/component audit all pass. No physical-device claim has been made.
 
