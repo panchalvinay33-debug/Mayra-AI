@@ -2,12 +2,9 @@ package ai.mayra.app.memory
 
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
+import android.util.Base64
 
-/**
- * Read-only context decorator. It never writes memory and only exposes approved, active,
- * query-relevant records to the downstream assistant. When context is used, the owner receives
- * a compact disclosure listing the memory keys that influenced the answer.
- */
+/** Read-only approved-memory context decorator with machine-readable usage metadata. */
 class PersonalMemoryAwareMayraAssistant(
     private val delegate: MayraAssistant,
     private val memory: MayraPersonalMemoryManager,
@@ -18,18 +15,20 @@ class PersonalMemoryAwareMayraAssistant(
     override suspend fun reply(message: String, conversation: List<MayraMessage>): Result<String> {
         val relevant = memory.retrieve(message, maxMemories)
         if (relevant.isEmpty()) return delegate.reply(message, conversation)
-
-        val context = relevant.joinToString(separator = "\n") { record ->
+        val context = relevant.joinToString("\n") { record ->
             "- ${record.key}: ${record.value} (approved memory; source ${record.provenance.sourceType})"
         }
-        val groundedMessage = buildString {
-            append(message)
-            append("\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n")
-            append(context)
-        }
+        val groundedMessage = "$message\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n$context"
         return delegate.reply(groundedMessage, conversation).map { answer ->
-            val keys = relevant.joinToString { it.key }
-            "$answer\n\n🧠 Used approved personal memory: $keys"
+            val encodedKeys = relevant.joinToString(",") { key ->
+                Base64.encodeToString(key.key.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            }
+            "$answer\n$USAGE_MARKER$encodedKeys"
         }
+    }
+
+    companion object {
+        const val USAGE_MARKER = "[[mayra-memory-keys:"
+        const val USAGE_SUFFIX = "]]"
     }
 }
