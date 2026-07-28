@@ -4,6 +4,8 @@ import ai.mayra.app.core.MayraQueryRouter
 import ai.mayra.app.core.MayraRoutingOutcome
 import ai.mayra.app.core.MayraRoutingRuntime
 import ai.mayra.app.core.MayraRoutingRuntimeResult
+import ai.mayra.app.memory.MayraMemoryChatController
+import ai.mayra.app.memory.MayraMemoryChatResult
 
 /** Pending approval retained by ChatViewModel across configuration changes. */
 data class PendingChatConfirmation(
@@ -26,14 +28,21 @@ sealed interface MayraChatBridgeResult {
 
 /**
  * Non-blocking chat boundary that preserves the stable suspend assistant for conversational answers.
- * Typed runtime owns retrieval, actions, clarification and unsupported outcomes.
+ * Deterministic owner-memory commands run before model delegation. Typed runtime owns retrieval,
+ * actions, clarification and unsupported outcomes.
  */
 class MayraChatRuntimeBridge(
-    private val runtime: MayraRoutingRuntime
+    private val runtime: MayraRoutingRuntime,
+    private val memoryChat: MayraMemoryChatController? = null
 ) {
     fun dispatch(message: String): MayraChatBridgeResult {
         val normalized = message.trim()
         if (normalized.isEmpty()) return MayraChatBridgeResult.Reply("Please tell Mayra what you need.")
+
+        when (val memoryResult = memoryChat?.handle(normalized)) {
+            is MayraMemoryChatResult.Reply -> return MayraChatBridgeResult.Reply(memoryResult.text)
+            MayraMemoryChatResult.NotHandled, null -> Unit
+        }
 
         if (MayraQueryRouter.route(normalized).outcome == MayraRoutingOutcome.ANSWER) {
             return MayraChatBridgeResult.DelegateToAssistant
