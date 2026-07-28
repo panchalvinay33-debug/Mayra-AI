@@ -2,7 +2,7 @@ package ai.mayra.app.memory
 
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
-import android.util.Base64
+import java.util.Base64
 
 /** Read-only approved-memory context decorator with machine-readable usage metadata. */
 class PersonalMemoryAwareMayraAssistant(
@@ -21,7 +21,7 @@ class PersonalMemoryAwareMayraAssistant(
         val groundedMessage = "$message\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n$context"
         return delegate.reply(groundedMessage, conversation).map { answer ->
             val encodedKeys = relevant.joinToString(",") { record ->
-                Base64.encodeToString(record.key.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                Base64.getUrlEncoder().withoutPadding().encodeToString(record.key.toByteArray(Charsets.UTF_8))
             }
             "$answer\n$USAGE_MARKER$encodedKeys$USAGE_SUFFIX"
         }
