@@ -197,7 +197,7 @@ class MayraPersonalMemoryManager(
         if (terms.isEmpty()) return emptyList()
         return activeMemories()
             .map { memory ->
-                val haystack = tokenize("${memory.key} ${memory.value} ${memory.category.name}")
+                val haystack = tokenize("${memory.key} ${memory.value}")
                 val overlap = terms.count { it in haystack }
                 memory to overlap
             }
