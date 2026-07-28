@@ -13,7 +13,7 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical validation |
 | Concrete runtime integration | DEVICE_VERIFY | Full-app composition, Activity History and main-chat action confirmation are CI-verified | Physical-device validation |
-| Personal memory | IN_PROGRESS | Consent core, persistent approvals, visual review, conflicts and answer context implemented | Full CI, edit/expiry UX, protected storage and phone validation |
+| Personal memory | IN_PROGRESS | Durable approvals, conflict review, context use, searchable/editable Memory Center and pending review UI implemented | Full CI, expiry editing, protected storage and phone validation |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | DEVICE_VERIFY | Safe picker plus confirmation/idempotency/chat UX implemented | Physical validation and reviewed adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
@@ -41,31 +41,34 @@ DEVICE_VERIFY: Activity History, file picker, action confirmation, rotation rete
 2. Explicit proposal and one-time approval; proposal creation never writes approved storage
 3. Prohibited-secret and sensitive-personal-data exclusions
 4. Bounded versioned Android persistence for approved memories
-5. Memory Center view, delete, clear and export controls
-6. Deterministic Hindi/Hinglish/English remember, confirm, cancel, forget and list routing
-7. Bounded persistent pending-proposal store with corruption recovery
-8. Process-death restoration of the latest pending memory approval
-9. Visual `Save this memory?` / `Save` / `Not now` dialog
-10. Same-key contradiction review showing current and proposed values
-11. Stale-conflict rejection if the existing fact changes before approval
-12. Read-only injection of approved, active, query-relevant memories into normal answer context
-13. No new Android permission, service, receiver or background component
-14. Regression coverage for persistence, replay safety, conflicts, restoration and approved-only context
+5. Deterministic Hindi/Hinglish/English remember, confirm, cancel, forget and list routing
+6. Bounded persistent pending-proposal store with corruption recovery and TTL pruning
+7. Process-death restoration of pending memory approval
+8. Visual Save/Not now and Replace/Not now review
+9. Same-key contradiction comparison and stale-conflict rejection
+10. Read-only injection of approved, active, query-relevant memories into normal answer context
+11. Search across approved memory key/value text
+12. Category filters covering every memory category
+13. Direct owner edit with privacy-policy revalidation and revision increment
+14. Pending proposal management in Memory Center with Save/Replace/Not now controls
+15. Clear-all covers approved memories and pending proposals
+16. Owner-visible disclosure appended when an answer used approved personal memory
+17. No new Android permission, service, receiver or background component
+18. Regression coverage for persistence, replay safety, conflicts, restoration, approved-only context and disclosure
 
 ### REMAINING
 
-1. Edit-value and expiry controls in Memory Center
-2. Search and category filters in Memory Center
-3. Encrypted or Keystore-backed protected memory-at-rest migration
-4. Multiple-pending-proposal management rather than restoring only the newest proposal
-5. Owner-visible indication when an answer used personal memory
-6. Owner-device validation of save/replace/restart/context flows
+1. Direct expiry editing and custom expiry selection in Memory Center
+2. Encrypted or Android Keystore-backed protected memory-at-rest migration
+3. Backward-compatible migration and rollback tests for protected storage
+4. Richer answer-level provenance surface beyond the compact memory-key disclosure
+5. Owner-device validation of save/replace/restart/edit/filter/context flows
 
 ## Validation truth
 
-Latest fully green authoritative validation remains Android CI #1458 on `abfa2711f01bb526d1c6fdb93364aa8ea148c6af`.
+Latest fully green authoritative validation remains Android CI #1458 on `abfa2711f01bb526d1c6fdb93364aa8ea148c6af` until a newer complete governed-head pipeline succeeds.
 
-Android CI #1505 started for source head `d098930a60b39f4e47333df4deaae37edf24bd94` and was still in progress when this record was written. The latest memory work remains `IN_PROGRESS`, not `DONE`, until a full compile, complete unit tests, lint, R8 and component audit pass on the governed head or a later equivalent head.
+The current Memory Center and disclosure batch is committed with tests but remains `IN_PROGRESS` pending compile, complete unit tests, lint, R8 and permission/component audit on the newest governed head.
 
 ## Governance rules
 
@@ -77,4 +80,4 @@ Android CI #1505 started for source head `d098930a60b39f4e47333df4deaae37edf24bd
 
 ## Immediate next coding priority
 
-Complete the full CI chain and fix any regression. Then add Memory Center edit/expiry/search controls and protected at-rest storage migration while preserving backward-compatible recovery. PR #12 remains Draft and unmerged.
+Complete the governed CI chain and fix any regression. Then implement expiry editing plus protected at-rest storage with backward-compatible migration, followed by owner-device memory acceptance. PR #12 remains Draft and unmerged.
