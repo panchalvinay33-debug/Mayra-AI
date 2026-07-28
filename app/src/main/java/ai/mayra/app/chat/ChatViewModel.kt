@@ -3,6 +3,7 @@ package ai.mayra.app.chat
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
+import ai.mayra.app.memory.MayraMemoryChatController
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -17,13 +18,18 @@ import kotlinx.coroutines.withContext
 class ChatViewModel(
     private val assistant: MayraAssistant = MayraRuntime.assistant,
     private val runtimeBridge: MayraChatRuntimeBridge? =
-        MayraRuntime.typedRuntime.takeIf { MayraRuntime.typedRuntimeInstalled }?.let { MayraChatRuntimeBridge(it.runtime) }
+        MayraRuntime.typedRuntime.takeIf { MayraRuntime.typedRuntimeInstalled }?.let {
+            MayraChatRuntimeBridge(
+                runtime = it.runtime,
+                memoryChat = MayraRuntime.personalMemory.takeIf { MayraRuntime.personalMemoryInstalled }
+                    ?.let(::MayraMemoryChatController)
+            )
+        }
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     fun updateInput(value: String) = _uiState.update { it.copy(input = value, error = null) }
-
     fun dismissError() = _uiState.update { it.copy(error = null) }
 
     fun clearConversation() {
@@ -34,17 +40,9 @@ class ChatViewModel(
     fun sendMessage() {
         val text = _uiState.value.input.trim()
         if (text.isEmpty() || _uiState.value.isThinking || _uiState.value.pendingConfirmation != null) return
-
         val userMessage = MayraMessage(text, MayraMessage.Sender.USER)
         val conversation = _uiState.value.messages + userMessage
-        _uiState.update {
-            it.copy(
-                messages = conversation,
-                input = "",
-                isThinking = true,
-                error = null
-            )
-        }
+        _uiState.update { it.copy(messages = conversation, input = "", isThinking = true, error = null) }
 
         viewModelScope.launch {
             when (val bridgeResult = withContext(Dispatchers.Default) {
@@ -52,17 +50,12 @@ class ChatViewModel(
             }) {
                 MayraChatBridgeResult.DelegateToAssistant -> replyWithAssistant(text, conversation)
                 is MayraChatBridgeResult.Reply -> appendMayraReply(bridgeResult.text)
-                is MayraChatBridgeResult.NeedsConfirmation -> {
-                    _uiState.update {
-                        it.copy(
-                            messages = it.messages + MayraMessage(
-                                bridgeResult.pending.prompt,
-                                MayraMessage.Sender.MAYRA
-                            ),
-                            isThinking = false,
-                            pendingConfirmation = bridgeResult.pending
-                        )
-                    }
+                is MayraChatBridgeResult.NeedsConfirmation -> _uiState.update {
+                    it.copy(
+                        messages = it.messages + MayraMessage(bridgeResult.pending.prompt, MayraMessage.Sender.MAYRA),
+                        isThinking = false,
+                        pendingConfirmation = bridgeResult.pending
+                    )
                 }
             }
         }
@@ -72,7 +65,6 @@ class ChatViewModel(
         val pending = _uiState.value.pendingConfirmation ?: return
         val bridge = runtimeBridge ?: return
         if (_uiState.value.isThinking) return
-
         _uiState.update { it.copy(isThinking = true, error = null) }
         viewModelScope.launch {
             val reply = withContext(Dispatchers.Default) { bridge.confirm(pending).text }
@@ -98,16 +90,9 @@ class ChatViewModel(
     }
 
     private suspend fun replyWithAssistant(text: String, conversation: List<MayraMessage>) {
-        assistant.reply(text, conversation)
-            .onSuccess(::appendMayraReply)
-            .onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        isThinking = false,
-                        error = error.message ?: "Something went wrong"
-                    )
-                }
-            }
+        assistant.reply(text, conversation).onSuccess(::appendMayraReply).onFailure { error ->
+            _uiState.update { it.copy(isThinking = false, error = error.message ?: "Something went wrong") }
+        }
     }
 
     private fun appendMayraReply(reply: String) {
@@ -121,17 +106,13 @@ class ChatViewModel(
     }
 
     companion object {
-        fun factory(
-            assistant: MayraAssistant,
-            runtimeBridge: MayraChatRuntimeBridge? = null
-        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                require(modelClass.isAssignableFrom(ChatViewModel::class.java)) {
-                    "Unsupported ViewModel: ${modelClass.name}"
+        fun factory(assistant: MayraAssistant, runtimeBridge: MayraChatRuntimeBridge? = null): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    require(modelClass.isAssignableFrom(ChatViewModel::class.java)) { "Unsupported ViewModel: ${modelClass.name}" }
+                    return ChatViewModel(assistant, runtimeBridge) as T
                 }
-                return ChatViewModel(assistant, runtimeBridge) as T
             }
-        }
     }
 }
