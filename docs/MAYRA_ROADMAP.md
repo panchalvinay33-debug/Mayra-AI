@@ -20,11 +20,11 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Document intelligence foundation | DEVICE_VERIFY | 16/18 implemented (88%) | Phone verification; OCR and legacy DOC deferred |
 | Core assistant routing | DONE | Typed outcomes, reasons, confidence, capability and confirmation policy | Keep compatibility regressions green |
 | Provider/tool eligibility | DONE | Runtime capability gates and auditable execution dispositions | Concrete adapter integration |
-| Audited routing runtime boundary | DONE | Typed results, handler isolation, action idempotency and activity records | Persist history and wire real adapters |
+| Audited routing runtime boundary | DONE | Typed results, handler isolation, idempotency, persistent audit and confirmation tokens | Wire real adapters |
 | Concrete runtime integration | IN_PROGRESS | Contracts and safety gates exist | Answer/document/action adapters and end-to-end wiring |
 | Personal memory | PLANNED | No completion claim | Consent-first schema and controls |
 | Search and knowledge providers | PLANNED | No completion claim | Provider interface, citations and freshness |
-| Actions and automations | IN_PROGRESS | Confirmation, idempotency and audit model implemented | Persistent history and confirmed action adapters |
+| Actions and automations | IN_PROGRESS | Confirmation, idempotency, persistent audit model implemented | Confirmed action adapters and history UI |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
 | Privacy/safety center | IN_PROGRESS | Least-privilege CI audits exist | User-facing controls and audit history |
 | Release/recovery | IN_PROGRESS | CI, isolated APKs and snapshots exist | Versioning and migration/release checklist |
@@ -80,18 +80,21 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 12. Deterministic action idempotency keys
 13. Duplicate successful/in-progress action blocking
 14. Failed-action reservation release for explicit retry
-15. Immutable activity record value model and defensive snapshots
+15. Immutable activity record value model
 16. Thread-safe in-memory activity and idempotency stores
-17. Runtime, idempotency and audit regression suites
+17. SharedPreferences-backed versioned activity persistence
+18. Bounded retention, corrupt-row recovery, clear and export
+19. One-time expiring confirmation tokens
+20. Exact-action binding and replay protection
+21. Runtime, idempotency, persistence and confirmation regression suites
 
 ### IN_PROGRESS — Concrete runtime integration
 
-1. Persisted user-visible activity history
-2. Concrete normal-answer adapter
-3. Concrete document-retrieval adapter
-4. Confirmed device-action adapter
-5. Confirmation-token lifecycle
-6. End-to-end assistant runtime wiring tests
+1. Concrete normal-answer adapter
+2. Concrete Current-only document-retrieval adapter
+3. Confirmed device-action adapter
+4. User-visible activity/history screen
+5. End-to-end assistant runtime wiring tests
 
 ## Track C — Personal memory
 
@@ -119,11 +122,12 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 1. Typed action requests — IN_PROGRESS
 2. Confirmation policy — DONE foundation
 3. Permission/capability checks — DONE foundation
-4. Transaction/result record — DONE in-memory foundation
+4. Persistent transaction/result record — DONE foundation
 5. Partial-failure handling — DONE foundation
 6. Idempotency and duplicate prevention — DONE foundation
-7. User-visible persistent history — IN_PROGRESS
-8. Calendar/email/reminder adapters — PLANNED
+7. Replay-safe confirmation tokens — DONE foundation
+8. User-visible history — IN_PROGRESS
+9. Calendar/email/reminder adapters — PLANNED
 
 ## Track F — Voice intelligence
 
@@ -141,12 +145,12 @@ Voice remains a separate controlled milestone. Do not add speech packages or rep
 
 ## Current batch pending authoritative CI
 
-- Added action idempotency and duplicate prevention.
-- Added immutable activity record model and thread-safe in-memory log.
-- Added reservation release on failed actions so explicit retries remain possible.
-- Added confirmation-safe behavior: pending confirmation does not reserve an action key.
-- Added eight idempotency/audit regression tests and updated capability-registry assertions.
+- Added versioned, bounded persistent runtime activity history.
+- Added Unicode-safe field encoding, corrupt-row skipping, clear and export.
+- Added one-time confirmation tokens with expiry, exact-action binding and replay protection.
+- Added persistence/retention/corruption/Unicode/expiry/binding/replay tests.
+- Updated capability registry and rolling backup.
 
 ## Immediate next coding priority
 
-Run full Android CI on the latest documentation head. After green validation, implement persisted activity history, confirmation-token lifecycle and concrete answer/document/action adapters. PR #12 remains Draft and unmerged.
+Run full Android CI. After green validation, connect concrete normal-answer and Current-only document-retrieval adapters, then confirmed device-action execution and a user-visible activity screen. PR #12 remains Draft and unmerged.
