@@ -15,10 +15,11 @@ Mayra is a private, user-controlled Android AI assistant. It should understand H
 4. Protected-storage failure is never presented as empty history and keys are never automatically reset.
 5. Remote conversational providers return text only and cannot execute actions or write memory.
 6. Provider cancellation propagates; bounded failure may use deterministic offline fallback.
-7. Provider configuration never comes from conversation history or personal memory.
+7. Provider credentials never live in source control, conversation history, personal memory or ordinary provider settings persistence.
 8. Remote endpoints must use HTTPS and be bounded by timeout, history, message and response-size limits.
-9. A concrete provider is not production-composed until owner configuration, network eligibility and full CI are complete.
-10. Physical-device and live-network claims require actual evidence.
+9. Remote answers are owner-disabled by default and an emergency disable must remain available.
+10. A concrete provider is not production-composed until network eligibility, secure credentials and full CI are complete.
+11. Physical-device and live-network claims require actual evidence.
 
 ## Architecture
 
@@ -27,28 +28,22 @@ Mayra is a private, user-controlled Android AI assistant. It should understand H
 - Visual action and memory confirmations.
 - Memory Center owner controls, storage health and safe migration retry.
 - Structured personal-memory provenance chips.
-
-### Knowledge and protected-storage layer
-- Private document library and Current-only evidence.
-- Approved personal memory and bounded pending proposals.
-- AES-GCM Android Keystore protection, backward-compatible migration and non-destructive diagnostics.
+- Remote-provider settings screen with explicit enable, save validation and emergency disable.
 
 ### Conversational-provider layer
 - `MayraConversationalProvider` is text-only.
 - `ResilientMayraProviderAssistant` owns timeout, retry, cancellation and offline fallback.
-- `MayraHttpConversationalProvider` supplies a concrete HTTPS POST transport but is not auto-installed.
-- Runtime authorization comes from a dedicated configuration source.
-- Owner configuration controls endpoint, model and enabled state.
-- Connect/read timeout, request history, message lengths and response bytes are bounded.
-- HTTP 408, 429 and 5xx are temporary; other non-success responses are permanent.
-- Successful JSON responses must contain a nonblank string field named `text`.
+- `MayraHttpConversationalProvider` supplies bounded HTTPS transport but is not auto-installed.
+- `AndroidMayraProviderSettingsStore` persists non-secret endpoint, model, enable state and limits only.
+- Runtime authorization comes from a separate `MayraProviderCredentialSource`.
+- Invalid settings cannot overwrite the previous valid configuration.
 - Provider health is explicit: DISABLED, MISSING_CREDENTIAL, READY, TEMPORARY_FAILURE or PERMANENT_FAILURE.
 - No network permission is silently introduced; release-flavor eligibility is a separate audited decision.
 
 ### Reliability layer
 - Compile, complete tests, lint, R8, permission/component audits and isolated APK artifacts.
-- CI failures are diagnosed from exact logs or artifacts before code changes.
-- Offline behavior remains available when the remote provider is disabled or unavailable.
+- CI failures are diagnosed from exact logs or reports before changes.
+- Offline behavior remains available when remote intelligence is disabled or unavailable.
 
 ## Current module state
 
@@ -57,7 +52,7 @@ Mayra is a private, user-controlled Android AI assistant. It should understand H
 | Core assistant and routing | Foundation present; expansion planned |
 | Document intelligence | Foundation 16/18 implemented |
 | Personal memory | Protected storage, diagnostics, recovery UI and structured provenance implemented; validation pending |
-| Conversational provider | Concrete bounded HTTPS transport implemented but not production-enabled |
+| Conversational provider | Bounded HTTPS transport and owner settings implemented; network flavor/credentials/composition pending |
 | Search and fresh knowledge | Provider architecture planned |
 | Actions and automations | Safety foundation present; expansion planned |
 | Voice intelligence | Separate controlled milestone |
