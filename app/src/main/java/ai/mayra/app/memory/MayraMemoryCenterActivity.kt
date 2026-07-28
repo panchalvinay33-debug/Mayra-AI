@@ -5,7 +5,7 @@ import ai.mayra.app.ui.theme.MayraAITheme
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.setContent
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,35 +47,24 @@ class MayraMemoryCenterActivity : ComponentActivity() {
         val memories = remember(refresh) { MayraRuntime.personalMemory.activeMemories() }
 
         Scaffold { padding ->
-            Column(
-                Modifier.fillMaxSize().padding(padding).padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Column(Modifier.fillMaxSize().padding(padding).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Memory Center", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text("Only memories you explicitly approved are stored locally.")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { share(MayraRuntime.personalMemoryStore.exportText()) }, modifier = Modifier.weight(1f)) {
-                        Text("Export")
-                    }
-                    OutlinedButton(onClick = { clearAll = true }, enabled = memories.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                        Text("Clear all")
-                    }
+                    OutlinedButton(onClick = { share(MayraRuntime.personalMemoryStore.exportText()) }, modifier = Modifier.weight(1f)) { Text("Export") }
+                    OutlinedButton(onClick = { clearAll = true }, enabled = memories.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Clear all") }
                 }
-                if (memories.isEmpty()) {
-                    Text("No approved memories yet.")
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(memories, key = { it.id }) { memory ->
-                            Card(Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Text(memory.key, fontWeight = FontWeight.Bold)
-                                    Text(memory.value)
-                                    Text("Category: ${memory.category.name.lowercase()}", style = MaterialTheme.typography.bodySmall)
-                                    Text("Source: ${memory.provenance.sourceType} · ${memory.provenance.sourceReference}", style = MaterialTheme.typography.bodySmall)
-                                    Text("Revision ${memory.revision} · updated ${format(memory.updatedAt)}", style = MaterialTheme.typography.bodySmall)
-                                    memory.expiresAt?.let { Text("Expires ${format(it)}", style = MaterialTheme.typography.bodySmall) }
-                                    TextButton(onClick = { deleteId = memory.id }) { Text("Delete") }
-                                }
+                if (memories.isEmpty()) Text("No approved memories yet.") else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(memories, key = { it.id }) { memory ->
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(memory.key, fontWeight = FontWeight.Bold)
+                                Text(memory.value)
+                                Text("Category: ${memory.category.name.lowercase()}", style = MaterialTheme.typography.bodySmall)
+                                Text("Source: ${memory.provenance.sourceType} · ${memory.provenance.sourceReference}", style = MaterialTheme.typography.bodySmall)
+                                Text("Revision ${memory.revision} · updated ${format(memory.updatedAt)}", style = MaterialTheme.typography.bodySmall)
+                                memory.expiresAt?.let { Text("Expires ${format(it)}", style = MaterialTheme.typography.bodySmall) }
+                                TextButton(onClick = { deleteId = memory.id }) { Text("Delete") }
                             }
                         }
                     }
@@ -92,15 +81,13 @@ class MayraMemoryCenterActivity : ComponentActivity() {
                 dismissButton = { TextButton(onClick = { deleteId = null }) { Text("Cancel") } }
             )
         }
-        if (clearAll) {
-            AlertDialog(
-                onDismissRequest = { clearAll = false },
-                title = { Text("Clear all memories?") },
-                text = { Text("This removes every approved personal memory from this device.") },
-                confirmButton = { Button(onClick = { MayraRuntime.personalMemory.clear(); clearAll = false; refresh++ }) { Text("Clear all") } },
-                dismissButton = { TextButton(onClick = { clearAll = false }) { Text("Cancel") } }
-            )
-        }
+        if (clearAll) AlertDialog(
+            onDismissRequest = { clearAll = false },
+            title = { Text("Clear all memories?") },
+            text = { Text("This removes every approved personal memory from this device.") },
+            confirmButton = { Button(onClick = { MayraRuntime.personalMemory.clear(); clearAll = false; refresh++ }) { Text("Clear all") } },
+            dismissButton = { TextButton(onClick = { clearAll = false }) { Text("Cancel") } }
+        )
     }
 
     private fun share(text: String) {
@@ -111,6 +98,5 @@ class MayraMemoryCenterActivity : ComponentActivity() {
         }, "Export memories"))
     }
 
-    private fun format(instant: java.time.Instant): String = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-        .withZone(ZoneId.systemDefault()).format(instant)
+    private fun format(instant: java.time.Instant): String = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(instant)
 }
