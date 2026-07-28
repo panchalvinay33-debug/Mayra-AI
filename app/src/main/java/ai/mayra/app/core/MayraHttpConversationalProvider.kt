@@ -1,6 +1,8 @@
 package ai.mayra.app.core
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
@@ -79,9 +81,7 @@ class MayraHttpConversationalProvider(
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val response = stream?.use { input ->
-                val bytes = input.readNBytes(config.maxResponseBytes + 1)
-                if (bytes.size > config.maxResponseBytes) throw ResponseTooLargeException()
-                String(bytes, StandardCharsets.UTF_8)
+                String(readBounded(input, config.maxResponseBytes), StandardCharsets.UTF_8)
             }.orEmpty()
 
             when {
@@ -126,6 +126,21 @@ class MayraHttpConversationalProvider(
             "{\"role\":\"${if (message.sender == MayraMessage.Sender.USER) "user" else "assistant"}\",\"text\":\"${escape(message.text.take(8_000))}\"}"
         }
         return "{\"model\":\"${escape(config.model)}\",\"locale\":\"${escape(request.localeTag)}\",\"message\":\"${escape(request.message.take(16_000))}\",\"conversation\":[$history]}"
+    }
+
+    /** API-26-compatible bounded read that never buffers more than maxBytes plus one chunk. */
+    private fun readBounded(input: InputStream, maxBytes: Int): ByteArray {
+        val output = ByteArrayOutputStream(minOf(maxBytes, 16_384))
+        val buffer = ByteArray(8_192)
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            total += read
+            if (total > maxBytes) throw ResponseTooLargeException()
+            output.write(buffer, 0, read)
+        }
+        return output.toByteArray()
     }
 
     private fun escape(value: String): String = buildString(value.length + 16) {
