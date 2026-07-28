@@ -3,9 +3,17 @@ package ai.mayra.app.memory
 import java.time.Clock
 import java.time.Instant
 
+data class PendingMemoryApproval(
+    val proposalId: String,
+    val key: String,
+    val newValue: String,
+    val previousValue: String? = null
+)
+
 sealed interface MayraMemoryChatResult {
     data object NotHandled : MayraMemoryChatResult
     data class Reply(val text: String) : MayraMemoryChatResult
+    data class NeedsApproval(val pending: PendingMemoryApproval) : MayraMemoryChatResult
 }
 
 /** Deterministic, model-independent chat commands for owner-controlled personal memory. */
@@ -18,17 +26,10 @@ class MayraMemoryChatController(
         if (text.isEmpty()) return MayraMemoryChatResult.NotHandled
 
         CONFIRM.matchEntire(text)?.groupValues?.get(1)?.let { proposalId ->
-            return when (val result = manager.approve(proposalId)) {
-                is MayraMemoryApprovalResult.Saved -> MayraMemoryChatResult.Reply(
-                    "Saved: ${result.memory.key} = ${result.memory.value}. You can review or delete it in Memory Center."
-                )
-                is MayraMemoryApprovalResult.Rejected -> MayraMemoryChatResult.Reply(result.reason)
-            }
+            return approve(proposalId)
         }
         CANCEL.matchEntire(text)?.groupValues?.get(1)?.let { proposalId ->
-            return MayraMemoryChatResult.Reply(
-                if (manager.reject(proposalId)) "Memory proposal cancelled." else "That memory proposal is missing or already handled."
-            )
+            return cancel(proposalId)
         }
         REMEMBER.matchEntire(text)?.let { match ->
             val key = match.groupValues[1].trim()
@@ -40,9 +41,13 @@ class MayraMemoryChatController(
                 provenance = MayraMemoryProvenance("chat", "owner-command", Instant.now(clock))
             )
             return when (val result = manager.propose(candidate)) {
-                is MayraMemoryProposalResult.ApprovalRequired -> MayraMemoryChatResult.Reply(
-                    "Please confirm before I save this memory: ${result.candidate.key} = ${result.candidate.value}. " +
-                        "Reply: confirm memory ${result.proposalId} — or cancel memory ${result.proposalId}."
+                is MayraMemoryProposalResult.ApprovalRequired -> MayraMemoryChatResult.NeedsApproval(
+                    PendingMemoryApproval(
+                        proposalId = result.proposalId,
+                        key = result.candidate.key,
+                        newValue = result.candidate.value,
+                        previousValue = result.conflictingMemory?.value
+                    )
                 )
                 is MayraMemoryProposalResult.Rejected -> MayraMemoryChatResult.Reply(result.reason)
             }
@@ -68,6 +73,25 @@ class MayraMemoryChatController(
             )
         }
         return MayraMemoryChatResult.NotHandled
+    }
+
+    fun approve(proposalId: String): MayraMemoryChatResult.Reply = when (val result = manager.approve(proposalId)) {
+        is MayraMemoryApprovalResult.Saved -> MayraMemoryChatResult.Reply(
+            "Saved: ${result.memory.key} = ${result.memory.value}. You can review or delete it in Memory Center."
+        )
+        is MayraMemoryApprovalResult.Rejected -> MayraMemoryChatResult.Reply(result.reason)
+    }
+
+    fun cancel(proposalId: String): MayraMemoryChatResult.Reply = MayraMemoryChatResult.Reply(
+        if (manager.reject(proposalId)) "Memory proposal cancelled." else "That memory proposal is missing or already handled."
+    )
+
+    fun restoreLatestPending(): PendingMemoryApproval? {
+        val proposal = manager.pendingProposals().firstOrNull() ?: return null
+        val previous = proposal.conflictingMemoryId?.let { id ->
+            manager.activeMemories().firstOrNull { it.id == id }?.value
+        }
+        return PendingMemoryApproval(proposal.id, proposal.candidate.key, proposal.candidate.value, previous)
     }
 
     private fun inferCategory(key: String): MayraMemoryCategory = when {
