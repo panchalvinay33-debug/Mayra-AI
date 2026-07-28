@@ -22,6 +22,8 @@ import ai.mayra.app.core.MayraAndroidRuntimeComposition
 import ai.mayra.app.core.MayraAnswerProvider
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
+import ai.mayra.app.memory.AndroidMayraPersonalMemoryStore
+import ai.mayra.app.memory.MayraPersonalMemoryManager
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import android.app.Application
 import java.util.Calendar
@@ -49,6 +51,11 @@ class MayraApplication : Application() {
             enableSafeFilePickerAction = true
         )
         MayraRuntime.installTypedRuntime(typedRuntime)
+
+        val personalMemoryStore = AndroidMayraPersonalMemoryStore(applicationContext)
+        val personalMemory = MayraPersonalMemoryManager(personalMemoryStore)
+        MayraRuntime.installPersonalMemory(personalMemoryStore, personalMemory)
+        personalMemory.activeMemories()
 
         val eventBus = BrainEventBus()
         val skillRegistry = MayraSkillRegistry().apply {
@@ -105,8 +112,6 @@ class MayraApplication : Application() {
         pendingActions.expireDue()
         pendingActions.prune()
 
-        // Background scheduling is useful but non-critical. A provider/OEM/test-environment failure
-        // must not prevent Mayra's local assistant and safety runtime from starting.
         runCatching { MayraBackgroundRuntime.initialize(applicationContext) }
         runCatching { MayraBriefingScheduler.sync(applicationContext) }
     }
@@ -118,6 +123,10 @@ object MayraRuntime {
     var assistant: MayraAssistant = LocalMayraAssistant()
 
     lateinit var typedRuntime: MayraAndroidRuntimeComposition
+        private set
+    lateinit var personalMemoryStore: AndroidMayraPersonalMemoryStore
+        private set
+    lateinit var personalMemory: MayraPersonalMemoryManager
         private set
     lateinit var brain: MayraBrainCoordinator
         private set
@@ -138,9 +147,16 @@ object MayraRuntime {
         get() = ::orchestrator.isInitialized
     val typedRuntimeInstalled: Boolean
         get() = ::typedRuntime.isInitialized
+    val personalMemoryInstalled: Boolean
+        get() = ::personalMemory.isInitialized
 
     fun installTypedRuntime(runtime: MayraAndroidRuntimeComposition) {
         typedRuntime = runtime
+    }
+
+    fun installPersonalMemory(store: AndroidMayraPersonalMemoryStore, manager: MayraPersonalMemoryManager) {
+        personalMemoryStore = store
+        personalMemory = manager
     }
 
     fun install(
