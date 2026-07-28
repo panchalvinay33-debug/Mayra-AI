@@ -13,7 +13,7 @@ import org.junit.Test
 class PersonalMemoryAwareMayraAssistantTest {
     private val clock = Clock.fixed(Instant.parse("2026-07-28T12:00:00Z"), ZoneOffset.UTC)
 
-    @Test fun injectsOnlyApprovedRelevantMemory() = runBlocking {
+    @Test fun injectsOnlyApprovedRelevantMemoryAndDisclosesUse() = runBlocking {
         val manager = MayraPersonalMemoryManager(MayraInMemoryPersonalMemoryStore(), clock)
         val pending = manager.propose(candidate("favorite tea", "masala chai")) as MayraMemoryProposalResult.ApprovalRequired
         manager.approve(pending.proposalId)
@@ -21,17 +21,19 @@ class PersonalMemoryAwareMayraAssistantTest {
         val delegate = object : MayraAssistant {
             override suspend fun reply(message: String, conversation: List<MayraMessage>): Result<String> {
                 received = message
-                return Result.success("ok")
+                return Result.success("You like masala chai.")
             }
         }
 
-        PersonalMemoryAwareMayraAssistant(delegate, manager).reply("Which tea do I like?")
+        val answer = PersonalMemoryAwareMayraAssistant(delegate, manager)
+            .reply("Which tea do I like?").getOrThrow()
 
         assertTrue(received.contains("favorite tea: masala chai"))
         assertTrue(received.contains("approved personal context"))
+        assertTrue(answer.contains("Used approved personal memory: favorite tea"))
     }
 
-    @Test fun doesNotInjectUnapprovedOrIrrelevantMemory() = runBlocking {
+    @Test fun doesNotInjectOrDiscloseUnapprovedOrIrrelevantMemory() = runBlocking {
         val manager = MayraPersonalMemoryManager(MayraInMemoryPersonalMemoryStore(), clock)
         manager.propose(candidate("favorite tea", "masala chai"))
         var received = ""
@@ -42,10 +44,12 @@ class PersonalMemoryAwareMayraAssistantTest {
             }
         }
 
-        PersonalMemoryAwareMayraAssistant(delegate, manager).reply("Open calculator")
+        val answer = PersonalMemoryAwareMayraAssistant(delegate, manager)
+            .reply("Open calculator").getOrThrow()
 
         assertFalse(received.contains("masala chai"))
         assertFalse(received.contains("approved personal context"))
+        assertFalse(answer.contains("Used approved personal memory"))
     }
 
     private fun candidate(key: String, value: String) = MayraMemoryCandidate(
