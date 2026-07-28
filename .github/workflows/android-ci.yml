@@ -16,7 +16,7 @@ concurrency:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -36,11 +36,11 @@ jobs:
       - name: Prepare CI diagnostics
         run: mkdir -p build/ci
 
-      - name: Compile debug sources
+      - name: Compile debug and full-test sources
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:compileDebugKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile-debug.log
+          gradle --no-daemon :app:compileDebugKotlin :app:compileFullTestKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile.log
 
       - name: Run complete unit-test suite
         shell: bash
@@ -52,29 +52,29 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:lintDebug :app:lintDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/lint.log
+          gradle --no-daemon :app:lintDebug :app:lintFullTest :app:lintDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/lint.log
 
-      - name: Assemble full Mayra debug APK
+      - name: Assemble full Mayra test APK
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build/ci/assemble-full-debug.log
+          gradle --no-daemon :app:assembleFullTest --stacktrace --console=plain 2>&1 | tee build/ci/assemble-full-test.log
 
-      - name: Verify full Mayra APK manifest and permissions
+      - name: Verify full Mayra test APK manifest and permissions
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -n 1)"
+          APK="$(find app/build/outputs/apk/fullTest -name '*.apk' -type f | head -n 1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
           test -x "$AAPT"
 
-          "$AAPT" dump permissions "$APK" | tee build/ci/full-debug-permissions.log
-          "$AAPT" dump badging "$APK" | tee build/ci/full-debug-badging.log
-          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/full-debug-manifest-tree.log
+          "$AAPT" dump permissions "$APK" | tee build/ci/full-test-permissions.log
+          "$AAPT" dump badging "$APK" | tee build/ci/full-test-badging.log
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/full-test-manifest-tree.log
 
-          grep -Fq "package: name='ai.mayra.app'" build/ci/full-debug-badging.log
-          grep -Fq "application-label:'Mayra AI'" build/ci/full-debug-badging.log
+          grep -Fq "package: name='ai.mayra.app.fulltest'" build/ci/full-test-badging.log
+          grep -Fq "application-label:'Mayra AI Full Test'" build/ci/full-test-badging.log
 
           required_permissions=(
             android.permission.RECORD_AUDIO
@@ -86,11 +86,11 @@ jobs:
             android.permission.RECEIVE_BOOT_COMPLETED
           )
           for permission in "${required_permissions[@]}"; do
-            grep -Fq "$permission" build/ci/full-debug-permissions.log
+            grep -Fq "$permission" build/ci/full-test-permissions.log
           done
 
-          if grep -Fq "android.permission.INTERNET" build/ci/full-debug-permissions.log; then
-            echo "Full debug APK unexpectedly requests INTERNET permission" >&2
+          if grep -Fq "android.permission.INTERNET" build/ci/full-test-permissions.log; then
+            echo "Full-test APK unexpectedly requests INTERNET permission" >&2
             exit 1
           fi
 
@@ -105,7 +105,7 @@ jobs:
             ai.mayra.app.background.MayraBootReceiver
           )
           for component in "${required_components[@]}"; do
-            grep -Fq "$component" build/ci/full-debug-manifest-tree.log
+            grep -Fq "$component" build/ci/full-test-manifest-tree.log
           done
 
       - name: Assemble isolated document-test APK
@@ -163,6 +163,7 @@ jobs:
           path: |
             build/ci/
             app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-fullTest.html
             app/build/reports/lint-results-documentTest.html
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
@@ -170,12 +171,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Upload full Mayra debug APK
+      - name: Upload full Mayra test APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: mayra-full-debug-apk-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/*.apk
+          name: mayra-full-test-apk-${{ github.run_number }}
+          path: app/build/outputs/apk/fullTest/*.apk
           if-no-files-found: error
           retention-days: 7
 
