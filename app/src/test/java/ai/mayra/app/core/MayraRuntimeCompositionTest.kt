@@ -70,9 +70,10 @@ class MayraRuntimeCompositionTest {
 
         val pending = composition.runtime.dispatch("Delete file report.pdf")
         assertTrue(pending is MayraRoutingRuntimeResult.ConfirmationRequired)
+        val confirmation = pending as MayraRoutingRuntimeResult.ConfirmationRequired
         val confirmed = composition.runtime.confirmAndDispatch(
             message = "Delete file report.pdf",
-            token = (pending as MayraRoutingRuntimeResult.ConfirmationRequired).token
+            token = requireNotNull(confirmation.token).value
         )
         assertTrue(confirmed is MayraRoutingRuntimeResult.Failed)
         assertTrue((confirmed as MayraRoutingRuntimeResult.Failed).reason.contains("not registered"))
