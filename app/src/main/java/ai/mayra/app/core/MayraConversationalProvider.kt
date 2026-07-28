@@ -72,6 +72,6 @@ class ResilientMayraProviderAssistant(
 }
 
 /** Provider secrets must come from runtime-secure configuration, never source control or memory. */
-interface MayraProviderCredentialSource {
+fun interface MayraProviderCredentialSource {
     fun bearerToken(): String?
 }
