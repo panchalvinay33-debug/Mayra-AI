@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.time.Instant
@@ -46,6 +47,7 @@ class MayraMemoryCenterActivity : ComponentActivity() {
 
     @Composable
     private fun MemoryCenter() {
+        val context = LocalContext.current
         var refresh by remember { mutableStateOf(0) }
         var query by remember { mutableStateOf("") }
         var category by remember { mutableStateOf<MayraMemoryCategory?>(null) }
@@ -56,7 +58,7 @@ class MayraMemoryCenterActivity : ComponentActivity() {
         var migrationMessage by remember { mutableStateOf<String?>(null) }
         val allMemories = remember(refresh) { MayraRuntime.personalMemory.activeMemories() }
         val pending = remember(refresh) { MayraRuntime.personalMemory.pendingProposals() }
-        val health = remember(refresh) { AndroidMayraMemoryStorageHealthReader(this).read() }
+        val health = remember(refresh, context) { AndroidMayraMemoryStorageHealthReader(context).read() }
         val memories = allMemories.filter { memory ->
             (category == null || memory.category == category) &&
                 (query.isBlank() || memory.key.contains(query, true) || memory.value.contains(query, true))
@@ -71,8 +73,7 @@ class MayraMemoryCenterActivity : ComponentActivity() {
                         MayraRuntime.personalMemoryStore.all()
                         MayraRuntime.personalMemory.pendingProposals()
                         refresh++
-                        val after = AndroidMayraMemoryStorageHealthReader(this).read()
-                        when (after.state) {
+                        when (AndroidMayraMemoryStorageHealthReader(context).read().state) {
                             MayraMemoryStorageState.HEALTHY -> "Protected storage is healthy."
                             MayraMemoryStorageState.EMPTY -> "There are no stored memory records."
                             MayraMemoryStorageState.MIGRATION_NEEDED -> "Some legacy records still need migration. No records were deleted."
@@ -92,7 +93,6 @@ class MayraMemoryCenterActivity : ComponentActivity() {
                     OutlinedButton(onClick = { share(MayraRuntime.personalMemoryStore.exportText()) }, modifier = Modifier.weight(1f)) { Text("Export") }
                     OutlinedButton(onClick = { clearAll = true }, enabled = allMemories.isNotEmpty() || pending.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Clear all") }
                 }
-
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (pending.isNotEmpty()) {
                         item { Text("Pending approval (${pending.size})", fontWeight = FontWeight.Bold) }
