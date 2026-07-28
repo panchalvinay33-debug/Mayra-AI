@@ -3,8 +3,7 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest batch head before final validation: `70f989a34a17906b3a81fdd8a1274e86fbb47577`
-Authoritative CI for this head: pending
+Authoritative CI for this batch: pending
 
 ## Purpose
 
@@ -14,43 +13,40 @@ This rolling recovery snapshot is updated in every coding batch. Significant mil
 
 - Canonical blueprint, roadmap and mandatory update policy are present.
 - Document foundation remains 16/18 implemented; OCR and legacy DOC are deferred.
-- Typed core routing and provider/tool eligibility policy are implemented.
-- An audited typed routing runtime boundary is now implemented and awaiting full CI.
-- Next active milestone after validation: idempotency, activity records and concrete adapters.
+- Typed routing, provider eligibility and audited runtime boundary are implemented.
+- Action idempotency, duplicate prevention and immutable activity records are implemented in-memory.
+- Concrete assistant/document/action adapters and persisted user-visible history remain active work.
 
 ## Completed in this batch
 
-- Detected that a newer integrated typed router and provider policy already existed on the branch.
-- Removed a duplicate standalone typed-router implementation and duplicate tests before they could create conflicting enum/data-class declarations.
-- Preserved the integrated `MayraRoutingDecision` compatibility contract.
-- Added `MayraRoutingRuntimeResult` variants: `Executed`, `ConfirmationRequired`, `ClarificationRequired`, `Blocked`, `Failed`.
-- Added `MayraRouteHandler` and `MayraRuntimeHandlers` adapter boundary.
-- Added `MayraRoutingRuntime` dispatcher after classification and policy planning.
-- Guaranteed confirmation, clarification and blocked plans do not invoke handlers.
-- Converted missing handlers, blank handler output and thrown exceptions into typed failures.
-- Added ten runtime regression tests covering answer, retrieval, action, confirmation, capability blocking, OCR blocking and failure behavior.
-- Updated the execution roadmap and this rolling backup.
+- Added deterministic SHA-256 action idempotency keys normalized for case and whitespace.
+- Added a thread-safe idempotency store using atomic reservation semantics.
+- Successful actions retain their reservation and duplicate execution is blocked before handler invocation.
+- Failed, blank-output and missing-handler actions release reservations so an explicit retry can proceed.
+- Confirmation-required actions do not reserve a key before approval.
+- Read-only answer and retrieval requests are not deduplicated.
+- Added immutable `MayraActivityRecord` values with timestamp, outcome, disposition, status, capability, optional action key and detail.
+- Added thread-safe in-memory activity log with defensive snapshots.
+- Added typed `DuplicateBlocked` runtime result.
+- Added eight idempotency/audit regression tests.
+- Updated capability registry, registry tests, execution roadmap and this rolling backup.
 
 ## Safety contract
 
-The router classifies intent. The policy plans eligibility and confirmation. The runtime dispatcher invokes only the handler selected by an executable plan.
+The router classifies intent. The policy gates capability and confirmation. The runtime invokes only an executable handler.
 
-A handler is never invoked when:
+Action execution additionally requires an atomic idempotency reservation. A duplicate successful or in-progress action never reaches its handler. A failed action releases the reservation for a deliberate retry.
 
-- clarification is required;
-- the capability is blocked or unavailable;
-- the feature is explicitly unsupported;
-- destructive-action confirmation is still pending.
-
-Provider exceptions and empty outputs are returned as typed failures rather than crashing or silently falling through.
+Activity records contain routing metadata and result detail; no hidden provider execution is performed by the audit layer.
 
 ## Current batch commits
 
-- `d8d42059219ee674e0de46867516636c12b5cabc` — remove duplicate typed router
-- `971586b9ddb415d7c51763e3bccb2248af22d30d` — remove duplicate tests
-- `01139d2d12f7e29edfcad9cfb7768efd9b49324d` — audited runtime boundary
-- `8bd9d695502f970c6df775aa41e57482707e2344` — runtime regression suite
-- `70f989a34a17906b3a81fdd8a1274e86fbb47577` — roadmap update
+- `b315e9c0a3fc654b936097c79cdd44ee7d970339` — activity/idempotency model
+- `b768297a6dc2a47dc359ade7d5bcc82c36f8d705` — runtime enforcement
+- `c0b9140f741fdccb7b9cd4857b54cceeed9a482f` — idempotency/audit tests
+- `29d8252b0d6b70b9d8337ba4b944061a21f67f8a` — capability registry update
+- `d80dee2626573d0bb0cba5d36bad8f77b1ec5d6b` — registry regression update
+- `39be90c236ff01ba51804333beb92c7e703ec3da` — roadmap update
 
 ## Verified document capabilities
 
@@ -71,8 +67,8 @@ Owner verified APK installation/launch and PDF selection/metadata persistence. P
 ## Validation truth
 
 - Full Android CI on the latest snapshot head is required.
-- Do not treat earlier runs or earlier heads as proof for this batch.
-- After CI passes, record exact head, run, artifacts and digest without moving the code head again.
+- Earlier green runs do not prove this batch.
+- After CI passes, record exact head, run, artifacts and digest in PR metadata without moving the verified code head.
 
 ## Recovery instructions
 
@@ -85,4 +81,4 @@ Owner verified APK installation/launch and PDF selection/metadata persistence. P
 
 ## Next step
 
-Run full CI, then implement idempotency and immutable activity records before connecting concrete answer, document and confirmed-action adapters.
+Run full CI, then add persisted activity history, confirmation-token lifecycle and concrete normal-answer, document-retrieval and confirmed-action adapters.
