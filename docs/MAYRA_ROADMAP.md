@@ -13,7 +13,7 @@ Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 | Core routing and eligibility | DONE | Typed outcomes and capability gates | Keep regressions green |
 | Audited runtime safety | DONE | Typed results, persistence, confirmation and idempotency | Physical validation |
 | Concrete runtime integration | DEVICE_VERIFY | Full-app composition, Activity History and main-chat Confirm/Cancel UX are CI-verified | Physical-device validation |
-| Personal memory | IN_PROGRESS | Consent-first core, Android persistence and Memory Center implemented | Chat Save/Not now proposal UX and transparent context injection |
+| Personal memory | IN_PROGRESS | Consent-first core, persistence, Memory Center and deterministic chat commands implemented | Full CI, visual Save/Not now UX, process-death safety and context injection |
 | Search and fresh knowledge | PLANNED | No completion claim | Provider interface, citations and freshness |
 | Actions and automations | DEVICE_VERIFY | Safe file-picker action plus confirmation/idempotency/chat UX implemented | Physical validation and reviewed adapters |
 | Voice intelligence | PLANNED | Controlled separate milestone | Hindi/Hinglish evaluation and device validation |
@@ -54,26 +54,26 @@ DEVICE_VERIFY: Activity History, file picker, Confirm/Cancel, rotation retention
 15. Clear-all confirmation and Android share-sheet export
 16. Direct launcher entry for current physical validation
 17. Privacy, persistence and retrieval regressions
+18. Model-independent chat routing for remember/confirm/cancel/forget/list commands
+19. Hindi/Hinglish/English command aliases for core memory operations
+20. Explicit text confirmation remains mandatory before persistence
+21. Deterministic tests for save, cancellation, prohibited secrets, listing and forgetting
 
 ### REMAINING
 
-1. Chat parser for explicit memory requests
-2. `Save this memory?` / `Save` / `Not now` dialog
-3. Edit-value and expiry controls in Memory Center
-4. Transparent injection of approved relevant memories into answer context
-5. Process-death persistence for pending memory proposals
-6. Owner-device validation
+1. Visual `Save this memory?` / `Save` / `Not now` dialog using the typed confirmation surface
+2. Edit-value and expiry controls in Memory Center
+3. Transparent injection of approved relevant memories into answer context
+4. Process-death persistence for pending memory proposals
+5. Contradiction/conflict review before replacing an existing approved fact
+6. Encrypted or Keystore-backed protected memory-at-rest migration
+7. Owner-device validation
 
-## Latest authoritative validation
+## Validation truth
 
-Android CI #1458 passed on `abfa2711f01bb526d1c6fdb93364aa8ea148c6af`: compile, complete tests, Android lint, isolated R8 APK, zero-permission/component audit and artifact uploads passed.
+Latest fully green authoritative validation remains Android CI #1458 on `abfa2711f01bb526d1c6fdb93364aa8ea148c6af`.
 
-The first visible-memory run #1457 caught an incorrect Compose `setContent` import. The import was corrected and the entire pipeline passed on #1458.
-
-Artifacts:
-
-- `mayra-document-test-apk-1458` — `sha256:75751ce1848b73618adfcb10627420cb88756c0dd2125d164451d07d37d4b869`
-- `android-reports-1458` — `sha256:931d86bcc5bfdf9f8037ba7e90c8c21d1ae15783f9e5f4b67ab1e327c69a7a69`
+The current memory-chat implementation head is `589d13ac731d5053be3668a4e60991550907ce05`. Full compile, complete unit tests, lint, R8 and artifact audit are pending for this newer head, so it is `IN_PROGRESS`, not `DONE`.
 
 ## Governance rules
 
@@ -85,4 +85,4 @@ Artifacts:
 
 ## Immediate next coding priority
 
-Add chat memory-proposal detection and explicit Save/Not now UX, then use only approved active relevant memories as transparent answer context. PR #12 remains Draft and unmerged.
+Run the full governed CI chain for memory chat commands, fix any regression, then add visual Save/Not now confirmation, persistent pending proposals and approved-memory context injection. PR #12 remains Draft and unmerged.
