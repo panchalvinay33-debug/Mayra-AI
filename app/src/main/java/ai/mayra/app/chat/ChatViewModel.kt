@@ -143,9 +143,14 @@ class ChatViewModel(
     }
 
     private fun appendMayraReply(reply: String) {
+        val parsed = MayraReplyMetadataParser.parse(reply)
         _uiState.update {
             it.copy(
-                messages = it.messages + MayraMessage(reply, MayraMessage.Sender.MAYRA),
+                messages = it.messages + MayraMessage(
+                    text = parsed.text,
+                    sender = MayraMessage.Sender.MAYRA,
+                    usedPersonalMemoryKeys = parsed.usedPersonalMemoryKeys
+                ),
                 isThinking = false,
                 pendingConfirmation = null,
                 pendingMemoryApproval = null
