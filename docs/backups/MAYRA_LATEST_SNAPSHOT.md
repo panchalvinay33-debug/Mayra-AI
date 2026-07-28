@@ -3,46 +3,50 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest authoritative code-and-docs head: `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`
-Authoritative CI: Android CI #1369
-APK artifact: `mayra-document-test-apk-1369`
-APK artifact ZIP SHA-256: `dee0f978a4b3a54e8af09e578c7092bd9c271492538281b5a5602e5fcebef688`
+Latest batch head before validation: `9fc0067f3ec7c415cbc7d45950182ecad23f2912`
+Authoritative CI for this batch: pending
 
 ## Product state
 
 - Document foundation remains 16/18 implemented; OCR and legacy DOC are deferred.
 - Typed routing, provider eligibility, audited runtime, idempotency and persistent history are implemented.
-- Replay-safe confirmation is integrated into runtime execution.
-- Concrete answer, Current-only document retrieval and optional device-action adapters are implemented and CI-verified.
-- App composition-root wiring and a user-visible Activity History screen remain active work.
+- Replay-safe confirmation and concrete answer/document/action adapter boundaries are implemented.
+- Android composition root, Activity History UI and first narrow safe action are now code-complete and awaiting CI/device validation.
+- Personal memory, fresh cited search, calendar/email/reminders and controlled Hindi/Hinglish voice remain major product tracks.
 
 ## Completed in this batch
 
-- `ConfirmationRequired` carries a one-time token.
-- `confirmAndDispatch()` validates and executes the exact approved action.
-- Mismatched, expired or replayed tokens are blocked before handlers.
-- Confirmed actions still pass through atomic idempotency protection.
-- Added concrete normal-answer, Current-only document-retrieval and optional device-action adapters.
-- Added confirmation execution/replay/mismatch and adapter regression tests.
-- Updated roadmap and rolling recovery backup.
-
-## Validation
-
-Android CI #1369 passed on `5ecbefc967ec6fe6f76f9f7ef1527484d53b2cd4`: compile, complete tests, lint, isolated R8 APK, manifest/permission/component audit and artifact uploads passed. Requested Android permissions: none.
-
-Artifacts:
-
-- `mayra-document-test-apk-1369` — `sha256:dee0f978a4b3a54e8af09e578c7092bd9c271492538281b5a5602e5fcebef688`
-- `android-reports-1369` — `sha256:1e6eed7017aec7b81b0da99d10b596ce5d7d4eb190e378336d4662756c37bb65`
+- Added `MayraAndroidRuntimeComposition` as the Android composition boundary.
+- Added a deliberately narrow device-action executor that opens Android's system document picker only.
+- The safe executor requests no permission and rejects delete/send/call/SMS or any unregistered action.
+- Added user-visible `MayraActivityHistoryActivity`.
+- History UI shows newest-first status, outcome, capability, timestamp, detail and truncated action key.
+- Added local clear and Android share-sheet export controls.
+- Registered the screen in the full app and exposed it as a separate launcher entry in the isolated validation APK.
+- Extended the isolated manifest audit to require the history component while preserving zero permissions and no background components.
+- Added Android composition tests for normal answer, Current-only document retrieval, system picker launch and destructive-action rejection.
+- Updated roadmap and this rolling recovery snapshot.
 
 ## Safety contract
 
-A destructive action requires capability eligibility, a one-time exact-action confirmation token and an atomic idempotency reservation. Document retrieval reads only Current indexes. Device actions exist only when an explicit executor is supplied.
+- Persistent history is audit data, not execution permission.
+- Destructive actions still require exact-action confirmation and idempotency, but the first Android executor deliberately does not implement destructive operations.
+- Document retrieval remains Current-index only.
+- The isolated APK continues to remove all permissions, services, receivers, providers and the main assistant application.
 
 ## Physical-device truth
 
-Owner verified APK installation/launch and PDF selection/metadata persistence. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance, persistent history and confirmed-action flows remain unverified on phone.
+Owner verified APK installation/launch and PDF selection/metadata persistence in an earlier build. PDF text search, DOCX search, freshness UI, Smart refresh, transactional maintenance, Activity History UI, export/clear, system-picker action and confirmation flows remain unverified on phone.
+
+## Recovery instructions
+
+1. Read `docs/MAYRA_BLUEPRINT.md` and `docs/MAYRA_ROADMAP.md`.
+2. Confirm PR #12 remains Draft/unmerged.
+3. Use only the newest fully green CI head as authoritative.
+4. Do not overclaim physical validation.
+5. Keep the first Android action executor narrow until each additional action receives explicit safety review and tests.
+6. Update this snapshot after every coding batch.
 
 ## Next step
 
-Wire adapters into the application composition root and add a user-visible Activity History screen with clear/export controls.
+Run full Android CI. After green validation, add a non-blocking bridge from the existing suspend assistant/chat path into the typed runtime and implement main-chat confirmation dialog state without replacing stable voice behavior.
