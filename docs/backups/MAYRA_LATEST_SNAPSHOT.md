@@ -3,10 +3,10 @@
 Snapshot date: 2026-07-28
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest verified head: `7edb4ea50bf2a2fa5ee5e8acbd176a20dc83ea44`
-Authoritative CI: Android CI #1335
-APK artifact: `mayra-document-test-apk-1335`
-APK artifact ZIP SHA-256: `fc91841dbf748dd4e88ee9c62f7248ee5008ff440a7cd0c9cdf28d2c30b990b8`
+Latest verified head: `f644969fcbe243f4952c66847f8cbd712734cc2b`
+Authoritative CI: Android CI #1337
+APK artifact: `mayra-document-test-apk-1337`
+APK artifact ZIP SHA-256: `c8c878ba0a4a87514c4a56d9ac0f7f7aced3735c5184371cc7c5ded96a089e8b`
 
 ## Purpose
 
@@ -35,7 +35,7 @@ This rolling recovery snapshot is updated in every coding batch. Significant mil
 
 ## Validation
 
-Android CI #1335 passed on `7edb4ea50bf2a2fa5ee5e8acbd176a20dc83ea44`:
+Android CI #1337 passed on `f644969fcbe243f4952c66847f8cbd712734cc2b`:
 
 - Kotlin compile passed
 - complete unit-test suite passed
@@ -47,8 +47,8 @@ Android CI #1335 passed on `7edb4ea50bf2a2fa5ee5e8acbd176a20dc83ea44`:
 
 Artifacts:
 
-- `mayra-document-test-apk-1335` — `sha256:fc91841dbf748dd4e88ee9c62f7248ee5008ff440a7cd0c9cdf28d2c30b990b8`
-- `android-reports-1335` — `sha256:a96aa6c6901255e890cc698b34b9be74b6a6563b1aa1e4e7f0d185a71b248e1a`
+- `mayra-document-test-apk-1337` — `sha256:c8c878ba0a4a87514c4a56d9ac0f7f7aced3735c5184371cc7c5ded96a089e8b`
+- `android-reports-1337` — `sha256:84eb551855efad7110840add4f1aead1f30bd74a008aa56d0409e3bbbefcd63e`
 
 ## Safety contract
 
@@ -65,7 +65,7 @@ Owner verified APK installation/launch and PDF selection/metadata persistence. P
 1. Read `docs/MAYRA_BLUEPRINT.md`.
 2. Read `docs/MAYRA_ROADMAP.md`.
 3. Confirm PR #12 remains Draft/unmerged.
-4. Use Android CI #1335 on head `7edb4ea50bf2a2fa5ee5e8acbd176a20dc83ea44` as the latest authoritative proof.
+4. Use Android CI #1337 on head `f644969fcbe243f4952c66847f8cbd712734cc2b` as the latest authoritative proof.
 5. Do not overclaim physical validation.
 6. Update this file after every coding batch.
 
