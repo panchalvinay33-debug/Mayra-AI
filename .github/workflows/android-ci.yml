@@ -77,11 +77,12 @@ jobs:
           grep -Fq "application-label:'Mayra AI Full Test'" build/ci/full-test-badging.log
           grep -Fq "android.permission.RECORD_AUDIO" build/ci/full-test-permissions.log
 
-          launcher_count="$(grep -Fc 'android.intent.category.LAUNCHER' build/ci/full-test-manifest-tree.log)"
+          launcher_count="$(grep -c '^launchable-activity:' build/ci/full-test-badging.log || true)"
           if [ "$launcher_count" -ne 1 ]; then
-            echo "Full-test APK must expose exactly one launcher entry; found $launcher_count" >&2
+            echo "Full-test APK must expose exactly one launchable activity; found $launcher_count" >&2
             exit 1
           fi
+          grep -Fq "launchable-activity: name='ai.mayra.app.MainActivity'" build/ci/full-test-badging.log
 
           forbidden_permissions=(
             android.permission.READ_CONTACTS
