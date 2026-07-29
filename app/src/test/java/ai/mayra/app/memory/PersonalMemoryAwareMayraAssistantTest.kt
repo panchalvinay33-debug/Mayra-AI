@@ -1,6 +1,5 @@
 package ai.mayra.app.memory
 
-import ai.mayra.app.chat.MayraReplyMetadataParser
 import ai.mayra.app.core.MayraAssistant
 import ai.mayra.app.core.MayraMessage
 import java.time.Clock
@@ -27,15 +26,14 @@ class PersonalMemoryAwareMayraAssistantTest {
             }
         }
 
-        val raw = PersonalMemoryAwareMayraAssistant(delegate, manager)
-            .reply("Which tea do I like?").getOrThrow()
-        val parsed = MayraReplyMetadataParser.parse(raw)
+        val response = PersonalMemoryAwareMayraAssistant(delegate, manager)
+            .replyStructured("Which tea do I like?").getOrThrow()
 
         assertTrue(received.contains("favorite tea: masala chai"))
         assertTrue(received.contains("approved personal context"))
-        assertEquals("You like masala chai.", parsed.text)
-        assertEquals(listOf("favorite tea"), parsed.usedPersonalMemoryKeys)
-        assertFalse(parsed.text.contains("Used approved personal memory"))
+        assertEquals("You like masala chai.", response.text)
+        assertEquals(listOf("favorite tea"), response.usedPersonalMemoryKeys)
+        assertFalse(response.text.contains("Used approved personal memory"))
     }
 
     @Test fun doesNotInjectOrAttachMetadataForUnapprovedOrIrrelevantMemory() = runBlocking {
@@ -49,14 +47,13 @@ class PersonalMemoryAwareMayraAssistantTest {
             }
         }
 
-        val parsed = MayraReplyMetadataParser.parse(
-            PersonalMemoryAwareMayraAssistant(delegate, manager).reply("Open calculator").getOrThrow()
-        )
+        val response = PersonalMemoryAwareMayraAssistant(delegate, manager)
+            .replyStructured("Open calculator").getOrThrow()
 
         assertFalse(received.contains("masala chai"))
         assertFalse(received.contains("approved personal context"))
-        assertEquals("ok", parsed.text)
-        assertTrue(parsed.usedPersonalMemoryKeys.isEmpty())
+        assertEquals("ok", response.text)
+        assertTrue(response.usedPersonalMemoryKeys.isEmpty())
     }
 
     private fun candidate(key: String, value: String) = MayraMemoryCandidate(
