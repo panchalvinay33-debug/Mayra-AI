@@ -1,34 +1,43 @@
 package ai.mayra.app.memory
 
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.core.MayraAssistantResponse
 import ai.mayra.app.core.MayraMessage
-import java.util.Base64
+import ai.mayra.app.core.MayraStructuredAssistant
 
-/** Read-only approved-memory context decorator with machine-readable usage metadata. */
+/** Read-only approved-memory context decorator with trusted typed usage metadata. */
 class PersonalMemoryAwareMayraAssistant(
     private val delegate: MayraAssistant,
     private val memory: MayraPersonalMemoryManager,
     private val maxMemories: Int = 5
-) : MayraAssistant {
+) : MayraStructuredAssistant {
     init { require(maxMemories in 1..10) }
 
-    override suspend fun reply(message: String, conversation: List<MayraMessage>): Result<String> {
+    override suspend fun replyStructured(
+        message: String,
+        conversation: List<MayraMessage>
+    ): Result<MayraAssistantResponse> {
         val relevant = memory.retrieve(message, maxMemories)
-        if (relevant.isEmpty()) return delegate.reply(message, conversation)
+        if (relevant.isEmpty()) return delegate.structuredReply(message, conversation)
+
         val context = relevant.joinToString("\n") { record ->
             "- ${record.key}: ${record.value} (approved memory; source ${record.provenance.sourceType})"
         }
-        val groundedMessage = "$message\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n$context"
-        return delegate.reply(groundedMessage, conversation).map { answer ->
-            val encodedKeys = relevant.joinToString(",") { record ->
-                Base64.getUrlEncoder().withoutPadding().encodeToString(record.key.toByteArray(Charsets.UTF_8))
-            }
-            "$answer\n$USAGE_MARKER$encodedKeys$USAGE_SUFFIX"
+        val groundedMessage =
+            "$message\n\n[Mayra approved personal context — use only when relevant; do not claim more than shown]\n$context"
+
+        return delegate.structuredReply(groundedMessage, conversation).map { response ->
+            response.copy(
+                usedPersonalMemoryKeys = response.usedPersonalMemoryKeys + relevant.map { it.key }
+            ).normalized()
         }
     }
 
-    companion object {
-        const val USAGE_MARKER = "[[mayra-memory-keys:"
-        const val USAGE_SUFFIX = "]]"
+    private suspend fun MayraAssistant.structuredReply(
+        message: String,
+        conversation: List<MayraMessage>
+    ): Result<MayraAssistantResponse> = when (this) {
+        is MayraStructuredAssistant -> replyStructured(message, conversation)
+        else -> reply(message, conversation).map(::MayraAssistantResponse)
     }
 }
