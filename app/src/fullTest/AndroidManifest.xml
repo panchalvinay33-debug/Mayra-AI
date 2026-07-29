@@ -2,7 +2,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      Owner-device full UI build. Keep microphone for voice testing, but remove
+      high-risk phone, messaging, notification, alarm and boot declarations so
+      sideloaded development APKs are not presented as broadly privileged apps.
+    -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" tools:node="remove" />
+    <uses-permission android:name="android.permission.CALL_PHONE" tools:node="remove" />
+    <uses-permission android:name="android.permission.SEND_SMS" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+
     <application
         android:label="Mayra AI Full Test"
-        tools:replace="android:label" />
+        tools:replace="android:label">
+
+        <service
+            android:name=".background.MayraNotificationListener"
+            tools:node="remove" />
+
+        <receiver
+            android:name=".background.MayraBootReceiver"
+            tools:node="remove" />
+    </application>
 </manifest>
