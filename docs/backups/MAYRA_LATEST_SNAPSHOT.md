@@ -1,50 +1,83 @@
 # Mayra AI — Latest Project Snapshot
 
-Snapshot date: 2026-07-28
+Snapshot date: 2026-07-29
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest isolated-APK CI-verified source head: `edc349ac4870a832f3a8612683e3fd7ab584fb82`
-Authoritative isolated green CI: Android CI #1631
+Latest authoritative single-app green head: `496f5d043b4adf5c446f14d14e4adfd13a7c0918`
+Authoritative single-app CI: Android CI #1667
+Current typed-response head: `f52d764a92aef9321cbe311c00119b32aba1b78b`
 Owner-device checklist: `docs/MAYRA_FULL_APP_ACCEPTANCE.md`
 
-## Important correction
+## Current package truth
 
-Android CI #1631 produced and audited `app-documentTest.apk`, an intentionally isolated document-testing package. It was **not the complete Mayra application APK**.
+Mayra is one Android application package for owner testing. Only `MainActivity` is launchable. Document Library, Memory Center, Provider Settings and Activity History remain internal screens opened from the main app.
 
-The isolated package excluded normal full-app surfaces and runtime components including Main Chat, `MayraApplication`, Memory Center launcher access, provider settings, notification listener, boot receiver and normal application permissions. It must not be used as evidence that the complete app was packaged or physically tested.
+CI #1667 verified exactly one `launchable-activity` entry and required it to be `ai.mayra.app.MainActivity`.
 
-## What CI #1631 actually verified
+## Safe full-test boundary
 
-1. Debug source compilation.
-2. Complete debug unit-test suite.
-3. Debug and document-test lint.
-4. Isolated minified document-test R8 build.
-5. Isolated zero-permission/component audit.
-6. Isolated APK and reports artifacts.
+The owner-device `fullTest` package keeps the complete visible application and microphone-based voice testing while removing high-risk declarations that caused Play Protect review in the earlier sideload build.
 
-Artifact: `mayra-document-test-apk-1631`
+Present:
 
-## Full Mayra APK pipeline now added
+- Main Chat
+- Document Library
+- Memory Center
+- Provider Settings
+- Activity History
+- microphone permission
 
-The Android CI workflow now also:
+Absent:
 
-1. Builds `:app:assembleDebug` for package `ai.mayra.app`.
-2. Audits the label `Mayra AI`.
-3. Requires Main Chat, Document Library, Memory Center, Provider Settings, Activity History, Notification Listener and Boot Receiver.
-4. Verifies expected microphone, contacts, call, SMS, notification, exact-alarm and boot permissions.
-5. Explicitly rejects unexpected `android.permission.INTERNET`.
-6. Uploads a separate `mayra-full-debug-apk-<run>` artifact.
-7. Continues building the isolated document artifact separately.
+- contacts permission
+- direct call permission
+- SMS permission
+- notification permission/listener
+- exact alarm permission
+- boot permission/receiver
+- INTERNET permission
 
-## Current truthful status
+The isolated `documentTest` package remains a separate CI regression artifact and is not the complete application.
 
-- Source compilation, complete tests and lint were green on CI #1631.
-- Isolated document APK/R8/audit was green.
-- Complete Mayra debug APK packaging and audit are pending the new CI run.
-- No complete-app Motorola testing has started.
-- Remote provider remains uninstalled and INTERNET permission remains absent.
-- PR remains Draft and unmerged.
+## Typed assistant response migration
+
+The current coding batch replaces text-embedded memory-use markers with trusted structured metadata.
+
+Implemented:
+
+1. `MayraAssistantResponse` carries visible text and `usedPersonalMemoryKeys` separately.
+2. `MayraStructuredAssistant` exposes `replyStructured` while preserving a text-only compatibility method.
+3. `LocalMayraAssistant` implements the structured contract.
+4. `PersonalMemoryAwareMayraAssistant` attaches approved-memory keys out-of-band.
+5. `ChatViewModel` consumes structured responses directly.
+6. The legacy marker parser and Base64 marker protocol were removed.
+7. Tests cover text normalization, key deduplication, legacy text isolation and the local structured contract.
+
+Security effect: provider output, document text or user content can no longer become trusted memory-attribution metadata merely by containing a special marker string.
+
+## Verification status
+
+Authoritative baseline CI #1667 passed:
+
+- Kotlin compilation
+- complete unit tests
+- Android lint
+- safe full-test APK assembly
+- safe permission/component audit
+- exactly-one-launcher audit
+- isolated document-test R8 build and audit
+
+The typed-response/documentation batch is awaiting its latest CI run. Do not treat it as green until that run completes successfully.
+
+## Historical correction
+
+CI #1631 produced only the intentionally isolated `documentTest` APK. CI #1647/#1653 created the first complete full-test path. The earlier privileged build was blocked for review by Play Protect, which led to the current microphone-only safe full-test boundary.
 
 ## Next gate
 
-Wait for the new full-APK workflow run to pass. Download and install only the artifact named `mayra-full-debug-apk-<run>` for complete Motorola acceptance testing with `docs/MAYRA_FULL_APP_ACCEPTANCE.md`.
+1. Obtain a green CI result for the typed-response head.
+2. Download the latest `mayra-full-test-apk-<run>` artifact.
+3. Remove older test packages from the Motorola device once.
+4. Install the latest artifact and confirm exactly one Mayra launcher icon.
+5. Test capability reply, Library, Memory, Provider, History and voice.
+6. Keep PR #12 Draft and unmerged until explicit owner approval.
