@@ -75,24 +75,23 @@ jobs:
 
           grep -Fq "package: name='ai.mayra.app.fulltest'" build/ci/full-test-badging.log
           grep -Fq "application-label:'Mayra AI Full Test'" build/ci/full-test-badging.log
+          grep -Fq "android.permission.RECORD_AUDIO" build/ci/full-test-permissions.log
 
-          required_permissions=(
-            android.permission.RECORD_AUDIO
+          forbidden_permissions=(
             android.permission.READ_CONTACTS
             android.permission.CALL_PHONE
             android.permission.SEND_SMS
             android.permission.POST_NOTIFICATIONS
             android.permission.SCHEDULE_EXACT_ALARM
             android.permission.RECEIVE_BOOT_COMPLETED
+            android.permission.INTERNET
           )
-          for permission in "${required_permissions[@]}"; do
-            grep -Fq "$permission" build/ci/full-test-permissions.log
+          for permission in "${forbidden_permissions[@]}"; do
+            if grep -Fq "$permission" build/ci/full-test-permissions.log; then
+              echo "Full-test APK unexpectedly requests: $permission" >&2
+              exit 1
+            fi
           done
-
-          if grep -Fq "android.permission.INTERNET" build/ci/full-test-permissions.log; then
-            echo "Full-test APK unexpectedly requests INTERNET permission" >&2
-            exit 1
-          fi
 
           required_components=(
             ai.mayra.app.MainActivity
@@ -101,11 +100,20 @@ jobs:
             ai.mayra.app.memory.MayraMemoryCenterActivity
             ai.mayra.app.core.MayraProviderSettingsActivity
             ai.mayra.app.core.MayraActivityHistoryActivity
-            ai.mayra.app.background.MayraNotificationListener
-            ai.mayra.app.background.MayraBootReceiver
           )
           for component in "${required_components[@]}"; do
             grep -Fq "$component" build/ci/full-test-manifest-tree.log
+          done
+
+          forbidden_components=(
+            ai.mayra.app.background.MayraNotificationListener
+            ai.mayra.app.background.MayraBootReceiver
+          )
+          for component in "${forbidden_components[@]}"; do
+            if grep -Fq "$component" build/ci/full-test-manifest-tree.log; then
+              echo "High-risk background component found in full-test APK: $component" >&2
+              exit 1
+            fi
           done
 
       - name: Assemble isolated document-test APK
