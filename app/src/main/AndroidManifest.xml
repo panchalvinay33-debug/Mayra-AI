@@ -9,19 +9,75 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
-    <queries><intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent></queries>
-    <application android:name=".MayraApplication" android:allowBackup="true" android:label="Mayra AI" android:theme="@style/Theme.MayraAI">
-        <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
-        <activity android:name=".document.MayraDocumentActivity" android:exported="true" android:label="Mayra Library"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
-        <activity android:name=".memory.MayraMemoryCenterActivity" android:exported="true" android:label="Mayra Memory Center"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
-        <activity android:name=".core.MayraProviderSettingsActivity" android:exported="true" android:label="Mayra Remote Provider"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>
-        <activity android:name=".document.MayraDocumentHealthActivity" android:exported="false" android:label="Mayra Library Health" />
-        <activity android:name=".core.MayraActivityHistoryActivity" android:exported="false" android:label="Mayra Activity History" />
-        <service android:name=".background.MayraNotificationListener" android:exported="false" android:label="Mayra notification intelligence" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
-            <meta-data android:name="android.service.notification.default_filter_types" android:value="conversations|alerting" />
-            <meta-data android:name="android.service.notification.disabled_filter_types" android:value="ongoing|silent" />
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".MayraApplication"
+        android:allowBackup="true"
+        android:label="Mayra AI"
+        android:theme="@style/Theme.MayraAI">
+
+        <!-- The app intentionally exposes exactly one launcher entry. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Feature screens are reachable only from the Mayra home screen. -->
+        <activity
+            android:name=".document.MayraDocumentActivity"
+            android:exported="false"
+            android:label="Mayra Library" />
+        <activity
+            android:name=".memory.MayraMemoryCenterActivity"
+            android:exported="false"
+            android:label="Mayra Memory Center" />
+        <activity
+            android:name=".core.MayraProviderSettingsActivity"
+            android:exported="false"
+            android:label="Mayra Remote Provider" />
+        <activity
+            android:name=".document.MayraDocumentHealthActivity"
+            android:exported="false"
+            android:label="Mayra Library Health" />
+        <activity
+            android:name=".core.MayraActivityHistoryActivity"
+            android:exported="false"
+            android:label="Mayra Activity History" />
+
+        <service
+            android:name=".background.MayraNotificationListener"
+            android:exported="false"
+            android:label="Mayra notification intelligence"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.notification.default_filter_types"
+                android:value="conversations|alerting" />
+            <meta-data
+                android:name="android.service.notification.disabled_filter_types"
+                android:value="ongoing|silent" />
         </service>
-        <receiver android:name=".background.MayraBootReceiver" android:enabled="true" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter></receiver>
+
+        <receiver
+            android:name=".background.MayraBootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
