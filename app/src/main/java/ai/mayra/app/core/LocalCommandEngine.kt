@@ -24,7 +24,12 @@ class LocalCommandEngine(
         val clean = message.trim()
         require(clean.isNotEmpty()) { "Message cannot be empty" }
 
-        val intent = intentEngine.parse(clean)
+        val parsedIntent = intentEngine.parse(clean)
+        val intent = if (parsedIntent is AssistantIntent.Chat) {
+            resolveFollowUpIntent(clean, recentMessages) ?: parsedIntent
+        } else {
+            parsedIntent
+        }
         actionDispatcher.dispatch(intent)?.let { return it }
 
         return when (intent) {
@@ -49,9 +54,35 @@ class LocalCommandEngine(
         }
     }
 
+    /**
+     * Completes narrow multi-turn commands without treating arbitrary previous chat as an action.
+     * Only an immediately preceding Mayra clarification can activate this continuation.
+     */
+    private fun resolveFollowUpIntent(
+        message: String,
+        recentMessages: List<MayraMessage>
+    ): AssistantIntent? {
+        val previous = recentMessages
+            .dropLastWhile { it.sender == MayraMessage.Sender.USER && it.text.trim() == message }
+            .lastOrNull()
+            ?: return null
+        if (previous.sender != MayraMessage.Sender.MAYRA) return null
+
+        val prompt = previous.text.trim().lowercase(Locale.ROOT)
+        return when {
+            prompt.contains("what should i remind you about") ||
+                prompt.contains("kis baat ki yaad") ||
+                prompt.contains("क्या याद") -> AssistantIntent.CreateReminder(message)
+            else -> null
+        }
+    }
+
     private fun respondToChat(message: String, recentMessages: List<MayraMessage>): String {
         val normalized = message.lowercase(Locale.ROOT)
         return when {
+            normalized.isWellbeingQuestion() ->
+                "Main bilkul theek hoon 😊 Aap kaise ho? Batao, aaj main aapki kya madad karun?"
+
             normalized.isGreeting() -> greeting()
             normalized.containsAny("who are you", "tum kaun", "aap kaun", "तुम कौन", "आप कौन") ->
                 "I’m Mayra, your private on-device assistant. I can chat offline, accept voice input, use approved personal memory, search imported documents, and safely prepare supported phone actions."
@@ -88,7 +119,7 @@ class LocalCommandEngine(
             in 17..21 -> "Good evening"
             else -> "Hello"
         }
-        return "$dayPart! I’m Mayra. How can I help you?"
+        return "$dayPart! Main Mayra hoon 😊 Batao, main aapki kya madad karun?"
     }
 
     private fun currentTime(): String {
@@ -115,7 +146,17 @@ class LocalCommandEngine(
     }
 
     private fun String.isGreeting(): Boolean =
-        trim() in setOf("hi", "hello", "hey", "namaste", "नमस्ते", "good morning", "good evening")
+        trim() in setOf(
+            "hi", "hello", "hey", "namaste", "नमस्ते", "good morning", "good evening",
+            "hii", "helo", "hello mayra", "hi mayra"
+        )
+
+    private fun String.isWellbeingQuestion(): Boolean =
+        containsAny(
+            "how are you", "how r u", "kaisi ho", "kesi ho", "kaise ho", "kese ho",
+            "tum kaisi ho", "tum kesi ho", "aap kaise ho", "aap kesi hain",
+            "कैसी हो", "कैसे हो", "आप कैसी हैं", "आप कैसे हैं"
+        )
 
     private fun String.isCapabilityQuestion(): Boolean =
         containsAny(
