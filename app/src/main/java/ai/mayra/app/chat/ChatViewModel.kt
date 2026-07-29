@@ -2,7 +2,9 @@ package ai.mayra.app.chat
 
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.core.MayraAssistantResponse
 import ai.mayra.app.core.MayraMessage
+import ai.mayra.app.core.MayraStructuredAssistant
 import ai.mayra.app.memory.MayraMemoryChatController
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -51,7 +53,7 @@ class ChatViewModel(
                 runtimeBridge?.dispatch(text) ?: MayraChatBridgeResult.DelegateToAssistant
             }) {
                 MayraChatBridgeResult.DelegateToAssistant -> replyWithAssistant(text, conversation)
-                is MayraChatBridgeResult.Reply -> appendMayraReply(bridgeResult.text)
+                is MayraChatBridgeResult.Reply -> appendMayraReply(MayraAssistantResponse(bridgeResult.text))
                 is MayraChatBridgeResult.NeedsConfirmation -> _uiState.update {
                     it.copy(
                         messages = it.messages + MayraMessage(bridgeResult.pending.prompt, MayraMessage.Sender.MAYRA),
@@ -137,19 +139,23 @@ class ChatViewModel(
         _uiState.value.pendingConfirmation != null || _uiState.value.pendingMemoryApproval != null
 
     private suspend fun replyWithAssistant(text: String, conversation: List<MayraMessage>) {
-        assistant.reply(text, conversation).onSuccess(::appendMayraReply).onFailure { error ->
+        val result = when (val current = assistant) {
+            is MayraStructuredAssistant -> current.replyStructured(text, conversation)
+            else -> current.reply(text, conversation).map(::MayraAssistantResponse)
+        }
+        result.onSuccess(::appendMayraReply).onFailure { error ->
             _uiState.update { it.copy(isThinking = false, error = error.message ?: "Something went wrong") }
         }
     }
 
-    private fun appendMayraReply(reply: String) {
-        val parsed = MayraReplyMetadataParser.parse(reply)
+    private fun appendMayraReply(reply: MayraAssistantResponse) {
+        val normalized = reply.normalized()
         _uiState.update {
             it.copy(
                 messages = it.messages + MayraMessage(
-                    text = parsed.text,
+                    text = normalized.text,
                     sender = MayraMessage.Sender.MAYRA,
-                    usedPersonalMemoryKeys = parsed.usedPersonalMemoryKeys
+                    usedPersonalMemoryKeys = normalized.usedPersonalMemoryKeys
                 ),
                 isThinking = false,
                 pendingConfirmation = null,
