@@ -8,8 +8,14 @@
       sideloaded development APKs are not presented as broadly privileged apps.
     -->
     <uses-permission android:name="android.permission.READ_CONTACTS" tools:node="remove" />
-    <uses-permission android:name="android.permission.CALL_PHONE" tools:node="remove" />
-    <uses-permission android:name="android.permission.SEND_SMS" tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.CALL_PHONE"
+        tools:ignore="PermissionImpliesUnsupportedChromeOsHardware"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.SEND_SMS"
+        tools:ignore="PermissionImpliesUnsupportedChromeOsHardware"
+        tools:node="remove" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
