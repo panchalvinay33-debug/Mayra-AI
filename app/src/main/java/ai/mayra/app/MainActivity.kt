@@ -1,6 +1,8 @@
 package ai.mayra.app
 
 import ai.mayra.app.chat.ChatViewModel
+import ai.mayra.app.core.AndroidMayraProviderCredentialStore
+import ai.mayra.app.core.AndroidMayraProviderSettingsStore
 import ai.mayra.app.core.MayraActivityHistoryActivity
 import ai.mayra.app.core.MayraMessage
 import ai.mayra.app.core.MayraProviderSettingsActivity
@@ -92,6 +94,12 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val permissionSnapshot = remember(permissionReader, readinessRefresh) { DevicePermissionSnapshotProvider(permissionReader).snapshot() }
     val installedAppsCount = remember(context, readinessRefresh) { runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0) }
     val microphoneReady = remember(context, readinessRefresh) { MicrophonePermission.isGranted(context) }
+    val providerConfigured = remember(context, readinessRefresh) {
+        runCatching {
+            val settings = AndroidMayraProviderSettingsStore(context).read()
+            settings.enabled && AndroidMayraProviderCredentialStore(context).hasCredential()
+        }.getOrDefault(false)
+    }
 
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
@@ -133,9 +141,13 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                         state.isThinking -> "Thinking…"
                         state.pendingConfirmation != null || state.pendingMemoryApproval != null -> "Waiting for confirmation"
                         voiceState.isListening -> "Listening…"
+                        providerConfigured -> "● Online AI configured"
                         else -> "● Offline core ready"
                     })
-                    Text("Private on-device mode", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (providerConfigured) "Local privacy controls · online answers" else "Private on-device mode",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
                 if (state.messages.isNotEmpty()) {
                     TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) { Text("Clear") }
@@ -231,10 +243,34 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
 
 @Composable
 private fun DeviceReadinessDialog(microphoneReady: Boolean, grantedPermissions: Set<DevicePermission>, installedAppsCount: Int, onRequestPermissions: () -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit) {
-    val rows = listOf(DevicePermission.READ_CONTACTS to "Find contacts", DevicePermission.CALL_PHONE to "Start phone calls", DevicePermission.SEND_MESSAGES to "Prepare messages", DevicePermission.POST_NOTIFICATIONS to "Assistant notifications", DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders", DevicePermission.QUERY_APPS to "Open installed apps")
+    val rows = listOf(
+        DevicePermission.READ_CONTACTS to "Find contacts",
+        DevicePermission.POST_NOTIFICATIONS to "Reminder notifications",
+        DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders",
+        DevicePermission.QUERY_APPS to "Open installed apps"
+    )
     val readyCount = rows.count { it.first in grantedPermissions } + if (microphoneReady) 1 else 0
     val totalCount = rows.size + 1
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Device readiness") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("$readyCount of $totalCount capabilities ready"); Text("$installedAppsCount launchable apps detected"); HorizontalDivider(); ReadinessRow("Voice input", microphoneReady); rows.forEach { (permission, label) -> ReadinessRow(label, permission in grantedPermissions) }; Text("Exact reminders may require enabling special access from Android settings.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { Button(onClick = onRequestPermissions) { Text("Allow permissions") } }, dismissButton = { Row { TextButton(onClick = onRefresh) { Text("Refresh") }; TextButton(onClick = onDismiss) { Text("Close") } } })
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Device readiness") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("$readyCount of $totalCount capabilities ready")
+                Text("$installedAppsCount launchable apps detected")
+                HorizontalDivider()
+                ReadinessRow("Voice input", microphoneReady)
+                rows.forEach { (permission, label) -> ReadinessRow(label, permission in grantedPermissions) }
+                Text(
+                    "Calls and messages use Android's dialer/composer for final review. Mayra does not need direct CALL_PHONE or SEND_SMS permission.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text("Exact reminders may require enabling special access from Android settings.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { Button(onClick = onRequestPermissions) { Text("Allow permissions") } },
+        dismissButton = { Row { TextButton(onClick = onRefresh) { Text("Refresh") }; TextButton(onClick = onDismiss) { Text("Close") } } }
+    )
 }
 
 @Composable
@@ -243,6 +279,7 @@ private fun ReadinessRow(label: String, ready: Boolean) {
 }
 
 private fun runtimePermissionNames(): Array<String> = buildList {
-    add(Manifest.permission.RECORD_AUDIO); add(Manifest.permission.READ_CONTACTS); add(Manifest.permission.CALL_PHONE); add(Manifest.permission.SEND_SMS)
+    add(Manifest.permission.RECORD_AUDIO)
+    add(Manifest.permission.READ_CONTACTS)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
 }.toTypedArray()
