@@ -16,11 +16,15 @@ import ai.mayra.app.brain.MayraSkillRegistry
 import ai.mayra.app.brain.MayraTaskPlanner
 import ai.mayra.app.brain.registerBuiltInDeviceSkills
 import ai.mayra.app.core.ActionDispatcher
+import ai.mayra.app.core.AndroidMayraProviderCredentialStore
+import ai.mayra.app.core.AndroidMayraProviderSettingsStore
 import ai.mayra.app.core.LocalCommandEngine
 import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAndroidRuntimeComposition
 import ai.mayra.app.core.MayraAnswerProvider
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.core.MayraHttpConversationalProvider
+import ai.mayra.app.core.ResilientMayraProviderAssistant
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.memory.AndroidMayraPendingMemoryProposalStore
 import ai.mayra.app.memory.AndroidMayraPersonalMemoryStore
@@ -50,8 +54,29 @@ class MayraApplication : Application() {
             actionDispatcher = ActionDispatcher(actionExecutor)
         )
         val localAssistant = LocalMayraAssistant(localCommandEngine)
+
+        val providerSettings = AndroidMayraProviderSettingsStore(applicationContext).read()
+        val providerCredentials = AndroidMayraProviderCredentialStore(applicationContext)
+        val providerConfig = providerSettings.validatedConfig().getOrNull()
+        val conversationalAssistant: MayraAssistant = if (
+            providerConfig?.enabled == true && providerCredentials.hasCredential()
+        ) {
+            ResilientMayraProviderAssistant(
+                provider = MayraHttpConversationalProvider(providerConfig, providerCredentials),
+                fallback = localAssistant,
+                timeoutMillis = providerConfig.readTimeoutMillis.toLong().coerceAtMost(60_000L),
+                maxAttempts = 2,
+                retryDelayMillis = 350
+            )
+        } else {
+            localAssistant
+        }
+
+        // Document queries stay local and grounded. Non-document conversation may delegate to the
+        // owner-enabled provider. Approved personal memory is injected outside both paths so its
+        // usage remains explicit and typed.
         val documentAssistant = DocumentInsightAwareMayraAssistant(
-            delegate = localAssistant,
+            delegate = conversationalAssistant,
             context = applicationContext
         )
         MayraRuntime.assistant = PersonalMemoryAwareMayraAssistant(
@@ -62,7 +87,7 @@ class MayraApplication : Application() {
         val typedRuntime = MayraAndroidRuntimeComposition(
             context = applicationContext,
             answerProvider = MayraAnswerProvider { message ->
-                runBlocking { localCommandEngine.respond(message, emptyList()) }
+                runBlocking { MayraRuntime.assistant.reply(message, emptyList()).getOrThrow() }
             },
             enableSafeFilePickerAction = true
         )
