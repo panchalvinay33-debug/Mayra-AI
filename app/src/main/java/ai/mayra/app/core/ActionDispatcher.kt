@@ -30,7 +30,7 @@ class ActionDispatcher(
             )
 
             is AssistantIntent.CallContact -> executor.callContact(intent.contact).toReply(
-                successMessage = "Calling ${intent.contact}."
+                successMessage = "Opening the dialer for ${intent.contact}. Review the number and tap Call when ready."
             )
 
             is AssistantIntent.ComposeMessage -> executor.sendMessage(
@@ -40,12 +40,12 @@ class ActionDispatcher(
                 successMessage = if (intent.message.isNullOrBlank()) {
                     "Opening a message for ${intent.recipient}."
                 } else {
-                    "Message prepared for ${intent.recipient}."
+                    "Message prepared for ${intent.recipient}. Review it and tap Send when ready."
                 }
             )
 
             is AssistantIntent.CreateReminder -> executor.createReminder(intent.request).toReply(
-                successMessage = "Reminder opened: ${intent.request}."
+                successMessage = "Reminder scheduled: ${intent.request}."
             )
 
             else -> null
