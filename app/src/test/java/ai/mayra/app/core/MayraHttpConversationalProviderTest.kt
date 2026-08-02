@@ -7,6 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,14 +18,14 @@ class MayraHttpConversationalProviderTest {
         var opened = false
         val provider = MayraHttpConversationalProvider(
             config(enabled = false),
-            MayraProviderCredentialSource { "token" },
-            MayraHttpConnectionFactory { opened = true; FakeConnection(it, 200, "{\"text\":\"ok\"}") }
+            MayraProviderCredentialSource { "token-value-123" },
+            MayraHttpConnectionFactory { opened = true; FakeConnection(it, 200, simpleText("ok")) }
         )
 
         val result = provider.answer(request)
 
         assertTrue(result is MayraProviderResult.PermanentFailure)
-        assertEquals(false, opened)
+        assertFalse(opened)
         assertEquals(MayraProviderHealthState.DISABLED, provider.health().state)
     }
 
@@ -33,26 +34,38 @@ class MayraHttpConversationalProviderTest {
         val provider = MayraHttpConversationalProvider(
             config(),
             MayraProviderCredentialSource { null },
-            MayraHttpConnectionFactory { opened = true; FakeConnection(it, 200, "{\"text\":\"ok\"}") }
+            MayraHttpConnectionFactory { opened = true; FakeConnection(it, 200, simpleText("ok")) }
         )
 
         val result = provider.answer(request)
 
         assertTrue(result is MayraProviderResult.PermanentFailure)
-        assertEquals(false, opened)
+        assertFalse(opened)
         assertEquals(MayraProviderHealthState.MISSING_CREDENTIAL, provider.health().state)
     }
 
-    @Test fun successfulJsonTextIsReturnedAndHealthBecomesReady() = runBlocking {
-        val connection = FakeConnection(URL("https://example.test"), 200, "{\"text\":\"Namaste \\u0926\\u094b\\u0938\\u094d\\u0924\"}")
+    @Test fun openAiResponsesOutputTextIsReturnedAndHealthBecomesReady() = runBlocking {
+        val response = """{"output":[{"type":"message","content":[{"type":"output_text","text":"Namaste \\u0926\\u094b\\u0938\\u094d\\u0924"}]}]}"""
+        val connection = FakeConnection(URL("https://api.openai.com/v1/responses"), 200, response)
         val provider = provider(connection)
 
         val result = provider.answer(request) as MayraProviderResult.Success
 
         assertEquals("Namaste दोस्त", result.text)
         assertEquals(MayraProviderHealthState.READY, provider.health().state)
-        assertTrue(connection.writtenBody().contains("\"locale\":\"hi-IN\""))
-        assertEquals("Bearer token", connection.requestProperties["Authorization"]?.single())
+        assertEquals("Bearer token-value-123", connection.requestProperties["Authorization"]?.single())
+        val body = connection.writtenBody()
+        assertTrue(body.contains("\"model\":\"gpt-5.6\""))
+        assertTrue(body.contains("\"input\":["))
+        assertTrue(body.contains("\"store\":false"))
+        assertTrue(body.contains("\"max_output_tokens\":1200"))
+        assertFalse(body.contains("\"locale\""))
+    }
+
+    @Test fun compatibleTopLevelTextIsStillAccepted() = runBlocking {
+        val result = provider(FakeConnection(URL("https://example.test"), 200, simpleText("Hello")))
+            .answer(request) as MayraProviderResult.Success
+        assertEquals("Hello", result.text)
     }
 
     @Test fun retryableHttpCodesAreTemporary() = runBlocking {
@@ -71,7 +84,7 @@ class MayraHttpConversationalProviderTest {
         val connection = FakeConnection(URL("https://example.test"), 200, "x".repeat(2_000))
         val provider = MayraHttpConversationalProvider(
             config(maxResponseBytes = 1_024),
-            MayraProviderCredentialSource { "token" },
+            MayraProviderCredentialSource { "token-value-123" },
             MayraHttpConnectionFactory { connection }
         )
 
@@ -83,16 +96,18 @@ class MayraHttpConversationalProviderTest {
 
     private fun provider(connection: FakeConnection) = MayraHttpConversationalProvider(
         config(),
-        MayraProviderCredentialSource { "token" },
+        MayraProviderCredentialSource { "token-value-123" },
         MayraHttpConnectionFactory { connection }
     )
 
     private fun config(enabled: Boolean = true, maxResponseBytes: Int = 256_000) = MayraHttpProviderConfig(
-        endpoint = "https://example.test/v1/chat",
-        model = "mayra-test",
+        endpoint = "https://api.openai.com/v1/responses",
+        model = "gpt-5.6",
         enabled = enabled,
         maxResponseBytes = maxResponseBytes
     )
+
+    private fun simpleText(value: String) = "{\"text\":\"$value\"}"
 
     private class FakeConnection(
         url: URL,
