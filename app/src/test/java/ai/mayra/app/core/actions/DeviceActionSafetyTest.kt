@@ -22,36 +22,27 @@ class DeviceActionSafetyTest {
     }
 
     @Test
-    fun `missing permissions are returned before confirmation`() {
+    fun `review first call needs contacts but not direct call permission`() {
         val gate = DeviceActionSafetyGate(clock = { 100L })
         val request = request(DeviceActionType.CALL_CONTACT, "Amit")
 
         val decision = gate.evaluate(request, PermissionSnapshot()) as ActionGateDecision.NeedsPermission
 
-        assertEquals(
-            setOf(DevicePermission.READ_CONTACTS, DevicePermission.CALL_PHONE),
-            decision.missing
-        )
-        assertTrue(gate.snapshot().pendingConfirmations == 0)
+        assertEquals(setOf(DevicePermission.READ_CONTACTS), decision.missing)
+        assertFalse(DevicePermission.CALL_PHONE in request.requiredPermissions)
+        assertEquals(0, gate.snapshot().pendingConfirmations)
     }
 
     @Test
-    fun `permanently denied permissions are identified separately`() {
-        val gate = DeviceActionSafetyGate(clock = { 100L })
+    fun `review first message needs contacts but not direct sms permission`() {
         val request = request(DeviceActionType.SEND_MESSAGE, "Mayra", "Hello")
-        val permissions = PermissionSnapshot(
-            granted = setOf(DevicePermission.READ_CONTACTS),
-            permanentlyDenied = setOf(DevicePermission.SEND_MESSAGES)
-        )
 
-        val decision = gate.evaluate(request, permissions) as ActionGateDecision.NeedsPermission
-
-        assertEquals(setOf(DevicePermission.SEND_MESSAGES), decision.missing)
-        assertEquals(setOf(DevicePermission.SEND_MESSAGES), decision.permanentlyDenied)
+        assertEquals(setOf(DevicePermission.READ_CONTACTS), request.requiredPermissions)
+        assertFalse(DevicePermission.SEND_MESSAGES in request.requiredPermissions)
     }
 
     @Test
-    fun `high risk call receives one time confirmation ticket`() {
+    fun `high risk dialer handoff receives one time confirmation ticket`() {
         var now = 100L
         val gate = DeviceActionSafetyGate(
             confirmationTtlMillis = 1_000L,
@@ -66,7 +57,7 @@ class DeviceActionSafetyTest {
         val reused = gate.confirm(pending.ticket.token)
 
         assertEquals("token-1", pending.ticket.token)
-        assertEquals("Confirm call to Amit.", pending.prompt)
+        assertEquals("Confirm opening the dialer for Amit.", pending.prompt)
         assertTrue(ready is ActionGateDecision.Ready)
         assertTrue(reused is ActionGateDecision.Rejected)
         assertEquals(0, gate.snapshot().pendingConfirmations)
