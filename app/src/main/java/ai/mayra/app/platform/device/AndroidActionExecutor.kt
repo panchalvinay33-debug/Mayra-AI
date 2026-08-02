@@ -10,20 +10,25 @@ import ai.mayra.app.core.actions.DeviceActionSafetyGate
 import ai.mayra.app.core.actions.DeviceActionType
 import ai.mayra.app.core.actions.DevicePermission
 import ai.mayra.app.core.actions.PermissionSnapshot
+import ai.mayra.app.reminder.MayraReminderParser
+import ai.mayra.app.reminder.MayraReminderRuntime
+import ai.mayra.app.reminder.ReminderParseResult
 import android.content.Context
 
 /**
  * Production bridge between Mayra's framework-neutral command layer and Android device actions.
  *
  * Targets are resolved before execution, permission checks happen before sensitive provider reads,
- * and high-risk actions are held behind the one-time confirmation gate.
+ * and high-risk actions are held behind the one-time confirmation gate. Calls and messages are
+ * review-first Android handoffs; reminders are owned and scheduled by Mayra itself.
  */
 class AndroidActionExecutor(
     private val permissionSnapshot: () -> PermissionSnapshot,
     private val contactResolver: ContactResolver,
     private val installedAppResolver: InstalledAppResolver,
     private val coordinator: DeviceActionCoordinator,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val appContext: Context? = null
 ) : ActionExecutor {
 
     constructor(context: Context) : this(
@@ -37,7 +42,8 @@ class AndroidActionExecutor(
         coordinator = DeviceActionCoordinator(
             safetyGate = DeviceActionSafetyGate(),
             runner = AndroidDeviceActionRunner(context)
-        )
+        ),
+        appContext = context.applicationContext
     )
 
     private var pendingConfirmationToken: String? = null
@@ -111,9 +117,31 @@ class AndroidActionExecutor(
         }
     }
 
-    override suspend fun createReminder(request: String): ActionExecutionResult = submit(
-        request(DeviceActionType.CREATE_REMINDER, request)
-    )
+    override suspend fun createReminder(request: String): ActionExecutionResult {
+        val context = appContext ?: return submit(request(DeviceActionType.CREATE_REMINDER, request))
+        val permissions = permissionSnapshot()
+        if (DevicePermission.POST_NOTIFICATIONS !in permissions.granted) {
+            return ActionExecutionResult.PermissionRequired(
+                message = "Mayra needs notification permission to alert you about reminders.",
+                permissions = setOf(DevicePermission.POST_NOTIFICATIONS)
+            )
+        }
+
+        return when (val parsed = MayraReminderParser().parse(request)) {
+            is ReminderParseResult.Parsed -> runCatching {
+                MayraReminderRuntime.create(context, parsed, clock())
+            }.fold(
+                onSuccess = { reminder ->
+                    ActionExecutionResult.Success
+                },
+                onFailure = { error ->
+                    ActionExecutionResult.Failure(error.message ?: "Could not schedule the reminder.")
+                }
+            )
+            is ReminderParseResult.NeedsClarification -> ActionExecutionResult.NotSupported(parsed.message)
+            is ReminderParseResult.Invalid -> ActionExecutionResult.NotSupported(parsed.message)
+        }
+    }
 
     override suspend fun confirmPending(): ActionExecutionResult {
         val token = pendingConfirmationToken
