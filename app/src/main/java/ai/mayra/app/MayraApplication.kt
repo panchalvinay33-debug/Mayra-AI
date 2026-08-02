@@ -31,6 +31,7 @@ import ai.mayra.app.memory.AndroidMayraPersonalMemoryStore
 import ai.mayra.app.memory.MayraPersonalMemoryManager
 import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
+import ai.mayra.app.reminder.MayraReminderRuntime
 import android.app.Application
 import java.util.Calendar
 import kotlinx.coroutines.runBlocking
@@ -72,9 +73,6 @@ class MayraApplication : Application() {
             localAssistant
         }
 
-        // Document queries stay local and grounded. Non-document conversation may delegate to the
-        // owner-enabled provider. Approved personal memory is injected outside both paths so its
-        // usage remains explicit and typed.
         val documentAssistant = DocumentInsightAwareMayraAssistant(
             delegate = conversationalAssistant,
             context = applicationContext
@@ -114,10 +112,7 @@ class MayraApplication : Application() {
                 userAvailable = true
             )
         }
-        val brain = MayraBrainCoordinator(
-            eventBus = eventBus,
-            contextProvider = contextProvider
-        )
+        val brain = MayraBrainCoordinator(eventBus = eventBus, contextProvider = contextProvider)
         val planRuntime = MayraPlanRuntime(
             planner = taskPlanner,
             store = planStore,
@@ -150,6 +145,7 @@ class MayraApplication : Application() {
 
         runCatching { MayraBackgroundRuntime.initialize(applicationContext) }
         runCatching { MayraBriefingScheduler.sync(applicationContext) }
+        runCatching { MayraReminderRuntime.rescheduleAll(applicationContext) }
     }
 }
 
@@ -179,12 +175,9 @@ object MayraRuntime {
     lateinit var orchestrator: MayraRuntimeOrchestrator
         private set
 
-    val installed: Boolean
-        get() = ::orchestrator.isInitialized
-    val typedRuntimeInstalled: Boolean
-        get() = ::typedRuntime.isInitialized
-    val personalMemoryInstalled: Boolean
-        get() = ::personalMemory.isInitialized
+    val installed: Boolean get() = ::orchestrator.isInitialized
+    val typedRuntimeInstalled: Boolean get() = ::typedRuntime.isInitialized
+    val personalMemoryInstalled: Boolean get() = ::personalMemory.isInitialized
 
     fun installTypedRuntime(runtime: MayraAndroidRuntimeComposition) {
         typedRuntime = runtime
