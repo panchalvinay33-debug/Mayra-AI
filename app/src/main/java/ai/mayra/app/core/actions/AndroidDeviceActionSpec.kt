@@ -16,7 +16,7 @@ data class AndroidIntentSpec(
 
 object AndroidDeviceActionSpecFactory {
     const val ACTION_MAIN = "android.intent.action.MAIN"
-    const val ACTION_CALL = "android.intent.action.CALL"
+    const val ACTION_DIAL = "android.intent.action.DIAL"
     const val ACTION_SENDTO = "android.intent.action.SENDTO"
     const val ACTION_INSERT = "android.intent.action.INSERT"
     const val CATEGORY_LAUNCHER = "android.intent.category.LAUNCHER"
@@ -30,11 +30,13 @@ object AndroidDeviceActionSpecFactory {
             categories = setOf(CATEGORY_LAUNCHER)
         )
 
+        // Review-first handoff: Mayra opens the dialer, but Android/user performs the actual call.
         DeviceActionType.CALL_CONTACT -> AndroidIntentSpec(
-            action = ACTION_CALL,
+            action = ACTION_DIAL,
             data = "tel:${request.target.trim()}"
         )
 
+        // Review-first handoff: the message is prepared in the SMS composer, never silently sent.
         DeviceActionType.SEND_MESSAGE -> AndroidIntentSpec(
             action = ACTION_SENDTO,
             data = "smsto:${request.target.trim()}",
@@ -57,9 +59,9 @@ object AndroidDeviceActionSpecFactory {
 
     fun androidPermissionName(permission: DevicePermission): String? = when (permission) {
         DevicePermission.QUERY_APPS -> null
-        DevicePermission.CALL_PHONE -> "android.permission.CALL_PHONE"
+        DevicePermission.CALL_PHONE -> null // ACTION_DIAL intentionally needs no direct-call permission.
         DevicePermission.READ_CONTACTS -> "android.permission.READ_CONTACTS"
-        DevicePermission.SEND_MESSAGES -> "android.permission.SEND_SMS"
+        DevicePermission.SEND_MESSAGES -> null // ACTION_SENDTO intentionally needs no direct-SMS permission.
         DevicePermission.POST_NOTIFICATIONS -> "android.permission.POST_NOTIFICATIONS"
         DevicePermission.SCHEDULE_EXACT_ALARM -> "android.permission.SCHEDULE_EXACT_ALARM"
     }
