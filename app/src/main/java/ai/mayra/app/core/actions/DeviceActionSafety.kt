@@ -46,17 +46,15 @@ data class DeviceActionRequest(
             DeviceActionType.SEND_MESSAGE -> ActionRiskLevel.HIGH
         }
 
+    /**
+     * Call/message handoff is review-first: Mayra only resolves the contact and opens Android's
+     * dialer/composer. Direct CALL_PHONE and SEND_SMS permissions are intentionally not required.
+     */
     val requiredPermissions: Set<DevicePermission>
         get() = when (type) {
             DeviceActionType.OPEN_APP -> setOf(DevicePermission.QUERY_APPS)
-            DeviceActionType.CALL_CONTACT -> setOf(
-                DevicePermission.READ_CONTACTS,
-                DevicePermission.CALL_PHONE
-            )
-            DeviceActionType.SEND_MESSAGE -> setOf(
-                DevicePermission.READ_CONTACTS,
-                DevicePermission.SEND_MESSAGES
-            )
+            DeviceActionType.CALL_CONTACT -> setOf(DevicePermission.READ_CONTACTS)
+            DeviceActionType.SEND_MESSAGE -> setOf(DevicePermission.READ_CONTACTS)
             DeviceActionType.CREATE_REMINDER -> setOf(DevicePermission.POST_NOTIFICATIONS)
         }
 
@@ -263,11 +261,11 @@ class DeviceActionSafetyGate(
     }
 
     private fun confirmationPrompt(request: DeviceActionRequest): String = when (request.type) {
-        DeviceActionType.CALL_CONTACT -> "Confirm call to ${request.target}."
+        DeviceActionType.CALL_CONTACT -> "Confirm opening the dialer for ${request.target}."
         DeviceActionType.SEND_MESSAGE -> if (request.payload.isNullOrBlank()) {
             "Confirm opening a message to ${request.target}."
         } else {
-            "Confirm sending this message to ${request.target}."
+            "Confirm preparing this message to ${request.target}."
         }
         DeviceActionType.OPEN_APP -> "Confirm opening ${request.target}."
         DeviceActionType.CREATE_REMINDER -> "Confirm reminder: ${request.target}."
