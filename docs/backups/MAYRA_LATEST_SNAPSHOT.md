@@ -1,83 +1,145 @@
 # Mayra AI — Latest Project Snapshot
 
-Snapshot date: 2026-07-29
+Snapshot date: 2026-08-02
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft, open, unmerged
-Latest authoritative single-app green head: `496f5d043b4adf5c446f14d14e4adfd13a7c0918`
-Authoritative single-app CI: Android CI #1667
-Current typed-response head: `f52d764a92aef9321cbe311c00119b32aba1b78b`
+Authoritative Personal Alpha feature head: `1aa031f8bb5213a9f3cacd88b7bfa3528489b132`
+Authoritative feature CI: Android CI #1753
 Owner-device checklist: `docs/MAYRA_FULL_APP_ACCEPTANCE.md`
 
 ## Current package truth
 
-Mayra is one Android application package for owner testing. Only `MainActivity` is launchable. Document Library, Memory Center, Provider Settings and Activity History remain internal screens opened from the main app.
+Mayra now has three governed Android test artifacts with deliberately different capability boundaries:
 
-CI #1667 verified exactly one `launchable-activity` entry and required it to be `ai.mayra.app.MainActivity`.
+1. **Personal Alpha** — `ai.mayra.app.alpha`, label `Mayra AI Personal Alpha`, version `0.2.0-alpha`. This is the owner-device functional candidate with provider, contacts, reminders and background recovery enabled. It is debug-signed and is not a production release.
+2. **Full Test** — `ai.mayra.app.fulltest`, label `Mayra AI Full Test`. This keeps the complete visible UI and microphone while stripping network, contacts, notifications and background recovery for lower-risk sideload testing.
+3. **Document Test** — `ai.mayra.app.documenttest`. This remains the isolated zero-permission document regression artifact and is not the complete application.
 
-## Safe full-test boundary
+Personal Alpha and Full Test each expose exactly one launcher activity: `ai.mayra.app.MainActivity`.
 
-The owner-device `fullTest` package keeps the complete visible application and microphone-based voice testing while removing high-risk declarations that caused Play Protect review in the earlier sideload build.
+## Personal Alpha 0.2.0 capability boundary
 
-Present:
+CI #1753 verified the Personal Alpha APK with these required permissions present:
 
-- Main Chat
-- Document Library
-- Memory Center
-- Provider Settings
-- Activity History
-- microphone permission
+- `android.permission.INTERNET`
+- `android.permission.RECORD_AUDIO`
+- `android.permission.READ_CONTACTS`
+- `android.permission.POST_NOTIFICATIONS`
+- `android.permission.RECEIVE_BOOT_COMPLETED`
 
-Absent:
+The following high-risk permissions were explicitly audited absent:
 
-- contacts permission
-- direct call permission
-- SMS permission
-- notification permission/listener
-- exact alarm permission
-- boot permission/receiver
-- INTERNET permission
+- `android.permission.CALL_PHONE`
+- `android.permission.SEND_SMS`
+- `android.permission.READ_SMS`
+- `android.permission.RECEIVE_SMS`
+- `android.permission.WRITE_CONTACTS`
+- `android.permission.SCHEDULE_EXACT_ALARM`
+- `android.permission.REQUEST_INSTALL_PACKAGES`
+- `android.permission.SYSTEM_ALERT_WINDOW`
 
-The isolated `documentTest` package remains a separate CI regression artifact and is not the complete application.
+Calls use a dialer handoff and messages use a composer handoff. Mayra does not directly place a call or send an SMS and must not claim connection/delivery.
 
-## Typed assistant response migration
+## Conversational provider status
 
-The current coding batch replaces text-embedded memory-use markers with trusted structured metadata.
+Implemented and CI-verified:
 
-Implemented:
+- owner-disabled-by-default remote provider
+- HTTPS-only endpoint validation
+- OpenAI Responses-compatible request/response shape
+- default endpoint `https://api.openai.com/v1/responses`
+- default model `gpt-5.6`
+- bounded request/response sizes and timeouts
+- bounded retry with deterministic local fallback
+- `store:false` request behavior
+- owner-editable endpoint/model
+- API key stored encrypted with Android Keystore-backed AES-GCM
+- key is not read back into the settings UI and is not stored in ordinary plaintext preferences
 
-1. `MayraAssistantResponse` carries visible text and `usedPersonalMemoryKeys` separately.
-2. `MayraStructuredAssistant` exposes `replyStructured` while preserving a text-only compatibility method.
-3. `LocalMayraAssistant` implements the structured contract.
-4. `PersonalMemoryAwareMayraAssistant` attaches approved-memory keys out-of-band.
-5. `ChatViewModel` consumes structured responses directly.
-6. The legacy marker parser and Base64 marker protocol were removed.
-7. Tests cover text normalization, key deduplication, legacy text isolation and the local structured contract.
+Still device-only:
 
-Security effect: provider output, document text or user content can no longer become trusted memory-attribution metadata merely by containing a special marker string.
+- real API-key connection/generation validation
+- Hindi/Hinglish answer quality
+- offline transition under real network loss
+- provider error UX on the Motorola device
 
-## Verification status
+## Mayra-owned reminder status
 
-Authoritative baseline CI #1667 passed:
+Implemented and CI-verified:
 
-- Kotlin compilation
-- complete unit tests
-- Android lint
-- safe full-test APK assembly
-- safe permission/component audit
-- exactly-one-launcher audit
-- isolated document-test R8 build and audit
+- Hindi/Hinglish/English reminder parser
+- relative-minute/hour parsing
+- day/time parsing including `kal subah 7 baje`
+- clarification when time is missing
+- persistent reminder store
+- revision-safe WorkManager scheduling
+- stale worker rejection
+- notification channel and guarded runtime permission check
+- Complete action
+- Snooze 10 min action
+- 30-minute follow-up for unresolved due reminders
+- reboot/app-update recovery
+- duplicate/stale action protection through revision matching
 
-The typed-response/documentation batch is awaiting its latest CI run. Do not treat it as green until that run completes successfully.
+The exact regression phrase `drinking water after 3 min` is covered by tests. Reminder timing, OEM battery behavior, notification presentation and reboot recovery still require physical-device acceptance.
 
-## Historical correction
+## Trusted assistant and memory status
 
-CI #1631 produced only the intentionally isolated `documentTest` APK. CI #1647/#1653 created the first complete full-test path. The earlier privileged build was blocked for review by Play Protect, which led to the current microphone-only safe full-test boundary.
+The trusted structured response boundary remains active:
+
+- `MayraAssistantResponse` separates visible answer text from `usedPersonalMemoryKeys`
+- `MayraStructuredAssistant` exposes structured replies
+- approved memory keys are attached out-of-band
+- provider/document/user text cannot manufacture trusted memory chips merely by containing a marker-like string
+
+Personal memory remains approval-first with protected storage, provenance, edit/delete/expiry and user-facing controls. Physical recovery and attribution checks remain pending.
+
+## CI #1753 evidence
+
+Android CI #1753 passed on feature head `1aa031f8bb5213a9f3cacd88b7bfa3528489b132`.
+
+Passed gates:
+
+- debug, Personal Alpha and Full Test Kotlin compilation
+- complete debug unit-test suite: 346 tests passed
+- lint for Debug, Personal Alpha, Full Test and Document Test
+- Personal Alpha APK assembly
+- Personal Alpha package/label/one-launcher audit
+- Personal Alpha required/forbidden permission audit
+- Personal Alpha required-component audit
+- safe Full Test APK assembly and audit
+- isolated minified Document Test APK assembly and zero-permission/component audit
+- report and APK artifact upload
+
+Artifacts:
+
+- `mayra-personal-alpha-apk-1753`
+  - artifact id `8834650772`
+  - ZIP size 18,712,293 bytes
+  - ZIP SHA-256 `d81c1bb8a1ffa1c95e75481dad97213477530df53eb2219bc8ce162e91d1b5d9`
+  - APK size 19,160,566 bytes
+  - APK SHA-256 `72411a46f39064db1a518fc9992a09138a501ef3afd490a6a84112ddf2bc42cb`
+- `mayra-full-test-apk-1753`
+  - artifact id `8834651004`
+  - ZIP SHA-256 `8d87855c8e399962e049d5e8a994aef7e789aee9f8c8a481f9537a156875d64a`
+- `mayra-document-test-apk-1753`
+  - artifact id `8834651181`
+  - ZIP SHA-256 `957a4735aeb132cb68a9e88ce1078add2a73e4f78ec884b58f05c06b532c5e77`
+- `android-reports-1753`
+  - artifact id `8834650536`
+  - ZIP SHA-256 `5774a5f4b6fca26a9e0e125adc2164e452741ffbef119ab0a040518b76c73dcc`
+
+## Historical corrections retained
+
+CI #1631 produced only the isolated `documentTest` APK and was never evidence of complete-app packaging. CI #1647/#1653 established the early complete Full Test path. An earlier broadly privileged sideload build was blocked by Play Protect review; that led to the safe Full Test boundary and later to the separately audited Personal Alpha package.
 
 ## Next gate
 
-1. Obtain a green CI result for the typed-response head.
-2. Download the latest `mayra-full-test-apk-<run>` artifact.
-3. Remove older test packages from the Motorola device once.
-4. Install the latest artifact and confirm exactly one Mayra launcher icon.
-5. Test capability reply, Library, Memory, Provider, History and voice.
-6. Keep PR #12 Draft and unmerged until explicit owner approval.
+1. Install `Mayra AI Personal Alpha 0.2.0-alpha` on the Motorola owner device.
+2. Verify launch, permission-on-use behavior and one launcher icon.
+3. Test real provider setup/generation and local fallback.
+4. Test reminder creation, notification, Complete, Snooze and reboot recovery.
+5. Test contact resolution plus dialer/composer handoff.
+6. Run Memory, Library, History and voice checks.
+7. Do not call the build device-verified until the applicable checklist evidence is recorded.
+8. Do not create a production-signed release or merge PR #12 without explicit owner approval.
