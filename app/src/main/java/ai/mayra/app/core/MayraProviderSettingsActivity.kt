@@ -25,51 +25,130 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
 class MayraProviderSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = AndroidMayraProviderSettingsStore(applicationContext)
-        setContent { MayraAITheme { ProviderSettings(store) } }
+        val credentials = AndroidMayraProviderCredentialStore(applicationContext)
+        setContent { MayraAITheme { ProviderSettings(store, credentials) } }
     }
 
     @Composable
-    private fun ProviderSettings(store: AndroidMayraProviderSettingsStore) {
+    private fun ProviderSettings(
+        store: AndroidMayraProviderSettingsStore,
+        credentials: AndroidMayraProviderCredentialStore
+    ) {
         val initial = remember { store.read() }
         var enabled by remember { mutableStateOf(initial.enabled) }
         var endpoint by remember { mutableStateOf(initial.endpoint) }
         var model by remember { mutableStateOf(initial.model) }
-        var status by remember { mutableStateOf("Remote provider is owner-disabled by default.") }
+        var apiKey by remember { mutableStateOf("") }
+        var credentialConfigured by remember { mutableStateOf(credentials.hasCredential()) }
+        var status by remember {
+            mutableStateOf(
+                if (credentialConfigured) "Encrypted provider credential is available."
+                else "Add an API key to enable online answers."
+            )
+        }
 
         Scaffold { padding ->
             Column(
                 Modifier.fillMaxSize().padding(padding).padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Remote Provider", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("AI Provider", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Enable remote answers", fontWeight = FontWeight.SemiBold)
+                            Text("Enable online answers", fontWeight = FontWeight.SemiBold)
                             Switch(checked = enabled, onCheckedChange = { enabled = it })
                         }
-                        Text("Only conversational text crosses this boundary. Actions and memory writes remain local and approval-controlled.", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Only conversational text may leave the device. Actions, confirmations and memory writes stay inside Mayra.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            if (credentialConfigured) "API key: stored securely ✓" else "API key: not configured",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
-                OutlinedTextField(endpoint, { endpoint = it }, label = { Text("HTTPS endpoint") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(model, { model = it }, label = { Text("Model") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Text("Bearer tokens are never stored on this screen. A secure runtime credential source is required separately.", style = MaterialTheme.typography.bodySmall)
-                Text("Network access remains unavailable in builds without the audited INTERNET permission.", style = MaterialTheme.typography.bodySmall)
-                Button(onClick = {
-                    val result = store.write(MayraProviderSettings(enabled, endpoint, model))
-                    status = result.fold({ "Settings saved. Restart Mayra to apply composition changes." }, { it.message ?: "Invalid provider settings." })
-                }, modifier = Modifier.fillMaxWidth()) { Text("Save settings") }
-                OutlinedButton(onClick = {
-                    store.disable()
-                    enabled = false
-                    status = "Remote provider disabled immediately for the next composition."
-                }, modifier = Modifier.fillMaxWidth()) { Text("Emergency disable") }
+
+                OutlinedTextField(
+                    value = endpoint,
+                    onValueChange = { endpoint = it },
+                    label = { Text("HTTPS endpoint") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    label = { Text("Model") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text(if (credentialConfigured) "Replace API key (optional)" else "API key") },
+                    placeholder = { Text("Stored with Android Keystore") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+
+                Text(
+                    "Mayra never reads the saved key back into this screen. The encryption key remains in Android Keystore.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Button(
+                    onClick = {
+                        val keyResult = if (apiKey.isBlank()) Result.success(Unit) else credentials.write(apiKey)
+                        status = keyResult.fold(
+                            onSuccess = {
+                                credentialConfigured = credentials.hasCredential()
+                                val settingsResult = store.write(MayraProviderSettings(enabled, endpoint, model))
+                                settingsResult.fold(
+                                    onSuccess = {
+                                        apiKey = ""
+                                        "Provider settings saved. Restart Mayra to rebuild the assistant composition."
+                                    },
+                                    onFailure = { it.message ?: "Invalid provider settings." }
+                                )
+                            },
+                            onFailure = { it.message ?: "Could not secure the API key." }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Save provider") }
+
+                OutlinedButton(
+                    onClick = {
+                        store.disable()
+                        enabled = false
+                        status = "Online answers disabled. Local Mayra remains available."
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Disable online answers") }
+
+                OutlinedButton(
+                    onClick = {
+                        credentials.clear()
+                        credentialConfigured = false
+                        apiKey = ""
+                        store.disable()
+                        enabled = false
+                        status = "Encrypted API key removed and online answers disabled."
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Remove API key") }
+
                 Text(status, style = MaterialTheme.typography.bodySmall)
             }
         }
