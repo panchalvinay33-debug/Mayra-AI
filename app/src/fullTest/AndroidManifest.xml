@@ -3,21 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      Owner-device full UI build. Keep microphone for voice testing, but remove
-      high-risk phone, messaging, notification, alarm and boot declarations so
-      sideloaded development APKs are not presented as broadly privileged apps.
+      Owner-device safe UI build. Production Mayra may use online AI and device capabilities,
+      while this sideloaded development variant stays deliberately offline and low-permission.
     -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
     <uses-permission android:name="android.permission.READ_CONTACTS" tools:node="remove" />
-    <uses-permission
-        android:name="android.permission.CALL_PHONE"
-        tools:ignore="PermissionImpliesUnsupportedChromeOsHardware"
-        tools:node="remove" />
-    <uses-permission
-        android:name="android.permission.SEND_SMS"
-        tools:ignore="PermissionImpliesUnsupportedChromeOsHardware"
-        tools:node="remove" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
 
     <application
