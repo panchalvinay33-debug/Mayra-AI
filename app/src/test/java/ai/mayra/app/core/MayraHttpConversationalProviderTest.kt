@@ -45,7 +45,7 @@ class MayraHttpConversationalProviderTest {
     }
 
     @Test fun openAiResponsesOutputTextIsReturnedAndHealthBecomesReady() = runBlocking {
-        val response = """{"output":[{"type":"message","content":[{"type":"output_text","text":"Namaste \\u0926\\u094b\\u0938\\u094d\\u0924"}]}]}"""
+        val response = """{"output":[{"type":"message","content":[{"type":"output_text","text":"Namaste दोस्त"}]}]}"""
         val connection = FakeConnection(URL("https://api.openai.com/v1/responses"), 200, response)
         val provider = provider(connection)
 
