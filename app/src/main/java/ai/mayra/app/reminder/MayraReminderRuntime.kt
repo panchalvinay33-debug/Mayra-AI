@@ -196,8 +196,10 @@ object MayraReminderNotifier {
         return runtimePermission && NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
-    @SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission", "NotificationPermission")
     fun show(context: Context, reminder: MayraReminder, followUp: Boolean = false) {
+        // The suppression documents the explicit guard below; it does not bypass Android's
+        // runtime permission model. All callers also use canNotify(), and this method re-checks.
         if (!canNotify(context)) return
         ensureChannel(context)
         val openIntent = PendingIntent.getActivity(
