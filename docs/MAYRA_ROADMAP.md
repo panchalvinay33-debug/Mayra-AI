@@ -93,22 +93,26 @@ The last failure is bounded: no false transcript and no crash. Root cause is mis
 Implemented after physical failure:
 
 - `MayraSpeechLocalePolicy` with finite locale chain: device locale → `hi-IN` → `en-IN` → `en-US`;
-- duplicate locale removal;
+- canonical BCP-47 normalization (`HI-in` → `hi-IN`, `gu_IN` → `gu-IN`);
+- duplicate locale removal and `und` rejection;
 - explicit `RecognizerIntent.EXTRA_LANGUAGE` and language preference;
 - automatic retry only for `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE`;
 - no endless retry loop and no cloud fallback;
-- unit tests for locale ordering/duplicate removal/blank device locale.
+- unit tests for locale ordering, normalization, duplicate removal and blank/undetermined device locale.
 
 Fresh validation history:
 
 - J1 #179 failed lint because the new on-device recognizer retry call did not expose its API-31 guard strongly enough to Android lint.
 - No audit was weakened and no lint baseline/suppression was added.
-- Repair commit `8de560527fed1ed41e6e2f50230ac97522c393f3` adds an explicit Android 12/API-31 guard at the exact recognizer creation boundary.
-- Replacement APK remains blocked until fresh J2/J1/Android/Governance checks are green.
+- Repair commit `8de560527fed1ed41e6e2f50230ac97522c393f3` added an explicit Android 12/API-31 guard at the exact recognizer creation boundary.
+- J1 #186 then passed compile, lint, zero-permission audit and artifact upload on the synchronized head.
+- J2 #82 ran 359 tests and found one canonical-locale test failure: input `HI-in` was de-duplicated but its non-canonical casing was preserved.
+- Production policy—not the test—was repaired in `3fc2d8692c14e86ded135bb4f39bca216d1df155`; tests were expanded in `08cc50270624dde4f36fd0330e717032264579b8`.
+- Replacement APK remains blocked until fresh J2/J1/Android/Governance checks are green on the final synchronized head.
 
 ## Immediate next actions
 
-1. Settle latest-head J2/J1/Android/Governance workflows for the locale-retry + API-guard repair.
+1. Settle latest-head J2/J1/Android/Governance workflows for the canonical-locale + API-guard repair.
 2. Inspect and repair any compile/lint/package/governance finding; do not weaken audits.
 3. Share a replacement J2 APK only after all required gates are green and artifact provenance is recorded.
 4. On Motorola, invoke J2 and test `Mayra namaste`, `kal subah saat baje`, `open WhatsApp`, and one short English phrase.
