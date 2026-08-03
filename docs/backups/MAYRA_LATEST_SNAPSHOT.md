@@ -76,10 +76,18 @@ Repair now in source:
 - no continuous retry loop and no cloud STT fallback;
 - unit tests cover locale ordering, duplicate removal and blank device locale.
 
+## Fresh CI repair history
+
+- Project Governance #252 passed on the first locale-retry synchronized head.
+- J1 Assistant Test #179 failed lint, not compilation/runtime, because Android lint required an explicit API-31 guard at the `createOnDeviceSpeechRecognizer` call site.
+- The check was not suppressed and no lint baseline was introduced.
+- Commit `8de560527fed1ed41e6e2f50230ac97522c393f3` adds the direct Android 12/API-31 guard inside `startCurrentLocale()` before the API-31 call.
+- Roadmap/snapshot were re-synchronized after this repair; the next candidate must pass fresh J2/J1/Android/Governance checks.
+
 ## Current exact gate
 
-1. Settle fresh J2 Voice Test, J1 Assistant Test, Android CI and Project Governance on the synchronized locale-repair head.
-2. Do not share a replacement APK until the required gates are green.
+1. Settle fresh J2 Voice Test, J1 Assistant Test, Android CI and Project Governance on the latest synchronized API-guard repair head.
+2. Do not share a replacement APK until all required gates are green.
 3. Record new source/run/artifact/hash provenance.
 4. Motorola retest phrases: `Mayra namaste`, `kal subah saat baje`, `open WhatsApp`, one English phrase.
 5. If transcript works, continue tap-dismiss, 20-cycle stability, already-locked invocation and reboot recovery.
