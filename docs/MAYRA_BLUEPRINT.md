@@ -95,6 +95,10 @@ Exact green application baseline:
 - `baseline/mayra-0.2.1-j2-voice-green-18`;
 - J2 #18, J1 #122, Android CI #2013 and Governance #194 all success.
 
+Motorola device evidence now proves that J2 can obtain microphone access inside the invoked Assistant session and that Android reports an on-device recognizer. The first recognition attempt nevertheless returned `ERROR_LANGUAGE_UNAVAILABLE`, proving recognizer availability and language-model availability are separate gates.
+
+J2 therefore uses bounded explicit locale negotiation for on-device recognition: device locale → `hi-IN` → `en-IN` → `en-US`, with duplicates removed. Only `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE` advance to the next locale. The chain is finite, stays offline, and never becomes a continuous retry/listening loop.
+
 Physical acceptance: `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`.
 
 ### 5. Production wake phrase
@@ -259,7 +263,7 @@ Policy:
 | Stable owner updates | IN_PROGRESS | Secret-backed signing path + trusted-install preflight exist; private secrets/A→B test pending |
 | J1 Assistant role proof | DEVICE_VERIFY | Selection/unlocked invocation physically proven; touch/locked-start/reboot completion pending |
 | Animated Mayra presence | DEVICE_VERIFY | Orb physically invoked; touch-dismiss repair is J2 CI-green, device retest pending |
-| J2 invocation-time voice | DEVICE_VERIFY | Exact-source J2/J1/Android/Governance green; Motorola speech/lifecycle proof next |
+| J2 invocation-time voice | DEVICE_VERIFY | Assistant/mic/on-device recognizer physically proven; locale fallback repair awaiting fresh CI/retest |
 | Wake phrase | BENCHMARK | Dedicated KWS architecture documented; sherpa-onnx first candidate only |
 | Local conversational model | BENCHMARK | LiteRT-LM/Qwen3-1.7B initial direction; Motorola benchmark required |
 | Notification intelligence | ACCEPTED | Local-first Notification Access architecture documented; device/privacy validation pending |
