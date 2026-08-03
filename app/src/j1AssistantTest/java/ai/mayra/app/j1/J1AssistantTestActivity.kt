@@ -1,6 +1,7 @@
 package ai.mayra.app.j1
 
 import android.app.role.RoleManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -29,9 +30,15 @@ import ai.mayra.app.ui.theme.MayraAITheme
 
 class J1AssistantTestActivity : ComponentActivity() {
     private var assistantSelected by mutableStateOf(false)
+    private var activationMessage by mutableStateOf("Ready to open Android Assistant setup")
 
     private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refreshAssistantStatus()
+        activationMessage = if (assistantSelected) {
+            "Mayra is selected. Now use the phone assistant gesture/button."
+        } else {
+            "Mayra is still not selected. Tap Activate Mayra to open Assistant settings again."
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +56,8 @@ class J1AssistantTestActivity : ComponentActivity() {
                         Text("This small build asks for no runtime permissions. It only checks whether this Motorola can select Mayra as the Android Assistant and show the animated assistant session.")
                         Spacer(Modifier.height(20.dp))
                         Text(if (assistantSelected) "Status: Mayra is selected ✓" else "Status: Mayra is not selected")
+                        Spacer(Modifier.height(8.dp))
+                        Text(activationMessage, style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(16.dp))
                         Button(onClick = ::openAssistantSetup, modifier = Modifier.fillMaxWidth()) {
                             Text(if (assistantSelected) "Open Assistant settings" else "Activate Mayra")
@@ -83,12 +92,49 @@ class J1AssistantTestActivity : ComponentActivity() {
     private fun openAssistantSetup() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val roleManager = getSystemService(RoleManager::class.java)
-            if (roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true && !roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
-                roleLauncher.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
-                return
+            if (roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true &&
+                !roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)
+            ) {
+                val request = roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
+                if (request.resolveActivity(packageManager) != null) {
+                    activationMessage = "Opening Android Assistant selection…"
+                    roleLauncher.launch(request)
+                    return
+                }
+                activationMessage = "Assistant role screen is not exposed directly on this Motorola. Opening system settings…"
+            } else if (roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true) {
+                activationMessage = "Mayra is already selected. Opening system Assistant settings…"
+            } else {
+                activationMessage = "Android reports that the Assistant role is unavailable. Opening system settings…"
             }
         }
-        runCatching { startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)) }
-            .recoverCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+
+        openFirstAvailableSettings()
+    }
+
+    private fun openFirstAvailableSettings() {
+        val candidates = listOf(
+            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+
+        for (intent in candidates) {
+            if (intent.resolveActivity(packageManager) != null) {
+                try {
+                    startActivity(intent)
+                    activationMessage = when (intent.action) {
+                        Settings.ACTION_VOICE_INPUT_SETTINGS -> "Opened Voice input settings. Select Mayra as the Assistant."
+                        Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS -> "Opened Default apps. Choose Digital assistant app, then Mayra."
+                        else -> "Opened Android Settings. Search for ‘Digital assistant app’ and select Mayra."
+                    }
+                    return
+                } catch (_: ActivityNotFoundException) {
+                    // Try the next official Settings screen.
+                }
+            }
+        }
+
+        activationMessage = "Motorola did not expose any Assistant settings screen. This result is now visible for diagnosis."
     }
 }
