@@ -120,29 +120,29 @@ Meaningful code/architecture work must update the roadmap and rolling snapshot; 
 
 Personal Alpha APKs intended for repeated installation on the owner device must use one stable signing certificate supplied through protected GitHub/environment secrets. Hosted-runner debug certificates are temporary and must not be presented as update-compatible.
 
-**Reason:** Android only allows an installed package to be upgraded by an APK signed with the same certificate. CI #1851 exposed this through a real Motorola install failure.
-
-**Consequences:**
-
-- a dedicated `Stable Owner Alpha` workflow builds the update-compatible owner package;
-- keystore bytes and passwords never enter source control, project documents or chat;
-- each stable artifact records certificate information and APK SHA-256;
-- clean-install and install-over-install data-retention tests are mandatory before promotion.
-
 ---
 
 ## ADR-015 — First launch uses one minimal owner setup
 
 **Status:** Implemented; CI/device validation pending
 
-Mayra will present a small two-step first-launch setup instead of scattering essential setup across many screens.
+The full Mayra app will present a small two-step first-launch setup: essential runtime permissions, Android Assistant activation, then Start Mayra.
 
-**Flow:**
+---
 
-1. request only microphone, contacts and notification runtime permissions;
-2. open Android's Assistant-role selector;
-3. start Mayra.
+## ADR-016 — J1 Assistant proof uses a zero-permission isolated APK
 
-**Reason:** The owner wants maximum capability with minimum confusion and no unnecessary settings maze.
+**Status:** Implemented; CI/device validation pending
 
-**Consequences:** Internet and boot recovery remain manifest permissions with no runtime prompt. Android roles and special access still require explicit system approval because apps cannot grant them silently.
+Assistant-role compatibility must be tested separately from the full sensitive-capability app after Play Protect blocked the sideloaded Personal Alpha.
+
+**Decision:** Create `ai.mayra.app.j1`, an engineering-only package containing only Assistant activation/status and the VoiceInteraction service/session/orb foundation. It requests zero Android permissions.
+
+**Reason:** J1 needs to answer one question—whether the Motorola exposes, selects and invokes Mayra as Android Assistant. Contacts, internet, reminders, notification access and owner data are unrelated to that proof and increase sideload trust friction.
+
+**Consequences:**
+
+- dedicated CI rejects every requested Android permission and forbidden feature/background component;
+- the J1 APK is not the final Mayra product and is removed after role testing;
+- full Mayra remains on stable private signing and trusted distribution;
+- Play Protect is not bypassed.
