@@ -54,6 +54,14 @@ class MayraProviderSettingsActivity : ComponentActivity() {
             )
         }
 
+        fun refreshAssistant(successMessage: String): String =
+            MayraAssistantComposition.rebuild(applicationContext).fold(
+                onSuccess = { successMessage },
+                onFailure = { error ->
+                    "Settings were saved, but Mayra could not refresh the assistant: ${error.message ?: "unknown error"}."
+                }
+            )
+
         Scaffold { padding ->
             Column(
                 Modifier.fillMaxSize().padding(padding).padding(18.dp),
@@ -117,7 +125,15 @@ class MayraProviderSettingsActivity : ComponentActivity() {
                                 settingsResult.fold(
                                     onSuccess = {
                                         apiKey = ""
-                                        "Provider settings saved. Restart Mayra to rebuild the assistant composition."
+                                        refreshAssistant(
+                                            if (enabled && credentialConfigured) {
+                                                "Provider settings saved and online answers are active now."
+                                            } else if (enabled) {
+                                                "Settings saved. Add a valid API key before online answers can start."
+                                            } else {
+                                                "Provider settings saved. Local Mayra is active."
+                                            }
+                                        )
                                     },
                                     onFailure = { it.message ?: "Invalid provider settings." }
                                 )
@@ -132,7 +148,7 @@ class MayraProviderSettingsActivity : ComponentActivity() {
                     onClick = {
                         store.disable()
                         enabled = false
-                        status = "Online answers disabled. Local Mayra remains available."
+                        status = refreshAssistant("Online answers disabled immediately. Local Mayra remains available.")
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Disable online answers") }
@@ -144,7 +160,7 @@ class MayraProviderSettingsActivity : ComponentActivity() {
                         apiKey = ""
                         store.disable()
                         enabled = false
-                        status = "Encrypted API key removed and online answers disabled."
+                        status = refreshAssistant("Encrypted API key removed. Online answers are disabled immediately.")
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Remove API key") }
