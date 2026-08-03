@@ -1,10 +1,10 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: REPAIR IN PROGRESS
+Status: READY FOR RETEST
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
-## Authoritative tested artifact
+## Previously tested artifact
 
 - Label: `Mayra J1 Assistant Test`
 - Package: `ai.mayra.app.j1`
@@ -16,62 +16,73 @@ Target device: Motorola owner device / Android 16
 - APK SHA-256: `edced64084537cd06ba55ddea0b2f80cdda2aaa322aa296379ac25d89ea66116`
 - Protected baseline: `baseline/mayra-0.2.1-j1-zero-permission-green-44`
 
-## Evidence received
+## Evidence received from #44
 
-### A. Installation and launch
+### Installation and launch
 
 Result: PASS
 
-- APK installed successfully without bypassing Play Protect.
+- APK installed without bypassing Play Protect.
 - App launched normally.
 - J1 activation screen rendered correctly.
 - Status displayed: `Mayra is not selected`.
 
-### B. Assistant activation button
+### Assistant activation button
 
 Result: FAIL
 
-Steps:
-
-1. Open `Mayra J1 Assistant Test`.
-2. Tap `Activate Mayra`.
-
-Expected:
-
-- Android Assistant role-selection dialog or an official Assistant/default-app settings screen opens.
-
-Actual:
-
-- No visible response.
+- Tapping `Activate Mayra` produced no visible response.
 - No role-selection screen appeared.
 - No explanatory error appeared.
 
-Evidence:
+Root cause:
 
-- Owner screenshot received at approximately 18:10 IST on 2026-08-03.
+- Motorola-specific role/settings launch failures were silently swallowed, making the button appear dead.
 
-Root-cause finding:
+## Authoritative repaired retest artifact
 
-- The J1 activity attempted `RoleManager.createRequestRoleIntent(ROLE_ASSISTANT)` and then silently fell back to Settings intents.
-- Intent resolution/launch failures were not shown in the UI, so Motorola-specific failure appeared as a dead button.
+- Label: `Mayra J1 Assistant Test`
+- Package: `ai.mayra.app.j1`
+- Version: `0.2.1-j1`
+- Source: `ce96f8e83fe33b878d426c407715d4a3e1b0495a`
+- J1 CI: #56 — success
+- Android CI: #1947 — success
+- Project Governance: #128 — success
+- Artifact: `mayra-j1-zero-permission-apk-56`
+- Artifact ID: `8856404389`
+- Artifact ZIP SHA-256: `18dfe69d34cd52f76fe63e26cff011b088a1ff95606e88a7ca577af99aec4300`
+- APK size: `19,192,842` bytes
+- APK SHA-256: `2def2acd55a0ea751c3cd70c9d78674c275f2c2d8e2e4e03ae527464cf48a318`
+- Protected baseline: `baseline/mayra-0.2.1-j1-activation-repair-green-56`
 
-Repair candidate:
+Repair behavior:
 
-- Commit `2b06cf8fe92b12c2c9d36d5099d1695ea13a1cf9`.
-- Resolve-check the role request before launch.
-- Try official settings screens in order: Voice input, Default apps, general Settings.
-- Show a visible diagnostic status for every route and final failure.
-- No hidden OEM component or security bypass is used.
+- Resolve-check Assistant role request before launching.
+- Try official settings screens in order: Assistant role, Voice input, Default apps, general Settings.
+- Show visible status for the route opened.
+- Show a visible final diagnostic if no official route can open.
+- No hidden OEM component, root, accessibility hack or security bypass.
 
-The repair is not device-ready until J1 CI, Android CI and Project Governance pass on the synchronized exact head and a new APK provenance is recorded.
+## Retest sequence
 
-## Remaining test sequence after repaired APK
+### A. Update/install
+
+- [ ] Install #56 over #44 successfully, or uninstall #44 only if Android reports a signing conflict.
+- [ ] App opens normally.
+- [ ] No runtime permission prompt appears.
+
+### B. Activate Mayra
+
+- [ ] Tap `Activate Mayra`.
+- [ ] A system Assistant/default-app/settings screen opens, or an exact visible diagnostic appears in the app.
+- [ ] Record the exact message shown inside Mayra.
+- [ ] Capture the next system screen.
 
 ### C. Assistant role visibility
 
-- [ ] Tapping Activate Mayra visibly opens a system screen or displays an exact diagnostic.
 - [ ] Mayra appears as an available assistant choice.
 - [ ] Mayra can be selected only through explicit owner action.
+- [ ] `Refresh status` changes to selected after returning.
 - [ ] Mayra can be deselected and the previous assistant restored.
 
 ### D. Unlocked invocation
@@ -91,7 +102,7 @@ The repair is not device-ready until J1 CI, Android CI and Project Governance pa
 
 - [ ] No invented transcript.
 - [ ] No endless listening loop.
-- [ ] No claim that the wake phrase is implemented.
+- [ ] No claim that wake phrase is implemented.
 
 ### G. Process/reboot recovery
 
@@ -101,7 +112,7 @@ The repair is not device-ready until J1 CI, Android CI and Project Governance pa
 
 ### H. Permission boundary
 
-- [x] CI verified zero requested Android permissions for J1 #44.
+- [x] CI verified zero requested Android permissions for #56.
 - [x] Exactly one launcher verified.
 - [x] No WorkManager, Startup, Room, notification listener or boot receiver.
 - [ ] Motorola shows no unexpected permission request.
@@ -112,4 +123,4 @@ Every failure must record exact steps, expected/actual behavior, screenshot or r
 
 ## Promotion rule
 
-J1 moves to device-verified only after activation, role visibility, select/remove, unlocked invocation, lock-screen behavior and orb lifecycle pass on one provenance-recorded repaired APK. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 moves to device-verified only after activation, role visibility, select/remove, unlocked invocation, lock-screen behavior and orb lifecycle pass on the repaired provenance-recorded APK. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
