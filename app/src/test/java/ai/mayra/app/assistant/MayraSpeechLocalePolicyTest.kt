@@ -13,7 +13,7 @@ class MayraSpeechLocalePolicyTest {
     }
 
     @Test
-    fun `duplicates are removed case insensitively`() {
+    fun `duplicates are normalized and removed case insensitively`() {
         assertEquals(
             listOf("hi-IN", "en-IN", "en-US"),
             MayraSpeechLocalePolicy.candidates("HI-in")
@@ -21,10 +21,22 @@ class MayraSpeechLocalePolicyTest {
     }
 
     @Test
-    fun `blank device locale still has safe fallbacks`() {
+    fun `underscore locale is normalized to bcp47`() {
+        assertEquals(
+            listOf("gu-IN", "hi-IN", "en-IN", "en-US"),
+            MayraSpeechLocalePolicy.candidates("gu_IN")
+        )
+    }
+
+    @Test
+    fun `blank or undetermined device locale still has safe fallbacks`() {
         assertEquals(
             listOf("hi-IN", "en-IN", "en-US"),
             MayraSpeechLocalePolicy.candidates("")
+        )
+        assertEquals(
+            listOf("hi-IN", "en-IN", "en-US"),
+            MayraSpeechLocalePolicy.candidates("und")
         )
     }
 }
