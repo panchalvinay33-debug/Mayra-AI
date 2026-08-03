@@ -53,6 +53,36 @@
             android:exported="false"
             android:label="Mayra Activity History" />
 
+        <!-- System-supported Jarvis-mode foundation. These services do nothing privileged unless
+             the user explicitly selects Mayra as their Android assistant. -->
+        <service
+            android:name=".assistant.MayraVoiceInteractionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/mayra_voice_interaction_service" />
+        </service>
+        <service
+            android:name=".assistant.MayraVoiceInteractionSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <service
+            android:name=".assistant.MayraRecognitionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_SPEECH_RECOGNITION">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/mayra_recognition_service" />
+        </service>
+
         <service
             android:name=".background.MayraNotificationListener"
             android:exported="false"
