@@ -16,6 +16,15 @@
         tools:replace="android:label">
 
         <service
+            android:name=".assistant.MayraVoiceInteractionService"
+            tools:node="remove" />
+        <service
+            android:name=".assistant.MayraVoiceInteractionSessionService"
+            tools:node="remove" />
+        <service
+            android:name=".assistant.MayraRecognitionService"
+            tools:node="remove" />
+        <service
             android:name=".background.MayraNotificationListener"
             tools:node="remove" />
 
