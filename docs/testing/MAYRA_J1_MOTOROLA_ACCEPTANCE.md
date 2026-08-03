@@ -1,6 +1,6 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: ASSISTANT ROLE SELECTED — POWER KEY STILL MAPPED TO POWER MENU
+Status: ASSISTANT ROLE + UNLOCKED INVOCATION PASS — STABILITY/LOCK-SCREEN NEXT
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
@@ -65,7 +65,7 @@ Initial update attempt: BLOCKED by package signing conflict because CI debug cer
 
 Safe recovery used: uninstall the J1 test package, then clean-install #68. J1 contains no personal Mayra memory/documents/reminders and requests zero Android runtime permissions.
 
-### #68 Motorola device evidence — 20:44 to 20:52 IST
+### #68 Motorola device evidence — 20:44 to 21:15 IST
 
 Default Apps navigation: PASS.
 
@@ -76,15 +76,18 @@ Assistant candidate/selection: PASS.
 
 - `Mayra J1 Assistant Test` appears as the selected `Digital assistant app` in Motorola Default Apps.
 - J1 itself shows `Status: Mayra is selected ✓`.
-- This proves Android 16 on the target Motorola recognizes the J1 `VoiceInteractionService` as a valid assistant candidate and accepts Mayra as the default digital assistant.
+- Android 16 on the target Motorola recognizes the J1 `VoiceInteractionService` as a valid assistant candidate and accepts Mayra as the default digital assistant.
 
-Power-key invocation attempt: BLOCKED BY DEVICE TRIGGER CONFIGURATION.
+Power-key configuration: PASS.
 
-- Owner pressed and held the physical Power key after Mayra was selected.
-- The phone displayed the standard Motorola Power menu with `Emergency`, `Lockdown`, `Power off`, and `Restart`.
-- This proves the Power key is still mapped to `Power menu`, not `Digital assistant`; it is not evidence that the Mayra `VoiceInteractionSession` failed.
-- Motorola's documented Android 16 path is `Settings → Gestures → Power key → Press & hold → Digital assistant`.
-- Gesture-navigation alternative: swipe diagonally inward from either lower corner to invoke the selected digital assistant.
+- Owner opened `Settings → Gestures` and configured the Power button Digital assistant action.
+- Previous Power-menu-only behavior was therefore identified as a device-trigger configuration issue, not a Mayra session failure.
+
+Unlocked assistant invocation: PASS.
+
+- After configuring the assistant trigger, invoking the selected digital assistant produced the Mayra assistant surface.
+- Owner screenshot shows the Mayra blue/purple orb with the `Mayra` label rendered over the current Settings screen.
+- This is direct device evidence that the Motorola system can launch Mayra's `VoiceInteractionSession` while unlocked and render the assistant orb without opening the full J1 activity.
 
 Permanent signing repair:
 
@@ -94,41 +97,28 @@ Permanent signing repair:
 
 ## Next device test sequence
 
-### D. Configure Motorola invocation trigger — CURRENT GATE
+### E. Unlocked invocation stability — CURRENT GATE
 
-- [ ] Open `Settings → Gestures → Power key → Press & hold`.
-- [ ] Select `Digital assistant` instead of `Power menu`.
-- [ ] Optionally shorten the press-and-hold duration for easier testing.
-- [ ] Return to the home screen.
-- [ ] Press and hold the Power key.
-- [ ] Record exactly what appears.
-
-Alternative invocation:
-
-- [ ] With gesture navigation enabled, swipe diagonally inward from either lower screen corner.
-- [ ] Record whether Mayra session/orb appears.
-
-### E. Unlocked invocation and orb
-
-- [ ] Mayra assistant session opens without launching the full test activity.
-- [ ] Animated Mayra orb/session appears.
-- [ ] Dismissal stops the animation.
+- [x] Mayra assistant session opens without launching the full test activity.
+- [x] Mayra orb/session appears.
+- [ ] Dismiss the orb, then invoke again.
 - [ ] Repeat invoke/dismiss 10 times without crash, duplicate surface or System UI restart.
+- [ ] Confirm the orb disappears fully after dismissal.
 
 ### F. Locked-screen invocation
 
 - [ ] Lock the phone normally.
-- [ ] Press and hold Power with `Digital assistant` still configured.
-- [ ] Mayra follows Android lock-screen policy.
+- [ ] Invoke Mayra using the same configured assistant trigger.
+- [ ] Record whether Mayra appears while locked, requests unlock, or is blocked by Motorola/Android policy.
 - [ ] No private Mayra content is exposed before unlock.
 - [ ] Dismissal returns cleanly to lock screen.
 
 ### G. Role state/recovery
 
-- [ ] Open J1 and tap `Refresh status`; it shows Mayra selected.
+- [ ] Open J1 and tap `Refresh status`; it still shows Mayra selected.
 - [ ] Reboot and verify assistant selection remains/recoverably returns.
 - [ ] Deselect Mayra and restore the previous assistant without errors.
 
 ## Promotion rule
 
-J1 moves to device-verified only after role selection, configured invocation trigger, unlocked invocation, orb/session lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 moves to device-verified only after role selection, unlocked invocation, repeated orb/session lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
