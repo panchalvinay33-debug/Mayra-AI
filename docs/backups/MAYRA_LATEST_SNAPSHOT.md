@@ -34,7 +34,7 @@ Evidence: `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`.
 
 ### Play Protect block
 
-After the owner retried installation, Google Play Protect blocked the full sideloaded Personal Alpha and displayed that the app could request sensitive data. The app was not installed.
+Google Play Protect blocked the full sideloaded Personal Alpha because it could request sensitive data. The app was not installed.
 
 Evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`.
 
@@ -42,37 +42,45 @@ Instruction: do not disable or bypass Play Protect for this artifact.
 
 ## Current corrective implementation
 
-A dedicated build type now exists:
+Dedicated J1 build:
 
-- name: `j1AssistantTest`;
+- build type: `j1AssistantTest`;
 - package: `ai.mayra.app.j1`;
 - label: `Mayra J1 Assistant Test`;
-- requested Android permissions: zero by design;
-- launcher count: exactly one;
+- requested Android permissions: zero;
+- one launcher;
 - included: small role activation/status activity, VoiceInteractionService, session service/orb and RecognitionService metadata shell;
 - excluded: full chat, provider, internet, contacts, reminders, notifications, boot recovery, notification listener, documents and memory.
 
 Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
 
-The workflow compiles, lints, assembles and hard-audits the APK. It fails on any requested Android permission, extra launcher or forbidden feature/background component.
+## Failure history and current repair
+
+J1 Assistant Test workflow run #16:
+
+- Kotlin compilation passed;
+- J1 lint failed on the full app's `MayraOwnerSetupGate` because `RoleManager.createRequestRoleIntent` requires API 29 and lint could not prove the call was guarded through derived Compose state;
+- no APK was produced or promoted.
+
+Repair:
+
+- added a direct `Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q` guard inside the click handler;
+- retained nullable RoleManager handling;
+- added no lint suppression and no baseline.
+
+Current repair commit: `60ad83d3e09f5e4e55cc57094e4ee9b3a2d4f6f7`, followed by synchronized Roadmap/Snapshot commits. Fresh workflows are required on the final exact head.
 
 ## Full owner-app distribution truth
 
-The complete Mayra app still requires:
+The complete Mayra app requires one stable private owner/release certificate, protected build secrets, signed APK/AAB provenance, trusted owner-controlled distribution (preferably Play Internal Testing), and install-over-install/local-data-retention proof.
 
-1. one stable private owner/release certificate;
-2. protected build secrets;
-3. signed APK/AAB provenance;
-4. preferably Google Play Internal Testing or another trusted owner-controlled distribution channel;
-5. install-over-install and local-data-retention proof.
-
-Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases and should not be used to bypass Play Protect.
+Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases and must not be used to bypass Play Protect.
 
 ## Latest validation gates
 
-1. Android CI on the exact current head.
-2. Project Governance on the exact current head.
-3. J1 Assistant Test workflow on the exact current head.
+1. Android CI on the exact latest head.
+2. Project Governance on the exact latest head.
+3. J1 Assistant Test workflow on the exact latest head.
 4. If all green, record artifact ID, source SHA, APK size and SHA-256.
 5. Motorola clean install of only the zero-permission J1 APK.
 6. Assistant role visibility, select/remove, unlocked/locked invocation and orb lifecycle.
@@ -82,7 +90,7 @@ Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases a
 
 - Core Mayra features remain code/CI mature but full-device acceptance is blocked by trusted installation/distribution.
 - Jarvis J1 services/orb are code/CI verified at baseline #1851 but not device verified.
-- The new zero-permission J1 package is the next installation proof vehicle.
+- The zero-permission J1 package is the next installation proof vehicle.
 - Local LLM, always-listening wake phrase and default Phone/InCallService remain planned and blocked until J1 evidence is processed.
 
 ## Merge and secret truth
