@@ -99,11 +99,16 @@ Implemented after physical failure:
 - no endless retry loop and no cloud fallback;
 - unit tests for locale ordering/duplicate removal/blank device locale.
 
-Repair is not an owner candidate until fresh J2, J1, Android CI and Project Governance all pass.
+Fresh validation history:
+
+- J1 #179 failed lint because the new on-device recognizer retry call did not expose its API-31 guard strongly enough to Android lint.
+- No audit was weakened and no lint baseline/suppression was added.
+- Repair commit `8de560527fed1ed41e6e2f50230ac97522c393f3` adds an explicit Android 12/API-31 guard at the exact recognizer creation boundary.
+- Replacement APK remains blocked until fresh J2/J1/Android/Governance checks are green.
 
 ## Immediate next actions
 
-1. Settle latest-head J2/J1/Android/Governance workflows for the locale-retry repair.
+1. Settle latest-head J2/J1/Android/Governance workflows for the locale-retry + API-guard repair.
 2. Inspect and repair any compile/lint/package/governance finding; do not weaken audits.
 3. Share a replacement J2 APK only after all required gates are green and artifact provenance is recorded.
 4. On Motorola, invoke J2 and test `Mayra namaste`, `kal subah saat baje`, `open WhatsApp`, and one short English phrase.
