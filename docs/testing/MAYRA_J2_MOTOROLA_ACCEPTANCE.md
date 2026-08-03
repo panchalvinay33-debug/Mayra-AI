@@ -1,10 +1,10 @@
 # Mayra AI — Motorola J2 Voice Acceptance
 
-Status: DEVICE RETEST READY — SUPPORT-PROBE REPAIR CI #106 GREEN
-Date updated: 2026-08-03
+Status: UNLOCKED ON-DEVICE HINDI TRANSCRIPT PASS — LIFECYCLE ACCEPTANCE NEXT
+Date updated: 2026-08-04
 Target device: Motorola Edge 70 Fusion / Android 16
 
-## New authoritative retest candidate
+## Authoritative device candidate
 
 - Label: `Mayra J2 Voice Test`
 - Package: `ai.mayra.app.j2`
@@ -23,118 +23,105 @@ Target device: Motorola Edge 70 Fusion / Android 16
 
 J2 requests exactly `android.permission.RECORD_AUDIO` and excludes internet/provider, contacts, notifications, reminders, boot recovery, notification listener, WorkManager, Room, documents, personal memory, full chat runtime and call control.
 
-## Physical evidence so far
+## Physical evidence through 00:04 IST
 
 PASS on Motorola:
 
-- J2 can clean-install and open.
-- J2 can be selected as Android Digital assistant.
-- microphone permission is allowed.
-- Android reports an on-device recognition service is available.
+- J2 clean-installed and opened.
+- J2 selected as Android Digital assistant.
+- microphone permission allowed.
+- Android on-device speech service available.
 - Motorola Power-button Assistant invocation launches Mayra over Home.
 - Mayra orb/label renders.
-- Back and phone-lock dismissal are physically proven in common Assistant behavior.
+- Android correctly surfaced `On-device speech language pack needed` before model availability was confirmed.
+- On-device settings showed downloaded `Hindi (India)` and `English (India)` packs.
+- After model availability, J2 produced an unlocked on-device Hindi transcript for the first short phrase.
+- Spoken `kal subah saat baje` was visibly transcribed as `कल सुबह 7:00`.
+- No cloud STT fallback was used.
+- No false transcript or crash was observed.
 
-Known transcript failures:
+Historical bounded failures:
 
 - CI #18: `Speech language unavailable`.
 - CI #90: `Speech recognizer unavailable`.
-- no false transcript and no crash in either failure.
+- CI #106 before usable model registration: `On-device speech language pack needed`.
 
-## CI #106 repair now ready for device test
-
-- one on-device `SpeechRecognizer` instance for a bounded attempt instead of destroy/recreate on every locale retry;
-- Android 13+ uses `SpeechRecognizer.checkRecognitionSupport()` before listening;
-- Mayra prioritizes actually installed on-device languages;
-- installed-language preference follows device locale → `hi-IN` → `en-IN` → `en-US`;
-- if a language is supported but not installed, visible state becomes `On-device speech language pack needed`;
-- if OEM support discovery itself is unavailable, Mayra uses bounded delayed locale trials;
-- retry reuses the recognizer and waits 450 ms between language attempts;
-- no cloud STT fallback and no endless retry loop;
-- J2 #106, J1 #210, Android CI #2101 and Governance #282 all pass.
+The support-probe/single-recognizer repair therefore passes the core physical objective: invocation-time on-device Hindi speech recognition works on the Motorola.
 
 ## A. Installation/update
 
-Temporary CI signing can differ between hosted runners.
-
-- [ ] Try installing CI #106 over current J2.
-- [ ] If Android reports package/signature conflict, uninstall only `Mayra J2 Voice Test`, then clean-install #106.
-- [ ] Do not uninstall full Mayra/Personal Alpha for this engineering test.
-- [ ] J2 #106 opens normally.
-- [ ] microphone readiness remains correct.
-- [ ] on-device speech service still reports available.
+- [x] J2 #106 installs without Play Protect bypass after removing only a conflicting engineering J2 package if required.
+- [x] J2 #106 opens normally.
+- [x] microphone readiness remains correct.
+- [x] on-device speech service reports available.
 
 ## B. Assistant selection
 
-After clean reinstall Android may reset the role.
+- [x] J2 appears as a Digital assistant candidate.
+- [x] J2 is selected as default Digital assistant.
+- [x] Power-button action invokes Mayra J2.
 
-- [ ] `Settings → Apps → Default apps → Digital assistant app` shows J2.
-- [ ] select `Mayra J2 Voice Test` if required.
-- [ ] Power-button action remains configured as Digital assistant.
+## C. Unlocked transcript — CORE PASS
 
-## C. Unlocked transcript — CURRENT GATE
+- [x] assistant surface appears.
+- [x] microphone/on-device speech path activates.
+- [x] at least one short Hindi phrase produces a transcript.
+- [x] `kal subah saat baje` produces visible `कल सुबह 7:00`.
+- [ ] `open WhatsApp` transcript-only test.
+- [ ] short English phrase test.
+- [ ] record whether mixed Hindi/English selects Hindi or English model consistently.
 
-From Home, invoke Mayra with the configured Power-button trigger and test in this order:
+J2 is transcript-only and must not execute `open WhatsApp`.
 
-1. `Mayra namaste`
-2. `kal subah saat baje`
-3. `open WhatsApp`
-4. `hello Mayra how are you`
+## D. Direct dismissal/lifecycle — CURRENT GATE
 
-Pass conditions:
-
-- [ ] assistant surface appears;
-- [ ] microphone becomes active;
-- [ ] at least one reasonable transcript is produced;
-- [ ] `open WhatsApp` remains transcript-only in J2;
-- [ ] no false transcript on recognition failure.
-
-If the visible state is `On-device speech language pack needed`, record that exact screen. Do not enable hidden cloud recognition.
-
-## D. Direct dismissal/lifecycle repair
-
-After transcript proof:
-
-- [ ] orb tap closes session;
-- [ ] outside/root tap closes session;
-- [ ] `Mayra` label tap closes session;
-- [ ] Back closes session;
-- [ ] phone lock closes session;
-- [ ] microphone privacy indicator disappears after dismissal;
+- [ ] orb tap closes session.
+- [ ] outside/root tap closes session.
+- [ ] `Mayra` label tap closes session.
+- [x] Back closes session in prior common-session physical test.
+- [x] phone lock closes session in prior common-session physical test.
+- [ ] microphone privacy indicator disappears after every dismissal.
 - [ ] no stuck/duplicate orb.
 
 ## E. Repeated stability
 
-After one successful transcript, run 20 invoke → speak/no-speech → dismiss cycles.
+Run 20 invoke → speak/no-speech → dismiss cycles.
 
-- [ ] no app crash;
-- [ ] no System UI restart;
-- [ ] no permanently busy recognizer;
-- [ ] no duplicate orb;
-- [ ] mic indicator does not remain active;
-- [ ] animation returns on each invocation.
+- [ ] no app crash.
+- [ ] no System UI restart.
+- [ ] no permanently busy recognizer.
+- [ ] no duplicate orb.
+- [ ] mic indicator does not remain active.
+- [ ] animation returns on every invocation.
 
 ## F. Already-locked invocation
 
-Pending unlocked transcript proof. Record normal Motorola/Android behavior; do not force with hacks.
+- [ ] lock phone first.
+- [ ] invoke Assistant trigger.
+- [ ] record whether Android shows Mayra, requires unlock or blocks recognition.
+- [ ] no private transcript before unlock.
+- [ ] dismissal returns cleanly to lock screen.
 
 ## G. Reboot/recovery
 
-Pending unlocked transcript proof.
+- [ ] reboot phone.
+- [ ] verify J2 remains selected as Digital assistant.
+- [ ] invoke J2 and complete one short transcript.
+- [ ] dismiss cleanly.
 
 ## H. Failure cases
 
-- [ ] microphone denied;
-- [ ] no speech;
-- [x] language unavailable — CI #18 physical observation;
-- [x] recognizer unavailable — CI #90 physical observation;
-- [ ] language pack needed;
-- [ ] recognizer busy/error;
-- [ ] rapid invoke/dismiss;
+- [ ] microphone denied.
+- [ ] no speech.
+- [x] language unavailable — CI #18 physical observation.
+- [x] recognizer unavailable — CI #90 physical observation.
+- [x] language pack needed — CI #106 physical observation before model availability.
+- [ ] recognizer busy/error.
+- [ ] rapid invoke/dismiss.
 - [ ] screen lock while listening.
 
 ## Promotion rule
 
-J2 becomes `DEVICE_VERIFIED` only after successful unlocked recognition plus dismissal, repeated lifecycle, locked-screen behavior and reboot recovery are physically recorded.
+J2 core on-device unlocked Hindi recognition is physically proven. Full `DEVICE_VERIFIED` status still requires direct dismissal, repeated lifecycle, already-locked behavior and reboot recovery.
 
 J2 success does not prove production wake phrase, local LLM, full Mayra conversation or call control.
