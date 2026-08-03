@@ -70,28 +70,32 @@ The CI #18 J2 recognition request did not explicitly set a speech language. Moto
 Repair now in source:
 
 - `MayraSpeechLocalePolicy` builds a finite candidate order: device locale → `hi-IN` → `en-IN` → `en-US`;
-- duplicate tags are removed case-insensitively;
+- locale tags are canonicalized to BCP-47 (`HI-in` → `hi-IN`, `gu_IN` → `gu-IN`);
+- duplicates are removed and blank/`und` locale values are ignored;
 - J2 explicitly sets `EXTRA_LANGUAGE` and `EXTRA_LANGUAGE_PREFERENCE`;
 - only language-not-supported/language-unavailable errors move to the next locale;
 - no continuous retry loop and no cloud STT fallback;
-- unit tests cover locale ordering, duplicate removal and blank device locale.
+- unit tests cover ordering, normalization, duplicate removal and blank/undetermined device locale.
 
 ## Fresh CI repair history
 
 - Project Governance #252 passed on the first locale-retry synchronized head.
-- J1 Assistant Test #179 failed lint, not compilation/runtime, because Android lint required an explicit API-31 guard at the `createOnDeviceSpeechRecognizer` call site.
+- J1 Assistant Test #179 failed lint because Android lint required an explicit API-31 guard at the `createOnDeviceSpeechRecognizer` call site.
 - The check was not suppressed and no lint baseline was introduced.
-- Commit `8de560527fed1ed41e6e2f50230ac97522c393f3` adds the direct Android 12/API-31 guard inside `startCurrentLocale()` before the API-31 call.
-- Roadmap/snapshot were re-synchronized after this repair; the next candidate must pass fresh J2/J1/Android/Governance checks.
+- Commit `8de560527fed1ed41e6e2f50230ac97522c393f3` added the direct Android 12/API-31 guard.
+- J1 #186 subsequently passed compile, lint, zero-permission package audit and artifact upload.
+- J2 #82 ran 359 tests and failed exactly one new locale-policy test because `HI-in` was de-duplicated but preserved with non-canonical casing.
+- Production policy was corrected in `3fc2d8692c14e86ded135bb4f39bca216d1df155`; tests were expanded in `08cc50270624dde4f36fd0330e717032264579b8` for mixed-case, underscore, blank and `und` inputs.
+- Roadmap/snapshot are synchronized again; a replacement APK remains blocked until fresh exact-head J2/J1/Android/Governance checks all pass.
 
 ## Current exact gate
 
-1. Settle fresh J2 Voice Test, J1 Assistant Test, Android CI and Project Governance on the latest synchronized API-guard repair head.
+1. Settle fresh J2 Voice Test, J1 Assistant Test, Android CI and Project Governance on the final canonical-locale/API-guard repair head.
 2. Do not share a replacement APK until all required gates are green.
 3. Record new source/run/artifact/hash provenance.
 4. Motorola retest phrases: `Mayra namaste`, `kal subah saat baje`, `open WhatsApp`, one English phrase.
 5. If transcript works, continue tap-dismiss, 20-cycle stability, already-locked invocation and reboot recovery.
-6. If all locales still fail, record that device language pack limitation and evaluate an explicitly separate offline STT engine rather than silently using cloud recognition.
+6. If all locales still fail, record that device language-pack limitation and evaluate an explicitly separate offline STT engine rather than silently using cloud recognition.
 
 ## Future capability gates
 
