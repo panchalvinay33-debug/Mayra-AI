@@ -1,176 +1,115 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: READY FOR OWNER TEST
-Date created: 2026-08-03
-Target artifact: `Mayra AI Personal Alpha` 0.2.1-alpha
-Package: `ai.mayra.app.alpha`
-Source baseline: `0d9435adb92b425bfb47a710d4f4516a6aaac398`
-Android CI: #1851 — success
-Project Governance: #32 — success
-APK SHA-256: `1459517f1aa375576afa353ba6683ceaf81ddbcb4e79fc6dd790a501f52307b8`
+Status: REPAIR IN PROGRESS
+Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
-## Evidence header — fill before testing
+## Authoritative tested artifact
 
-- Test date/time/timezone:
-- Exact Motorola model:
-- Android version:
-- Android build number/security patch:
-- Installed Mayra label/version:
-- APK SHA-256 verified: YES / NO
-- Existing Mayra variants uninstalled or intentionally retained:
-- Battery saver state:
-- Screen lock configured:
-- Tester notes:
+- Label: `Mayra J1 Assistant Test`
+- Package: `ai.mayra.app.j1`
+- Version: `0.2.1-j1`
+- Source: `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
+- J1 CI: #44 — success
+- Android CI: #1935 — success
+- Project Governance: #116 — success
+- APK SHA-256: `edced64084537cd06ba55ddea0b2f80cdda2aaa322aa296379ac25d89ea66116`
+- Protected baseline: `baseline/mayra-0.2.1-j1-zero-permission-green-44`
 
-## A. Install and baseline sanity
+## Evidence received
 
-- [ ] Install succeeds without bypassing Play Protect.
-- [ ] Android package is `ai.mayra.app.alpha`.
-- [ ] Label is `Mayra AI Personal Alpha`.
-- [ ] Exactly one launcher icon appears for this package.
-- [ ] Main screen launches without crash/blank state.
-- [ ] History, Library, Memory, Provider and Device screens open.
-- [ ] Background/foreground and force-stop/reopen do not crash.
+### A. Installation and launch
 
-Record result: PASS / FAIL / BLOCKED
-Evidence/notes:
+Result: PASS
 
-## B. Assistant role visibility
+- APK installed successfully without bypassing Play Protect.
+- App launched normally.
+- J1 activation screen rendered correctly.
+- Status displayed: `Mayra is not selected`.
 
-Path may vary by Motorola build; locate Default digital assistant app / Assistant app in Android settings.
+### B. Assistant activation button
 
+Result: FAIL
+
+Steps:
+
+1. Open `Mayra J1 Assistant Test`.
+2. Tap `Activate Mayra`.
+
+Expected:
+
+- Android Assistant role-selection dialog or an official Assistant/default-app settings screen opens.
+
+Actual:
+
+- No visible response.
+- No role-selection screen appeared.
+- No explanatory error appeared.
+
+Evidence:
+
+- Owner screenshot received at approximately 18:10 IST on 2026-08-03.
+
+Root-cause finding:
+
+- The J1 activity attempted `RoleManager.createRequestRoleIntent(ROLE_ASSISTANT)` and then silently fell back to Settings intents.
+- Intent resolution/launch failures were not shown in the UI, so Motorola-specific failure appeared as a dead button.
+
+Repair candidate:
+
+- Commit `2b06cf8fe92b12c2c9d36d5099d1695ea13a1cf9`.
+- Resolve-check the role request before launch.
+- Try official settings screens in order: Voice input, Default apps, general Settings.
+- Show a visible diagnostic status for every route and final failure.
+- No hidden OEM component or security bypass is used.
+
+The repair is not device-ready until J1 CI, Android CI and Project Governance pass on the synchronized exact head and a new APK provenance is recorded.
+
+## Remaining test sequence after repaired APK
+
+### C. Assistant role visibility
+
+- [ ] Tapping Activate Mayra visibly opens a system screen or displays an exact diagnostic.
 - [ ] Mayra appears as an available assistant choice.
 - [ ] Mayra can be selected only through explicit owner action.
-- [ ] Android shows no unexpected second launcher/app identity.
 - [ ] Mayra can be deselected and the previous assistant restored.
-- [ ] Selecting/deselecting does not erase Mayra data.
 
-Record result: PASS / FAIL / BLOCKED
-Exact settings path:
-Evidence/notes:
-
-## C. Unlocked invocation
-
-With phone unlocked and Mayra selected as Assistant:
+### D. Unlocked invocation
 
 - [ ] System assistant gesture/button invokes Mayra.
-- [ ] Animated Mayra orb/session appears over the current screen.
-- [ ] Only the assistant session appears; full MainActivity is not unnecessarily launched.
-- [ ] Orb pulses smoothly without freezing.
-- [ ] Hiding/dismissing the assistant stops the visible animation.
-- [ ] Repeated invoke/dismiss cycles do not stack multiple surfaces.
-- [ ] No crash after 10 repeated invocations.
-- [ ] Returning to previous app preserves expected state.
+- [ ] Animated orb/session appears.
+- [ ] Dismissal stops the animation.
+- [ ] Ten repeated invoke/dismiss cycles do not crash or stack surfaces.
 
-Record result: PASS / FAIL / BLOCKED
-Invocation method used:
-Evidence/notes:
+### E. Locked-screen invocation
 
-## D. Locked-screen invocation
+- [ ] Supported Motorola gesture/button invokes Mayra according to lock-screen policy.
+- [ ] No private Mayra content is exposed before unlock.
+- [ ] Dismissal returns cleanly to lock screen.
 
-- [ ] Lock phone normally.
-- [ ] Invoke the selected assistant using the supported Motorola gesture/button.
-- [ ] Mayra session behavior matches Android lock-screen policy.
-- [ ] Private app content/memory/document text is not exposed without unlock.
-- [ ] Dismissing returns to lock screen.
-- [ ] Unlocking after invocation does not duplicate the assistant surface.
-- [ ] Five repeated locked invocations do not crash System UI or Mayra.
+### F. Recognition honesty
 
-Record result: PASS / FAIL / BLOCKED
-Evidence/notes:
+- [ ] No invented transcript.
+- [ ] No endless listening loop.
+- [ ] No claim that the wake phrase is implemented.
 
-## E. Recognition shell honesty
+### G. Process/reboot recovery
 
-The real local recognizer/wake phrase is not integrated in this baseline.
+- [ ] Force-stop does not create a crash loop.
+- [ ] Reboot preserves or visibly recovers role state.
+- [ ] Removing Mayra restores previous assistant behavior.
 
-- [ ] Assistant does not invent a transcript when recognition is unavailable.
-- [ ] Recognition failure is bounded; no endless spinner/service loop.
-- [ ] Main Mayra voice button remains independently usable where supported.
-- [ ] No claim that “always listening” works yet.
+### H. Permission boundary
 
-Record result: PASS / FAIL / BLOCKED
-Evidence/notes:
-
-## F. Process, reboot and role recovery
-
-- [ ] Select Mayra as Assistant, then force-stop Mayra.
-- [ ] Invoking Assistant does not create a crash loop.
-- [ ] Reopen Mayra and verify main features remain usable.
-- [ ] Reboot phone with Mayra selected as Assistant.
-- [ ] After reboot, Android role selection remains correct or fails visibly/recoverably.
-- [ ] Assistant invocation after reboot works or produces a documented bounded failure.
-- [ ] Removing Mayra as Assistant restores previous system behavior.
-
-Record result: PASS / FAIL / BLOCKED
-Evidence/notes:
-
-## G. Permission and component boundary
-
-- [ ] No `CALL_PHONE` permission requested.
-- [ ] No `SEND_SMS` permission requested.
-- [ ] No system-overlay permission requested for the assistant orb.
-- [ ] Microphone permission appears only when voice functionality requires it.
-- [ ] Contacts/notification permissions remain feature-scoped.
-- [ ] Assistant role is not silently selected.
-- [ ] Low-permission Full Test is not used for this J1 role test.
-
-Record result: PASS / FAIL / BLOCKED
-Evidence/notes:
-
-## H. Stability and resource observation
-
-Run at least 20 invoke/dismiss cycles and keep Mayra selected for at least 30 minutes.
-
-- [ ] No ANR/crash/System UI restart.
-- [ ] No persistent orb after session dismissal.
-- [ ] No unexpected screen wake loop.
-- [ ] No continuous microphone indicator from this recognition-shell baseline.
-- [ ] Phone temperature remains normal during idle.
-- [ ] Battery drain observation recorded (not yet a full wake-word benchmark).
-
-Start battery/time:
-End battery/time:
-Temperature/behavior notes:
-Record result: PASS / FAIL / BLOCKED
-
-## I. Regression smoke after Assistant role
-
-- [ ] Main text chat works.
-- [ ] `kesi ho` receives natural reply.
-- [ ] `drinking water after 3 min` creates a reminder or requests required permission correctly.
-- [ ] `Open WhatsApp` reaches the app-opening path.
-- [ ] Library opens.
-- [ ] Memory Center opens.
-- [ ] Provider screen opens.
-- [ ] Deselecting Assistant does not break normal Mayra app use.
-
-Record result: PASS / FAIL / BLOCKED
-Evidence/notes:
+- [x] CI verified zero requested Android permissions for J1 #44.
+- [x] Exactly one launcher verified.
+- [x] No WorkManager, Startup, Room, notification listener or boot receiver.
+- [ ] Motorola shows no unexpected permission request.
 
 ## Failure protocol
 
-For every failure record:
-
-- section/item;
-- exact steps;
-- expected result;
-- actual result;
-- screenshot/screen recording;
-- whether it repeats after app restart/reboot;
-- whether removing Assistant role recovers the phone;
-- date/time;
-- app version/source SHA/APK SHA;
-- any Android crash dialog or system log text.
-
-Stop the J1 test immediately if there is a System UI crash loop, lock-screen access problem, repeated unwanted screen wake, persistent microphone use or inability to restore the previous Assistant.
+Every failure must record exact steps, expected/actual behavior, screenshot or recording, repeatability after restart/reboot, artifact source SHA and APK SHA-256.
 
 ## Promotion rule
 
-J1 can move from `DEVICE_VERIFY` to `DONE` only when:
-
-1. all blocking sections pass on the Motorola;
-2. failures are repaired and re-tested on a new provenance-recorded artifact;
-3. audit, roadmap, latest snapshot and this sheet are synchronized;
-4. a new exact-head dual-green baseline is created after any repair;
-5. only then may wake-word/local-model work begin.
+J1 moves to device-verified only after activation, role visibility, select/remove, unlocked invocation, lock-screen behavior and orb lifecycle pass on one provenance-recorded repaired APK. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
