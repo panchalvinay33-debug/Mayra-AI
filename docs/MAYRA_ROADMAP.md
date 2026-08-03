@@ -1,81 +1,74 @@
 # Mayra AI — Execution Roadmap
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 Entry point: `START_HERE.md`
 Latest recovery state: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 J2 device sheet: `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`
 Canonical product issue: #13
-Mandatory major-feature feasibility gate: #14
+Mandatory feasibility gate: #14
 Repository hygiene registry: #15
 
-## Overall program view
+## Program view
 
 | Track | Status | Current truth | Next gate |
 |---|---|---|---|
 | Governance/backups | DONE / CONTINUOUS | Canonical records, governance CI and protected baselines exist | Sync every meaningful batch |
-| J1 Assistant role | DEVICE VERIFIED FOUNDATION | Motorola accepts/selects Mayra; Power trigger invokes orb; Back/lock dismiss | Preserve as regression baseline |
-| J2 invocation-time voice | DEVICE RETEST READY | CI #106 is exact-head quadruple-green with support probing + single-recognizer reuse; previous CI #90 device failure is documented | Motorola transcript retest with #106 |
-| Animated Mayra presence | DEVICE VERIFY | Orb physically renders; tap-dismiss repair exists in shared session | Verify direct tap dismissal after transcript proof |
-| Wake phrase | BENCHMARK | Continuous SpeechRecognizer loop rejected; dedicated local KWS required | Start only after J2 transcript/lifecycle acceptance |
-| Local brain | BENCHMARK | LiteRT-LM/Qwen-class direction preflighted, no model selected | Motorola benchmark after J2 voice proof |
-| Lock-screen voice | DEVICE VERIFY | Assistant framework foundation exists | Test already-locked invocation after unlocked transcript |
-| Calls | ACCEPTED / GATED | Default Phone/InCallService architecture preflighted | No role takeover before full call UI/runtime |
-| Trusted install | IN_PROGRESS | Stable owner signing/trusted distribution still required for seamless upgrades | Configure private certificate/channel |
+| J1 Assistant role | DEVICE VERIFIED FOUNDATION | Motorola accepts/selects Mayra; Power trigger invokes orb | Preserve regression baseline |
+| J2 on-device recognition | CORE DEVICE ACCEPTED | Hindi/Hinglish/English transcript, direct dismissal, 20 cycles, locked invocation and owner-reported reboot/no-speech/rapid tests pass | Consolidated privacy + spoken-reply regression |
+| Lock-screen privacy | REPAIR IN CI | CI #106 exposes transcript/overlap before unlock | Generic locked state, no private transcript/TTS |
+| Spoken Mayra reply | IN PROGRESS | Offline-first Android TTS + deterministic local response policy implemented in source | Fresh CI, then voice-quality device round |
+| Voice actions | SAFE FOUNDATION | J2 understands app/reminder intent but does not execute or falsely claim success | Integrate full typed action/confirmation runtime after spoken-reply proof |
+| Wake phrase | BENCHMARK | Continuous SpeechRecognizer loop rejected; dedicated KWS required | After consolidated voice acceptance |
+| Local LLM | BENCHMARK | LiteRT-LM/Qwen-class direction preflighted, no model selected | Motorola benchmark after voice bridge |
+| Calls | ACCEPTED / GATED | Default Phone/InCallService preflight complete | No role takeover before full UI/runtime |
+| Trusted install | IN PROGRESS | Stable owner signing/trusted distribution required | Private certificate + upgrade proof |
 
-## Protected baselines
+## Latest protected application baseline
 
-- `baseline/mayra-0.2.1-green-1795`
-- `baseline/mayra-0.2.1-jarvis-j1-green-1851`
-- `baseline/mayra-0.2.1-j1-zero-permission-green-44`
-- `baseline/mayra-0.2.1-j1-activation-repair-green-56`
-- `baseline/mayra-0.2.1-j2-voice-green-18`
-- `baseline/mayra-0.2.1-j2-locale-repair-green-90`
-- `baseline/mayra-0.2.1-j2-speech-support-green-106`
-
-Latest protected J2 application baseline:
+`baseline/mayra-0.2.1-j2-speech-support-green-106`
 
 - source `a63ef1e7c3ddca06ce444502e5afd3a410d8fb18`
-- J2 #106 success
-- J1 #210 success
-- Android CI #2101 success
-- Governance #282 success
-- artifact `mayra-j2-voice-apk-106`, ID `8866441207`
-- APK size `19,209,329` bytes
+- J2 #106, J1 #210, Android CI #2101, Governance #282: success
+- artifact ID `8866441207`
 - APK SHA-256 `d0917d17b50429a843f3a5e688580df66f3eea678be4806b44ef9f1535adeb6e`
-- ZIP SHA-256 `b2109366a0140a66f85fef3cd6a85a95263815643ae86076ba0a9f20194140db`
-- package boundary remains exactly `RECORD_AUDIO`.
+- exactly `RECORD_AUDIO`
 
-## Motorola evidence established
+Do not move/promote the new privacy/TTS source until fresh exact-head J2/J1/Android/Governance CI is green.
 
-1. J1/J2 appear as valid Digital assistant candidates.
-2. Mayra can be selected as default Digital assistant.
-3. Motorola Power-button Assistant trigger launches Mayra.
-4. Orb renders over Home.
-5. Back/lock dismiss common session.
-6. J2 microphone permission/readiness is PASS.
-7. Android reports an on-device recognition service is available.
-8. CI #18 recognition FAIL: `Speech language unavailable`.
-9. CI #90 recognition FAIL: `Speech recognizer unavailable`.
-10. No false transcript or crash was observed in either failure.
+## Device evidence
 
-## J2 #106 repair now green
+PASS:
 
-- one `SpeechRecognizer` instance per bounded attempt instead of destroy/recreate on every locale fallback;
-- Android 13+ uses `checkRecognitionSupport()` before listening;
-- Mayra prefers actually installed on-device languages over guessed locales;
-- if a model is not installed but available for download, surface `On-device speech language pack needed`;
-- OEM support-probe failure falls back to bounded delayed locale trials;
-- locale retry delay is 450 ms while reusing the recognizer;
-- no cloud STT fallback, no endless listening loop, no permission expansion;
-- new unit tests cover support-state language ordering and normalization.
+- Digital assistant selection and Power-button invocation;
+- on-device Hindi/English language-pack discovery;
+- Hindi/Hinglish/English transcript;
+- transcript-only `open WhatsApp` with no execution;
+- all direct dismissal paths;
+- 20-cycle stability without reported crash, duplicate orb, stuck mic or permanent busy recognizer;
+- already-locked invocation;
+- owner-reported consolidated reboot/no-speech/rapid-open-close behavior OK.
+
+OPEN DEFECT:
+
+- CI #106 shows transcript/private text and overlapping layout before unlock.
+
+## Current implementation batch
+
+- keyguard-aware locked rendering;
+- no transcript-derived/private spoken response while locked;
+- layout spacing repair;
+- offline TTS voice selection: Hindi India → English India → English US → offline fallback;
+- speech rate 0.95, neutral pitch;
+- deterministic local replies for greeting, time, capability, reminder and app-open intent;
+- no action execution in J2; confirmation wording only;
+- TTS/recognizer lifecycle cleanup;
+- unit tests for no fake action claim and private unknown transcript handling.
 
 ## Immediate next actions
 
-1. Clean-install J2 #106 if CI-signature conflict occurs; remove only engineering J2 package, not full Mayra.
-2. Select J2 as Digital assistant if Android reset the role.
-3. Motorola retest `Mayra namaste` first and capture exact transcript/error.
-4. If transcript succeeds: test `kal subah saat baje`, `open WhatsApp`, and one short English phrase.
-5. Then verify tap/root/label dismissal, microphone indicator stop, 20 cycles, already-locked invocation and reboot recovery.
-6. If Mayra reports `On-device speech language pack needed`, record that exact state and add explicit language-pack guidance rather than hidden cloud recognition.
-7. Keep wake-word/local-LLM/Phone-role production integration gated.
-8. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Settle fresh J2/J1/Android/Governance workflows.
+2. Repair compile/lint/test/audit failures without weakening checks.
+3. Promote exact-head baseline and artifact only after all gates pass.
+4. Run one consolidated Motorola round: voice quality, privacy, action-confirmation wording, all lifecycle regressions, locked state and reboot.
+5. Then connect the proven voice bridge to the existing full Mayra typed local brain and confirmation-safe action runtime.
+6. Keep PR #12 Draft/open/unmerged until explicit owner approval.
