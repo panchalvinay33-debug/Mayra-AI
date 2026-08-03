@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -30,16 +29,9 @@ import ai.mayra.app.ui.theme.MayraAITheme
 
 class J1AssistantTestActivity : ComponentActivity() {
     private var assistantSelected by mutableStateOf(false)
-    private var activationMessage by mutableStateOf("Ready to open Android Assistant setup")
-
-    private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        refreshAssistantStatus()
-        activationMessage = if (assistantSelected) {
-            "Mayra is selected. Now use the phone assistant gesture/button."
-        } else {
-            "Mayra is still not selected. Tap Activate Mayra to open Assistant settings again."
-        }
-    }
+    private var activationMessage by mutableStateOf(
+        "Tap Activate Mayra. Then open Digital assistant and choose Mayra."
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,11 +43,20 @@ class J1AssistantTestActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize().padding(24.dp),
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text("Mayra J1 Assistant Test", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Mayra J1 Assistant Test",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                         Spacer(Modifier.height(12.dp))
-                        Text("This small build asks for no runtime permissions. It only checks whether this Motorola can select Mayra as the Android Assistant and show the animated assistant session.")
+                        Text(
+                            "This small build asks for no runtime permissions. It only checks whether this Motorola can select Mayra as the Android Assistant and show the animated assistant session."
+                        )
                         Spacer(Modifier.height(20.dp))
-                        Text(if (assistantSelected) "Status: Mayra is selected ✓" else "Status: Mayra is not selected")
+                        Text(
+                            if (assistantSelected) "Status: Mayra is selected ✓"
+                            else "Status: Mayra is not selected"
+                        )
                         Spacer(Modifier.height(8.dp))
                         Text(activationMessage, style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(16.dp))
@@ -67,7 +68,10 @@ class J1AssistantTestActivity : ComponentActivity() {
                             Text("Refresh status")
                         }
                         Spacer(Modifier.height(20.dp))
-                        Text("After selecting Mayra, use the phone's normal assistant gesture/button. The expected result is the Mayra orb. This build does not contain chat, contacts, reminders, provider, notification listener or background recovery.", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Motorola path: Settings → Apps → Default apps → Digital assistant → Mayra. After selecting Mayra, use the phone's normal assistant gesture/button. The expected result is the Mayra orb.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -87,54 +91,29 @@ class J1AssistantTestActivity : ComponentActivity() {
         } else {
             false
         }
+
+        activationMessage = if (assistantSelected) {
+            "Mayra is selected. Use the phone assistant gesture/button to invoke her."
+        } else {
+            "Tap Activate Mayra. In Default apps, tap Digital assistant and choose Mayra."
+        }
     }
 
     private fun openAssistantSetup() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(RoleManager::class.java)
-            if (roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true &&
-                !roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)
-            ) {
-                val request = roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
-                if (request.resolveActivity(packageManager) != null) {
-                    activationMessage = "Opening Android Assistant selection…"
-                    roleLauncher.launch(request)
-                    return
-                }
-                activationMessage = "Assistant role screen is not exposed directly on this Motorola. Opening system settings…"
-            } else if (roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true) {
-                activationMessage = "Mayra is already selected. Opening system Assistant settings…"
-            } else {
-                activationMessage = "Android reports that the Assistant role is unavailable. Opening system settings…"
-            }
+        val defaultAppsIntent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+        try {
+            startActivity(defaultAppsIntent)
+            activationMessage = "Opened Default apps. Tap Digital assistant, then choose Mayra."
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Fall through to the general Settings screen.
         }
 
-        openFirstAvailableSettings()
-    }
-
-    private fun openFirstAvailableSettings() {
-        val candidates = listOf(
-            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
-            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
-            Intent(Settings.ACTION_SETTINGS)
-        )
-
-        for (intent in candidates) {
-            if (intent.resolveActivity(packageManager) != null) {
-                try {
-                    startActivity(intent)
-                    activationMessage = when (intent.action) {
-                        Settings.ACTION_VOICE_INPUT_SETTINGS -> "Opened Voice input settings. Select Mayra as the Assistant."
-                        Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS -> "Opened Default apps. Choose Digital assistant app, then Mayra."
-                        else -> "Opened Android Settings. Search for ‘Digital assistant app’ and select Mayra."
-                    }
-                    return
-                } catch (_: ActivityNotFoundException) {
-                    // Try the next official Settings screen.
-                }
-            }
+        try {
+            startActivity(Intent(Settings.ACTION_SETTINGS))
+            activationMessage = "Opened Settings. Go to Apps → Default apps → Digital assistant → Mayra."
+        } catch (_: ActivityNotFoundException) {
+            activationMessage = "Could not open Android Settings. Open Settings manually: Apps → Default apps → Digital assistant → Mayra."
         }
-
-        activationMessage = "Motorola did not expose any Assistant settings screen. This result is now visible for diagnosis."
     }
 }
