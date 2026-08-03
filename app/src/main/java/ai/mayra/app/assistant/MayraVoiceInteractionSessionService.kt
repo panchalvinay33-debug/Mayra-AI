@@ -3,6 +3,7 @@ package ai.mayra.app.assistant
 import android.Manifest
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -22,27 +23,27 @@ class MayraVoiceInteractionSessionService : VoiceInteractionSessionService() {
     override fun onNewSession(args: Bundle?): VoiceInteractionSession = MayraVoiceInteractionSession(this)
 }
 
-/**
- * Lightweight animated assistant surface. J1 uses it only for lifecycle/orb proof. J2 can enable a
- * bounded invocation-time on-device speech recognizer through BuildConfig without turning the
- * always-running VoiceInteractionService into a heavy or continuous microphone process.
- */
 class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(context) {
     private var pulse: AnimatorSet? = null
     private var orbView: View? = null
+    private var nameLabel: TextView? = null
     private var stateLabel: TextView? = null
     private var recognizer: MayraOnDeviceSpeechRecognizer? = null
+    private var ttsSpeaker: MayraOfflineTtsSpeaker? = null
     private var voiceState: MayraVoiceSessionState = MayraVoiceSessionState.Idle
 
     override fun onCreate() {
         super.onCreate()
         setKeepAwake(false)
+        if (BuildConfig.VOICE_SESSION_RECOGNITION_ENABLED) {
+            ttsSpeaker = MayraOfflineTtsSpeaker(context)
+        }
     }
 
     override fun onCreateContentView(): View {
         val density = context.resources.displayMetrics.density
         val root = FrameLayout(context).apply {
-            setPadding(24.dp(density), 24.dp(density), 24.dp(density), 56.dp(density))
+            setPadding(24.dp(density), 24.dp(density), 24.dp(density), 72.dp(density))
             isClickable = true
             isFocusable = true
             contentDescription = "Mayra assistant surface. Tap to close."
@@ -61,15 +62,12 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
         }
         orbView = orb
         val orbSize = 104.dp(density)
-        root.addView(
-            orb,
-            FrameLayout.LayoutParams(orbSize, orbSize).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = 78.dp(density)
-            }
-        )
+        root.addView(orb, FrameLayout.LayoutParams(orbSize, orbSize).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = 102.dp(density)
+        })
 
-        val label = TextView(context).apply {
+        nameLabel = TextView(context).apply {
             text = "Mayra"
             textSize = 18f
             setTextColor(Color.WHITE)
@@ -77,13 +75,10 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             isClickable = true
             setOnClickListener { hide() }
         }
-        root.addView(
-            label,
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = 42.dp(density)
-            }
-        )
+        root.addView(nameLabel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = 66.dp(density)
+        })
 
         stateLabel = TextView(context).apply {
             textSize = 13f
@@ -93,15 +88,12 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             isClickable = true
             setOnClickListener { hide() }
         }
-        root.addView(
-            stateLabel,
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = 14.dp(density)
-                marginStart = 20.dp(density)
-                marginEnd = 20.dp(density)
-            }
-        )
+        root.addView(stateLabel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = 18.dp(density)
+            marginStart = 28.dp(density)
+            marginEnd = 28.dp(density)
+        })
 
         startPulse(orb)
         renderVoiceState()
@@ -112,19 +104,15 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
         super.onShow(args, showFlags)
         setKeepAwake(true)
         orbView?.let { if (pulse == null) startPulse(it) }
-        if (BuildConfig.VOICE_SESSION_RECOGNITION_ENABLED) {
-            startInvocationRecognition()
-        } else {
-            setVoiceState(MayraVoiceSessionState.Idle)
-        }
+        if (BuildConfig.VOICE_SESSION_RECOGNITION_ENABLED) startInvocationRecognition()
+        else setVoiceState(MayraVoiceSessionState.Idle)
     }
 
-    override fun onBackPressed() {
-        hide()
-    }
+    override fun onBackPressed() = hide()
 
     override fun onHide() {
         stopRecognition()
+        ttsSpeaker?.stop()
         setKeepAwake(false)
         pulse?.cancel()
         pulse = null
@@ -133,9 +121,12 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
 
     override fun onDestroy() {
         stopRecognition()
+        ttsSpeaker?.shutdown()
+        ttsSpeaker = null
         pulse?.cancel()
         pulse = null
         orbView = null
+        nameLabel = null
         stateLabel = null
         super.onDestroy()
     }
@@ -145,7 +136,6 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             setVoiceState(MayraVoiceSessionState.PermissionRequired)
             return
         }
-
         stopRecognition()
         val next = MayraOnDeviceSpeechRecognizer(context) { state -> setVoiceState(state) }
         recognizer = next
@@ -160,27 +150,45 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
     private fun setVoiceState(state: MayraVoiceSessionState) {
         voiceState = state
         renderVoiceState()
+        if (state is MayraVoiceSessionState.Heard) handleHeard(state.text)
+    }
+
+    private fun handleHeard(transcript: String) {
+        val reply = MayraVoiceReplyPolicy.replyFor(transcript)
+        if (isDeviceLocked()) {
+            // Never expose or speak transcript-derived/private content before unlock.
+            stateLabel?.text = "Heard you. Unlock to continue."
+            ttsSpeaker?.speak("Maine suna. Phone unlock karke continue karein.")
+        } else {
+            stateLabel?.text = reply.text
+            ttsSpeaker?.speak(reply.text)
+        }
     }
 
     private fun renderVoiceState() {
-        stateLabel?.text = if (BuildConfig.VOICE_SESSION_RECOGNITION_ENABLED) {
-            voiceState.primaryText()
-        } else {
-            "Tap or Back to close"
+        val label = stateLabel ?: return
+        label.text = when {
+            !BuildConfig.VOICE_SESSION_RECOGNITION_ENABLED -> "Tap or Back to close"
+            isDeviceLocked() -> when (voiceState) {
+                is MayraVoiceSessionState.Listening,
+                is MayraVoiceSessionState.Partial,
+                is MayraVoiceSessionState.Processing,
+                is MayraVoiceSessionState.Preparing -> "Listening…"
+                is MayraVoiceSessionState.Heard -> "Heard you. Unlock to continue."
+                else -> voiceState.primaryText().takeUnless { it.startsWith("Heard:") } ?: "Mayra is ready"
+            }
+            else -> voiceState.primaryText()
         }
     }
 
+    private fun isDeviceLocked(): Boolean =
+        (context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isDeviceLocked
+
     private fun startPulse(orb: View) {
         pulse?.cancel()
-        val scaleX = ObjectAnimator.ofFloat(orb, View.SCALE_X, 0.92f, 1.08f, 0.92f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val scaleY = ObjectAnimator.ofFloat(orb, View.SCALE_Y, 0.92f, 1.08f, 0.92f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val alpha = ObjectAnimator.ofFloat(orb, View.ALPHA, 0.72f, 1f, 0.72f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
+        val scaleX = ObjectAnimator.ofFloat(orb, View.SCALE_X, 0.92f, 1.08f, 0.92f).apply { repeatCount = ObjectAnimator.INFINITE }
+        val scaleY = ObjectAnimator.ofFloat(orb, View.SCALE_Y, 0.92f, 1.08f, 0.92f).apply { repeatCount = ObjectAnimator.INFINITE }
+        val alpha = ObjectAnimator.ofFloat(orb, View.ALPHA, 0.72f, 1f, 0.72f).apply { repeatCount = ObjectAnimator.INFINITE }
         pulse = AnimatorSet().apply {
             playTogether(scaleX, scaleY, alpha)
             duration = 1400L
