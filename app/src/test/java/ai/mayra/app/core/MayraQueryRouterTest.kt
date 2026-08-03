@@ -59,6 +59,20 @@ class MayraQueryRouterTest {
     }
 
     @Test
+    fun genericInstalledAppOpenDelegatesToLocalActionAssistant() {
+        val english = MayraQueryRouter.route("Open WhatsApp")
+        val launch = MayraQueryRouter.route("Launch YouTube")
+        val hindi = MayraQueryRouter.route("खोलो Chrome")
+
+        listOf(english, launch, hindi).forEach { decision ->
+            assertEquals(MayraQueryRoute.DELEGATE, decision.route)
+            assertEquals(MayraRoutingOutcome.ANSWER, decision.outcome)
+            assertEquals(MayraRequiredCapability.CORE_ASSISTANT, decision.requiredCapability)
+            assertFalse(decision.requiresConfirmation)
+        }
+    }
+
+    @Test
     fun blankInputRequestsClarification() {
         val decision = MayraQueryRouter.route("   ")
 
