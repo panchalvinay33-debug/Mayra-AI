@@ -8,7 +8,7 @@ Canonical product issue: #13
 Mandatory feasibility gate: #14
 Repository hygiene registry: #15
 
-## Program view
+## Overall program view
 
 | Track | Status | Current truth | Next gate |
 |---|---|---|---|
