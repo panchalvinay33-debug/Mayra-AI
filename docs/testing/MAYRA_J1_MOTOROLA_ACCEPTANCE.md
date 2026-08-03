@@ -1,50 +1,33 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: ASSISTANT ROLE + UNLOCKED INVOCATION PASS — ORB DISMISSAL REPAIR IN PROGRESS
+Status: ASSISTANT ROLE + UNLOCKED INVOCATION PASS — DIRECT TOUCH/LOCK-SCREEN/REBOOT COMPLETION PENDING
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
-## Previously tested artifact #44
+## Historical artifacts
 
-- Label: `Mayra J1 Assistant Test`
+### J1 #44
+
 - Package: `ai.mayra.app.j1`
-- Version: `0.2.1-j1`
 - Source: `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
-- J1 CI: #44 — success
-- Android CI: #1935 — success
-- Project Governance: #116 — success
+- J1 #44 / Android CI #1935 / Governance #116: success
 - APK SHA-256: `edced64084537cd06ba55ddea0b2f80cdda2aaa322aa296379ac25d89ea66116`
 - Protected baseline: `baseline/mayra-0.2.1-j1-zero-permission-green-44`
+- Device: install/launch PASS; first activation route FAIL.
 
-### #44 result
+### J1 #56
 
-Installation/launch: PASS.
-Activation button: FAIL — no visible response.
+- Source: `ce96f8e83fe33b878d426c407715d4a3e1b0495a`
+- J1 #56 / Android CI #1947 / Governance #128: success
+- APK SHA-256: `2def2acd55a0ea751c3cd70c9d78674c275f2c2d8e2e4e03ae527464cf48a318`
+- Protected baseline: `baseline/mayra-0.2.1-j1-activation-repair-green-56`
+- Device: visible diagnostics PASS; usable activation route still FAIL.
 
-## Tested repaired artifact #56
+## Authoritative Motorola-route artifact — J1 #68
 
 - Label: `Mayra J1 Assistant Test`
 - Package: `ai.mayra.app.j1`
 - Version: `0.2.1-j1`
-- Source: `ce96f8e83fe33b878d426c407715d4a3e1b0495a`
-- J1 CI: #56 — success
-- Android CI: #1947 — success
-- Project Governance: #128 — success
-- Artifact: `mayra-j1-zero-permission-apk-56`
-- Artifact ID: `8856404389`
-- APK size: `19,192,842` bytes
-- APK SHA-256: `2def2acd55a0ea751c3cd70c9d78674c275f2c2d8e2e4e03ae527464cf48a318`
-- Protected baseline: `baseline/mayra-0.2.1-j1-activation-repair-green-56`
-
-### #56 result
-
-Installation/update and launch: PASS.
-Visible diagnostic text: PASS.
-Activation navigation: FAIL — tapping `Activate Mayra` still did not leave the J1 screen or open a usable system selection screen.
-
-## J1 #68 Motorola-route artifact
-
-- Package: `ai.mayra.app.j1`
 - Source: `8b0e7ee33a34b8784de6b555ff7b273ab11ac525`
 - J1 Assistant Test #68: success
 - Android CI #1959: success
@@ -54,90 +37,107 @@ Activation navigation: FAIL — tapping `Activate Mayra` still did not leave the
 - APK size: `19,192,850` bytes
 - APK SHA-256: `0e1a36ff6b5e72c7d719430b5e04e87c3f7c3707d341a0527d6e488942d13cb9`
 
-#68 contains the Motorola activation repairs:
+## Device evidence on J1 #68
 
-1. J1-specific voice-interaction metadata points `settingsActivity` to `ai.mayra.app.j1.J1AssistantTestActivity`.
-2. `Activate Mayra` targets Android Default Apps with the Motorola path `Settings → Apps → Default apps → Digital assistant` shown in-app.
+### A. Installation and package boundary
 
-### #68 installation history
+Result: PASS.
 
-Initial update attempt: BLOCKED by package signing conflict because CI debug certificates changed between runs.
+- Clean install succeeded without bypassing Play Protect after an older differently signed J1 package was removed.
+- J1 requested zero runtime permissions.
+- App launched normally.
 
-Safe recovery used: uninstall the J1 test package, then clean-install #68. J1 contains no personal Mayra memory/documents/reminders and requests zero Android runtime permissions.
+### B. Motorola Default Apps route
 
-### #68 Motorola device evidence — 20:44 to 21:15 IST
+Result: PASS.
 
-Default Apps navigation: PASS.
+- `Settings → Apps → Default apps` opened.
+- `Digital assistant app` was visible.
+- J1-specific assistant metadata correctly points to `J1AssistantTestActivity`.
 
-- `Settings → Apps → Default apps` opened successfully.
-- `Digital assistant app` was visible in Motorola settings.
+### C. Assistant candidate and selection
 
-Assistant candidate/selection: PASS.
+Result: PASS.
 
-- `Mayra J1 Assistant Test` appears as the selected `Digital assistant app` in Motorola Default Apps.
-- J1 itself shows `Status: Mayra is selected ✓`.
-- Android 16 on the target Motorola recognizes the J1 `VoiceInteractionService` as a valid assistant candidate and accepts Mayra as the default digital assistant.
+- `Mayra J1 Assistant Test` appeared as a valid Digital assistant choice.
+- Owner selected Mayra.
+- Motorola Default Apps displayed `Digital assistant app — Mayra J1 Assistant Test`.
+- J1 displayed `Status: Mayra is selected ✓`.
 
-Power-key configuration: PASS.
+This proves Android 16 on the target Motorola accepts Mayra’s `VoiceInteractionService` as the default digital assistant.
 
-- Owner opened `Settings → Gestures` and configured the Power button Digital assistant action.
-- Previous Power-menu-only behavior was therefore identified as a device-trigger configuration issue, not a Mayra session failure.
+### D. Invocation trigger
 
-Unlocked assistant invocation: PASS.
+Result: PASS after device configuration.
 
-- After configuring the assistant trigger, invoking the selected digital assistant produced the Mayra assistant surface.
-- Owner screenshot shows the Mayra blue/purple orb with the `Mayra` label rendered over the current Settings screen.
-- This is direct device evidence that the Motorola system can launch Mayra's `VoiceInteractionSession` while unlocked and render the assistant orb without opening the full J1 activity.
+- Initial Power hold showed Motorola Power menu because the physical key was still mapped to Power menu.
+- Owner configured the Motorola Power-button action for Digital assistant under Gestures.
+- Power-button invocation then launched Mayra.
 
-Orb dismissal by touch: FAIL.
+### E. Unlocked assistant session/orb
 
-- Owner reported that tapping the orb did nothing.
-- Tapping outside the orb also did nothing.
-- Root cause in source: the assistant root/orb/label had no click listeners and there was no explicit Back dismissal handling.
+Result: PASS.
 
-Repair candidate:
+- Mayra `VoiceInteractionSession` opened over the current screen.
+- Blue/purple animated orb and `Mayra` label rendered.
+- Full J1 activity was not required for the visible assistant surface.
 
-- Commit `af593761ef68959c230b376e31e654f01e0ab9f5`.
-- Orb tap calls `hide()`.
-- Root/outside tap calls `hide()`.
-- Label tap calls `hide()`.
-- Back calls `hide()`.
-- Animation is cancelled on hide/destroy so the session does not remain active visually.
+### F. Dismissal behavior on tested #68
 
-This repair is not device-ready until fresh J1 Assistant Test, Android CI and Project Governance all pass on the synchronized head and a new artifact is recorded.
+Back gesture: PASS.
 
-Permanent signing repair:
+- Owner confirmed Back dismisses the assistant session.
 
-- Commit `2d1d78f477f9fcd592c67b7a63a3c22358efdf1c` changes `j1AssistantTest` to use the `mayraOwner` signing configuration whenever owner signing secrets are available.
-- Stable owner secrets still need to be configured in GitHub Actions before future CI J1 APKs are install-over-install stable.
-- No keystore/password/private key is committed to the repository.
+Phone lock while orb is visible: PASS.
 
-## Next device test sequence
+- Owner confirmed locking the phone dismisses the current assistant session.
 
-### E. Orb dismissal retest — CURRENT GATE
+Orb tap: FAIL on #68.
+Outside/root tap: FAIL on #68.
 
-- [ ] Install the fresh repaired artifact after all three CI gates pass.
-- [ ] Invoke Mayra while unlocked.
-- [ ] Tap the orb; session closes.
-- [ ] Invoke again; tap outside/root; session closes.
-- [ ] Invoke again; Back gesture closes the session.
-- [ ] Repeat invoke/dismiss 10 times without crash, duplicate surface or System UI restart.
-- [ ] Confirm the orb disappears fully after every dismissal.
+Root cause:
 
-### F. Locked-screen invocation
+- #68 source had no click listeners on the assistant surface/orb/label.
 
-- [ ] Lock the phone normally.
-- [ ] Invoke Mayra using the same configured assistant trigger.
-- [ ] Record whether Mayra appears while locked, requests unlock, or is blocked by Motorola/Android policy.
-- [ ] No private Mayra content is exposed before unlock.
+Repair chain:
+
+- `af593761ef68959c230b376e31e654f01e0ab9f5` adds orb/root/label tap-to-hide and explicit Back-to-hide.
+- later common-session work also stops recognition/animation on hide/destroy and restarts animation cleanly on a new show.
+
+The repaired touch path has not yet been physically retested. Because the repair is shared by J1/J2, the next owner artifact may validate this lifecycle through J2 rather than forcing another J1 signing/install cycle.
+
+## Stable-signing truth
+
+- J1/J2 use `mayraOwner` signing when protected owner signing secrets are available.
+- Hosted-runner debug fallback remains non-update-stable until those secrets are configured.
+- No private key/password is committed.
+
+## Remaining J1/J2 Motorola acceptance sequence
+
+### G. Direct dismissal/repeat lifecycle — CURRENT SHARED GATE
+
+- [ ] Invoke repaired Mayra session.
+- [ ] Tap orb → session closes.
+- [ ] Invoke again; tap outside/root → session closes.
+- [x] Back closes the tested session.
+- [x] Locking the phone closes the tested unlocked session.
+- [ ] Repeat invoke/dismiss 10–20 times without crash, duplicate surface, dead animation or System UI restart.
+
+### H. Invocation beginning while already locked
+
+- [ ] Lock phone first.
+- [ ] Invoke the configured Digital assistant trigger.
+- [ ] Record whether Mayra appears, requests unlock or is blocked by Android/Motorola policy.
+- [ ] No private content is exposed before unlock.
 - [ ] Dismissal returns cleanly to lock screen.
 
-### G. Role state/recovery
+### I. Role/process recovery
 
-- [ ] Open J1 and tap `Refresh status`; it still shows Mayra selected.
-- [ ] Reboot and verify assistant selection remains/recoverably returns.
+- [ ] Reboot phone.
+- [ ] Verify Digital assistant selection persists or recovers visibly.
+- [ ] Invoke Mayra after reboot.
 - [ ] Deselect Mayra and restore the previous assistant without errors.
 
 ## Promotion rule
 
-J1 moves to device-verified only after role selection, unlocked invocation, reliable dismissal/repeated orb lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 Assistant-role proof can be considered physically complete only after direct touch/repeated lifecycle, already-locked invocation behavior and reboot/role recovery are recorded. J2 may provide the repaired lifecycle evidence because it uses the same common session implementation, but its microphone/STT evidence remains a separate J2 gate.
