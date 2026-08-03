@@ -16,7 +16,7 @@ Play Protect evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
 |---|---|---|---|
 | Governance/backups | DONE | Canonical records, governance CI, immutable snapshots and protected baselines | Continuous synchronization |
 | Secure baselines | DONE | Pre-Jarvis #1795 and Jarvis J1 #1851 protected branches | Promote only exact-head dual-green milestones |
-| Zero-permission J1 test | IN_PROGRESS | `ai.mayra.app.j1` is isolated to Assistant activation/services/orb; run #16 fixed API lint and run #22 exposed inherited AndroidX infrastructure, now explicitly removed and audited | Fresh J1 CI green, artifact provenance, Motorola install/role test |
+| Zero-permission J1 test | IN_PROGRESS | `ai.mayra.app.j1` is isolated to Assistant activation/services/orb; runs #16, #22 and #32 progressively exposed API guard, inherited AndroidX infrastructure and one invalid ProfileInstaller removal declaration | Fresh J1 CI green, artifact provenance, Motorola install/role test |
 | Full owner installation | BLOCKED / IN_PROGRESS | Full debug Personal Alpha was blocked by Play Protect; stable owner signing workflow exists | Configure private certificate and use trusted owner/Play Internal distribution |
 | Simple onboarding | IN_PROGRESS | Full app has two-step permissions + Assistant activation setup; API-29 request directly guarded | Fresh full CI and trusted-install device test |
 | One-app packaging | DEVICE_VERIFY | Final product remains one Mayra launcher; J1 is a temporary engineering proof package | Final owner build one-icon acceptance |
@@ -58,9 +58,10 @@ Play Protect evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
 ## J1 CI findings retained
 
 - Run #16: lint caught an API-29 role-request guard; direct runtime guard added without suppression.
-- Run #22: compile/lint/assembly passed, but the manifest audit found AndroidX-inherited `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, an app-private dynamic-receiver permission, WorkManager/Startup/Room/ProfileInstaller components.
-- The J1 manifest now explicitly removes those permissions/components.
-- The workflow now permanently rejects the inherited infrastructure as well as broad Mayra features.
+- Run #22: compile/lint/assembly passed, but manifest audit found AndroidX-inherited permissions and WorkManager/Startup/Room/ProfileInstaller infrastructure.
+- Run #32: lint correctly rejected a removal declaration for `androidx.profileinstaller.ProfileInstallReceiver` because that class was absent from the actual dependency graph.
+- The invalid declaration was removed; real inherited permission/component removals remain.
+- The workflow permanently rejects any requested permission, extra launcher, broad Mayra feature or unrelated background infrastructure.
 
 ## Correct installation strategy
 
