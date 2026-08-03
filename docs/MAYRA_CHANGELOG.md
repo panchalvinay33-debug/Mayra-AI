@@ -2,19 +2,29 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
+## Unreleased — Play Protect recovery and zero-permission J1 test
+
+- Recorded the Motorola Play Protect block against the full sideloaded Personal Alpha.
+- Stopped treating the full debug-signed Personal Alpha as the correct J1 installation path.
+- Added a dedicated `j1AssistantTest` package: `ai.mayra.app.j1`.
+- The J1 package requests zero Android runtime permissions and contains only:
+  - a small Assistant activation/status screen;
+  - Android VoiceInteractionService/session/recognition foundations;
+  - the animated Mayra assistant orb/session.
+- Removed chat, provider, contacts, reminders, notification listener, boot recovery, document and memory screens from this test package.
+- Added a dedicated CI workflow that hard-fails on any requested permission, extra launcher or forbidden component.
+- Full Mayra remains on the stable owner-signing / Play Internal Testing track.
+
+Validation state: J1 source and audit workflow committed; latest CI and Motorola installation evidence pending.
+
 ## Unreleased — Simplified owner setup and stable updates
 
 - Recorded the real Motorola install failure where Personal Alpha #1851 could not update an older `ai.mayra.app.alpha` signed by another temporary CI debug certificate.
 - Added a stable secret-backed owner signing configuration for Personal Alpha.
 - Added a dedicated `Stable Owner Alpha` GitHub workflow that requires protected signing secrets, verifies the certificate, records APK SHA-256 and uploads an update-compatible artifact.
-- Added a one-time two-step Mayra setup screen:
-  - request microphone, contacts and reminder-notification permissions together;
-  - open Android's Assistant-role selector;
-  - start Mayra with an explicit continue option if a permission/role is temporarily skipped.
+- Added a one-time two-step Mayra setup screen for the full owner app.
 - Renamed the main `Device` chip to `Setup` and simplified its wording.
-- Added a permanent device test record for the package-signature conflict and a mandatory install-over-install data-retention test.
-
-Validation state: source has been committed; Android CI, Project Governance and Motorola clean-install/upgrade tests are pending.
+- Added install-over-install data-retention testing.
 
 ## Jarvis Mode foundation and recovery hardening
 
@@ -23,11 +33,7 @@ Validation state: source has been committed; Android CI, Project Governance and 
 - Added animated Mayra voice-session orb foundation.
 - Added RecognitionService shell for future offline wake-word/speech pipeline.
 - Declared lock-screen assistant-session support.
-- Kept Assistant-role components out of the low-permission Full Test variant.
-- Added canonical project governance records and automated documentation-drift protection.
-- Added `START_HERE.md`, pinpoint audit, test matrix and rollback playbook.
-- Created protected pre-Jarvis and Jarvis J1 known-green baselines.
-- Preserved CI #1833 failure evidence and repaired Assistant API/type incompatibilities.
+- Added governance, pinpoint audit, test matrix, rollback playbook and protected baselines.
 
 Verified Jarvis J1 baseline: Android CI #1851 and Project Governance #32 green on `0d9435adb92b425bfb47a710d4f4516a6aaac398`.
 
