@@ -1,6 +1,6 @@
 # Mayra AI — Motorola J2 Voice Acceptance
 
-Status: UNLOCKED ON-DEVICE TRANSCRIPT + DIRECT DISMISS PASS — STABILITY ACCEPTANCE NEXT
+Status: UNLOCKED TRANSCRIPT + DIRECT DISMISS + 20-CYCLE STABILITY PASS — LOCKED/REBOOT ACCEPTANCE NEXT
 Date updated: 2026-08-04
 Target device: Motorola Edge 70 Fusion / Android 16
 
@@ -23,7 +23,7 @@ Target device: Motorola Edge 70 Fusion / Android 16
 
 J2 requests exactly `android.permission.RECORD_AUDIO` and excludes internet/provider, contacts, notifications, reminders, boot recovery, notification listener, WorkManager, Room, documents, personal memory, full chat runtime and call control.
 
-## Physical evidence through 00:08 IST
+## Physical evidence through 00:12 IST
 
 PASS on Motorola:
 
@@ -43,6 +43,9 @@ PASS on Motorola:
 - `Mayra` label tap dismisses the session.
 - outside/root tap dismisses the session.
 - Back and phone-lock dismissal were already physically proven in the common Assistant session.
+- Owner completed 20 invoke/speak-or-silence/dismiss cycles with no observed problem.
+- No crash, System UI restart, duplicate orb, permanently busy recognizer or stuck microphone indicator was reported during the 20-cycle test.
+- Orb/animation returned normally on repeated invocation.
 - No cloud STT fallback was used.
 - No false transcript or crash was observed.
 
@@ -52,7 +55,7 @@ Historical bounded failures:
 - CI #90: `Speech recognizer unavailable`.
 - CI #106 before usable model registration: `On-device speech language pack needed`.
 
-The support-probe/single-recognizer repair therefore passes the core physical objective: invocation-time on-device speech recognition and direct touch dismissal work on the Motorola.
+The support-probe/single-recognizer repair therefore passes the core physical objective: invocation-time on-device speech recognition, direct touch dismissal and repeated unlocked lifecycle stability work on the Motorola.
 
 ## A. Installation/update
 
@@ -86,21 +89,21 @@ J2 is intentionally transcript-only.
 - [x] `Mayra` label tap closes session.
 - [x] Back closes session in prior common-session physical test.
 - [x] phone lock closes session in prior common-session physical test.
-- [ ] microphone privacy indicator disappears after every dismissal.
-- [x] no stuck/duplicate orb observed in the direct-dismiss tests.
+- [x] microphone privacy indicator does not remain stuck after repeated dismissal.
+- [x] no stuck/duplicate orb observed.
 
-## E. Repeated stability — CURRENT GATE
+## E. Repeated stability — PASS
 
-Run 20 invoke → speak/no-speech → dismiss cycles.
+Owner completed 20 invoke → speak/no-speech → dismiss cycles.
 
-- [ ] no app crash.
-- [ ] no System UI restart.
-- [ ] no permanently busy recognizer.
-- [ ] no duplicate orb.
-- [ ] mic indicator does not remain active.
-- [ ] animation returns on every invocation.
+- [x] no app crash.
+- [x] no System UI restart.
+- [x] no permanently busy recognizer.
+- [x] no duplicate orb.
+- [x] mic indicator does not remain active.
+- [x] animation returns on every invocation.
 
-## F. Already-locked invocation
+## F. Already-locked invocation — CURRENT GATE
 
 - [ ] lock phone first.
 - [ ] invoke Assistant trigger.
@@ -122,12 +125,11 @@ Run 20 invoke → speak/no-speech → dismiss cycles.
 - [x] language unavailable — CI #18 physical observation.
 - [x] recognizer unavailable — CI #90 physical observation.
 - [x] language pack needed — CI #106 physical observation before model availability.
-- [ ] recognizer busy/error.
-- [ ] rapid invoke/dismiss.
+- [x] rapid repeated invoke/dismiss — 20-cycle stability pass.
 - [ ] screen lock while listening.
 
 ## Promotion rule
 
-J2 core on-device unlocked speech recognition and direct touch dismissal are physically proven. Full `DEVICE_VERIFIED` status still requires 20-cycle stability, microphone-indicator cleanup, already-locked behavior and reboot recovery.
+J2 core on-device unlocked speech recognition, direct dismissal and 20-cycle stability are physically proven. Full `DEVICE_VERIFIED` status still requires already-locked behavior and reboot recovery.
 
 J2 success does not prove production wake phrase, local LLM, full Mayra conversation or call control.
