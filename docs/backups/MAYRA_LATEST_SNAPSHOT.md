@@ -5,7 +5,7 @@ Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
 Mandatory entry point: `START_HERE.md`
-Current phase: Jarvis J1 installation/setup repair and Motorola verification
+Current phase: Jarvis J1 zero-permission installation proof
 
 ## Protected baselines
 
@@ -15,79 +15,79 @@ Current phase: Jarvis J1 installation/setup repair and Motorola verification
 - Commit: `065e22524c835f3ddd3b2f56215a3616f071d4b3`
 - Android CI #1795: success
 
-### Jarvis J1
+### Jarvis J1 code baseline
 
 - Branch: `baseline/mayra-0.2.1-jarvis-j1-green-1851`
 - Commit: `0d9435adb92b425bfb47a710d4f4516a6aaac398`
 - Android CI #1851: success
 - Project Governance #32: success
-- Immutable snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-03_JARVIS_J1_CI1851.md`
 
-These remain known-green rollback points. The current repair head is not a new baseline until both workflows pass.
+These remain known-green rollback points. Current zero-permission J1 work is not a baseline until all latest-head workflows pass.
 
 ## Motorola evidence received
 
-The owner attempted to install Personal Alpha #1851 and Android displayed:
+### Signature conflict
 
-> App not installed as package conflicts with an existing package.
+An update attempt for `ai.mayra.app.alpha` failed because the old and new APKs used different temporary GitHub runner debug certificates.
 
-Evidence record: `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`.
+Evidence: `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`.
 
-Root cause: an older `ai.mayra.app.alpha` was signed by a different temporary GitHub runner debug certificate. Android correctly rejected the new APK as an incompatible update.
+### Play Protect block
 
-Immediate recovery for the #1851 test:
+After the owner retried installation, Google Play Protect blocked the full sideloaded Personal Alpha and displayed that the app could request sensitive data. The app was not installed.
 
-1. uninstall the old Mayra AI Personal Alpha;
-2. install #1851 as a clean install.
+Evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`.
 
-This removes the old test package's local data.
+Instruction: do not disable or bypass Play Protect for this artifact.
 
-## Current corrective batch
+## Current corrective implementation
 
-Committed after the #1851 baseline:
+A dedicated build type now exists:
 
-- `MayraOwnerSetupGate` with one two-step first-launch screen;
-- one permission request for microphone, contacts and notifications;
-- one explicit Android Assistant-role activation step;
-- simple Start Mayra/Continue for now path;
-- main Device chip renamed to Setup and wording reduced;
-- `personalAlpha` supports a stable secret-backed owner signing config;
-- dedicated `.github/workflows/owner-alpha.yml` builds a stable owner APK, verifies package/certificate and records SHA-256;
-- permanent install-failure evidence and upgrade-retention test contract;
-- blueprint, roadmap, decisions, ideas and changelog synchronized.
+- name: `j1AssistantTest`;
+- package: `ai.mayra.app.j1`;
+- label: `Mayra J1 Assistant Test`;
+- requested Android permissions: zero by design;
+- launcher count: exactly one;
+- included: small role activation/status activity, VoiceInteractionService, session service/orb and RecognitionService metadata shell;
+- excluded: full chat, provider, internet, contacts, reminders, notifications, boot recovery, notification listener, documents and memory.
 
-Validation state: `IN_PROGRESS`. Compile, tests, lint, package audits and Governance are pending on the latest repair head.
+Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
 
-## Stable owner signing setup still required
+The workflow compiles, lints, assembles and hard-audits the APK. It fails on any requested Android permission, extra launcher or forbidden feature/background component.
 
-The repository now expects four protected GitHub secrets for the dedicated owner workflow:
+## Full owner-app distribution truth
 
-- `MAYRA_OWNER_KEYSTORE_BASE64`
-- `MAYRA_OWNER_STORE_PASSWORD`
-- `MAYRA_OWNER_KEY_ALIAS`
-- `MAYRA_OWNER_KEY_PASSWORD`
+The complete Mayra app still requires:
 
-No secret value belongs in chat, commits or documentation. Until these are configured, ordinary Android CI may still produce disposable debug-signed Personal Alpha APKs that require clean install and are not upgrade-compatible.
+1. one stable private owner/release certificate;
+2. protected build secrets;
+3. signed APK/AAB provenance;
+4. preferably Google Play Internal Testing or another trusted owner-controlled distribution channel;
+5. install-over-install and local-data-retention proof.
 
-## Next validation gates
+Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases and should not be used to bypass Play Protect.
 
-1. Android CI latest-head compile, complete tests, lint and all package audits.
-2. Project Governance latest-head success.
-3. Clean-install test of the latest candidate.
-4. First-launch setup test: permissions, role selector, Start Mayra.
-5. Configure stable owner signing secrets once.
-6. Build stable owner version A and version B.
-7. Install B over A without uninstalling and verify local data remains.
-8. Continue J1 Assistant visibility/invocation/lock-screen/orb/reboot testing.
-9. Update evidence documents before J2 wake-word/local-model work.
+## Latest validation gates
 
-## Current capability truth
+1. Android CI on the exact current head.
+2. Project Governance on the exact current head.
+3. J1 Assistant Test workflow on the exact current head.
+4. If all green, record artifact ID, source SHA, APK size and SHA-256.
+5. Motorola clean install of only the zero-permission J1 APK.
+6. Assistant role visibility, select/remove, unlocked/locked invocation and orb lifecycle.
+7. Update device evidence before local LLM, wake-word or Phone-role coding.
 
-The Jarvis J1 service/session/orb foundation remains CI-verified at baseline #1851 but not yet device-verified. Local LLM, always-listening wake phrase and Phone/InCallService remain blocked until the J1 installation/setup/device gate is processed.
+## Current feature truth
+
+- Core Mayra features remain code/CI mature but full-device acceptance is blocked by trusted installation/distribution.
+- Jarvis J1 services/orb are code/CI verified at baseline #1851 but not device verified.
+- The new zero-permission J1 package is the next installation proof vehicle.
+- Local LLM, always-listening wake phrase and default Phone/InCallService remain planned and blocked until J1 evidence is processed.
 
 ## Merge and secret truth
 
 - PR #12 remains Draft/open/unmerged.
 - No merge/ready transition is authorized.
-- No API keys, keystores, passwords, tokens or owner-private data belong in GitHub records.
+- No API keys, keystores, passwords, tokens or owner-private data belong in GitHub records or chat.
 - Device claims require actual Motorola evidence.
