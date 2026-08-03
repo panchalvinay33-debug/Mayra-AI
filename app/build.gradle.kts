@@ -5,15 +5,28 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val mayraReleaseStoreFile = System.getenv("MAYRA_RELEASE_STORE_FILE")?.takeIf(String::isNotBlank)
-val mayraReleaseStorePassword = System.getenv("MAYRA_RELEASE_STORE_PASSWORD")?.takeIf(String::isNotBlank)
-val mayraReleaseKeyAlias = System.getenv("MAYRA_RELEASE_KEY_ALIAS")?.takeIf(String::isNotBlank)
-val mayraReleaseKeyPassword = System.getenv("MAYRA_RELEASE_KEY_PASSWORD")?.takeIf(String::isNotBlank)
+fun env(name: String): String? = System.getenv(name)?.takeIf(String::isNotBlank)
+
+val mayraReleaseStoreFile = env("MAYRA_RELEASE_STORE_FILE")
+val mayraReleaseStorePassword = env("MAYRA_RELEASE_STORE_PASSWORD")
+val mayraReleaseKeyAlias = env("MAYRA_RELEASE_KEY_ALIAS")
+val mayraReleaseKeyPassword = env("MAYRA_RELEASE_KEY_PASSWORD")
 val mayraReleaseSigningAvailable = listOf(
     mayraReleaseStoreFile,
     mayraReleaseStorePassword,
     mayraReleaseKeyAlias,
     mayraReleaseKeyPassword
+).all { it != null }
+
+val mayraOwnerStoreFile = env("MAYRA_OWNER_STORE_FILE")
+val mayraOwnerStorePassword = env("MAYRA_OWNER_STORE_PASSWORD")
+val mayraOwnerKeyAlias = env("MAYRA_OWNER_KEY_ALIAS")
+val mayraOwnerKeyPassword = env("MAYRA_OWNER_KEY_PASSWORD")
+val mayraOwnerSigningAvailable = listOf(
+    mayraOwnerStoreFile,
+    mayraOwnerStorePassword,
+    mayraOwnerKeyAlias,
+    mayraOwnerKeyPassword
 ).all { it != null }
 
 android {
@@ -29,7 +42,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     signingConfigs {
         if (mayraReleaseSigningAvailable) {
@@ -44,6 +60,18 @@ android {
                 enableV4Signing = true
             }
         }
+        if (mayraOwnerSigningAvailable) {
+            create("mayraOwner") {
+                storeFile = file(mayraOwnerStoreFile!!)
+                storePassword = mayraOwnerStorePassword
+                keyAlias = mayraOwnerKeyAlias
+                keyPassword = mayraOwnerKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
     }
 
     buildTypes {
@@ -52,6 +80,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfigs.findByName("mayraRelease")?.let { signingConfig = it }
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -63,7 +92,8 @@ android {
             versionNameSuffix = "-alpha"
             isDebuggable = true
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
             matchingFallbacks += listOf("debug")
         }
         create("fullTest") {
@@ -73,6 +103,7 @@ android {
             isDebuggable = true
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
             matchingFallbacks += listOf("debug")
         }
         create("documentTest") {
@@ -81,6 +112,7 @@ android {
             isDebuggable = false
             isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
             matchingFallbacks += listOf("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
