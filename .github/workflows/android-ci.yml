@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon :app:lintDebug :app:lintPersonalAlpha :app:lintFullTest :app:lintDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/lint.log
+          gradle --no-daemon :app:lintDebug :app:lintPersonalAlpha :app:lintFullTest :app:lintRelease :app:lintDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/lint.log
 
       - name: Assemble Personal Alpha APK
         shell: bash
@@ -127,6 +127,86 @@ jobs:
           )
           for component in "${required_components[@]}"; do
             grep -Fq "$component" build/ci/personal-alpha-manifest-tree.log
+          done
+
+      - name: Assemble minified final release candidate
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build/ci/assemble-release.log
+
+      - name: Verify final release candidate manifest and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/release -name '*.apk' -type f | head -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
+          test -n "$APK"
+          test -x "$AAPT"
+          test -f app/build/outputs/mapping/release/mapping.txt
+
+          "$AAPT" dump permissions "$APK" | tee build/ci/release-permissions.log
+          "$AAPT" dump badging "$APK" | tee build/ci/release-badging.log
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/release-manifest-tree.log
+
+          grep -Fq "package: name='ai.mayra.app'" build/ci/release-badging.log
+          grep -Fq "application-label:'Mayra AI'" build/ci/release-badging.log
+          if grep -Fq "application-debuggable" build/ci/release-badging.log; then
+            echo "Final release candidate must not be debuggable" >&2
+            exit 1
+          fi
+
+          launcher_count="$(grep -c '^launchable-activity:' build/ci/release-badging.log || true)"
+          if [ "$launcher_count" -ne 1 ]; then
+            echo "Final release candidate must expose exactly one launchable activity; found $launcher_count" >&2
+            exit 1
+          fi
+          grep -Fq "launchable-activity: name='ai.mayra.app.MainActivity'" build/ci/release-badging.log
+
+          required_permissions=(
+            android.permission.INTERNET
+            android.permission.RECORD_AUDIO
+            android.permission.READ_CONTACTS
+            android.permission.POST_NOTIFICATIONS
+            android.permission.RECEIVE_BOOT_COMPLETED
+          )
+          for permission in "${required_permissions[@]}"; do
+            if ! grep -Fq "$permission" build/ci/release-permissions.log; then
+              echo "Final release candidate is missing required capability permission: $permission" >&2
+              exit 1
+            fi
+          done
+
+          forbidden_permissions=(
+            android.permission.CALL_PHONE
+            android.permission.SEND_SMS
+            android.permission.READ_SMS
+            android.permission.RECEIVE_SMS
+            android.permission.WRITE_CONTACTS
+            android.permission.SCHEDULE_EXACT_ALARM
+            android.permission.REQUEST_INSTALL_PACKAGES
+            android.permission.SYSTEM_ALERT_WINDOW
+          )
+          for permission in "${forbidden_permissions[@]}"; do
+            if grep -Fq "$permission" build/ci/release-permissions.log; then
+              echo "Final release candidate unexpectedly requests high-risk permission: $permission" >&2
+              exit 1
+            fi
+          done
+
+          required_components=(
+            ai.mayra.app.MainActivity
+            ai.mayra.app.MayraApplication
+            ai.mayra.app.document.MayraDocumentActivity
+            ai.mayra.app.memory.MayraMemoryCenterActivity
+            ai.mayra.app.core.MayraProviderSettingsActivity
+            ai.mayra.app.core.MayraActivityHistoryActivity
+            ai.mayra.app.background.MayraBootReceiver
+            ai.mayra.app.background.MayraNotificationListener
+            ai.mayra.app.reminder.MayraReminderActionReceiver
+          )
+          for component in "${required_components[@]}"; do
+            grep -Fq "$component" build/ci/release-manifest-tree.log
           done
 
       - name: Assemble full Mayra test APK
@@ -255,10 +335,12 @@ jobs:
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-personalAlpha.html
             app/build/reports/lint-results-fullTest.html
+            app/build/reports/lint-results-release.html
             app/build/reports/lint-results-documentTest.html
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/problems/
+            app/build/outputs/mapping/release/mapping.txt
           if-no-files-found: warn
           retention-days: 7
 
