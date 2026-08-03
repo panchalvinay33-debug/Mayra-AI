@@ -7,8 +7,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.annotation.RequiresApi
 
 class MayraOnDeviceSpeechRecognizer(
     private val context: Context,
@@ -37,7 +40,14 @@ class MayraOnDeviceSpeechRecognizer(
         localeIndex = 0
         active = true
         onState(MayraVoiceSessionState.Preparing)
-        return startCurrentLocale()
+
+        if (!ensureRecognizer()) return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            probeInstalledLanguagesAndStart()
+            true
+        } else {
+            startCurrentLocale()
+        }
     }
 
     fun stop() {
@@ -48,17 +58,16 @@ class MayraOnDeviceSpeechRecognizer(
         localeIndex = 0
     }
 
-    private fun startCurrentLocale(): Boolean {
-        if (!active || localeIndex !in localeCandidates.indices) return false
+    private fun ensureRecognizer(): Boolean {
+        if (recognizer != null) return true
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             active = false
             onState(MayraVoiceSessionState.OnDeviceUnavailable)
             return false
         }
 
-        destroyRecognizer()
         val created = try {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            createOnDeviceRecognizerApi31()
         } catch (_: UnsupportedOperationException) {
             active = false
             onState(MayraVoiceSessionState.OnDeviceUnavailable)
@@ -71,15 +80,71 @@ class MayraOnDeviceSpeechRecognizer(
 
         recognizer = created
         created.setRecognitionListener(listener)
-        val languageTag = localeCandidates[localeIndex]
-        val request = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        return true
+    }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun createOnDeviceRecognizerApi31(): SpeechRecognizer =
+        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun probeInstalledLanguagesAndStart() {
+        val created = recognizer ?: return
+        val probeLocale = localeCandidates.firstOrNull() ?: "en-IN"
+        val probeIntent = recognitionRequest(probeLocale)
+
+        try {
+            created.checkRecognitionSupport(
+                probeIntent,
+                context.mainExecutor,
+                object : RecognitionSupportCallback {
+                    override fun onSupportResult(recognitionSupport: RecognitionSupport) {
+                        if (!active) return
+                        val installed = MayraSpeechLocalePolicy.installedCandidates(
+                            preferred = localeCandidates,
+                            installed = recognitionSupport.installedOnDeviceLanguages
+                        )
+                        if (installed.isNotEmpty()) {
+                            localeCandidates = installed
+                            localeIndex = 0
+                            startCurrentLocale()
+                            return
+                        }
+
+                        val downloadable = recognitionSupport.supportedOnDeviceLanguages
+                        active = false
+                        destroyRecognizer()
+                        onState(
+                            MayraVoiceSessionState.Error(
+                                if (downloadable.isNotEmpty()) {
+                                    "On-device speech language pack needed"
+                                } else {
+                                    "No installed on-device speech language"
+                                }
+                            )
+                        )
+                    }
+
+                    override fun onError(error: Int) {
+                        if (!active) return
+                        // Some OEM recognizers cannot report support. Fall back to a bounded
+                        // locale trial while reusing the same recognizer instance.
+                        startCurrentLocale()
+                    }
+                }
+            )
+        } catch (_: RuntimeException) {
+            if (active) startCurrentLocale()
         }
+    }
+
+    private fun startCurrentLocale(): Boolean {
+        if (!active || localeIndex !in localeCandidates.indices) return false
+        val created = recognizer ?: if (ensureRecognizer()) recognizer else null
+        if (created == null) return false
+
+        val languageTag = localeCandidates[localeIndex]
+        val request = recognitionRequest(languageTag)
 
         return try {
             created.startListening(request)
@@ -97,13 +162,27 @@ class MayraOnDeviceSpeechRecognizer(
         }
     }
 
+    private fun recognitionRequest(languageTag: String): Intent =
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        }
+
     private fun retryNextLocale(): Boolean {
         if (!active || localeIndex + 1 >= localeCandidates.size) return false
         localeIndex += 1
         onState(MayraVoiceSessionState.Preparing)
-        mainHandler.post {
-            if (active) startCurrentLocale()
-        }
+        recognizer?.runCatching { cancel() }
+        mainHandler.postDelayed(
+            {
+                if (active) startCurrentLocale()
+            },
+            RETRY_DELAY_MS
+        )
         return true
     }
 
@@ -186,5 +265,9 @@ class MayraOnDeviceSpeechRecognizer(
         SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "Speech language not supported"
         SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "Speech language unavailable"
         else -> "Speech recognition error ($code)"
+    }
+
+    private companion object {
+        const val RETRY_DELAY_MS = 450L
     }
 }
