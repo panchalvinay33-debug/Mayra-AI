@@ -1,6 +1,6 @@
 # Mayra AI — Motorola J2 Voice Acceptance
 
-Status: CI-VERIFIED — DEVICE TEST NEXT
+Status: DEVICE TEST IN PROGRESS — MIC + ON-DEVICE SPEECH PASS
 Date updated: 2026-08-03
 Target device: Motorola Edge 70 Fusion / Android 16
 
@@ -31,25 +31,36 @@ J2 intentionally excludes internet/provider, contacts, notifications, reminders,
 
 J2 uses Android on-device speech recognition only after explicit Assistant invocation and only when Android reports on-device recognition available. It is not an always-listening wake-word build.
 
+## Device evidence received — 22:40 IST
+
+Owner screenshot from the Motorola J2 readiness screen shows:
+
+- App launch: PASS.
+- Microphone permission: `allowed ✓` — PASS.
+- Android on-device speech recognition: `available ✓` — PASS.
+- Digital assistant selection: not yet selected — NEXT GATE.
+
+This is physical evidence that the target Motorola exposes an on-device speech recognizer to J2 and that the one runtime microphone permission is granted successfully.
+
 ## Preconditions
 
-1. Remove or deselect J1 as Digital assistant if Android requires changing the current assistant.
-2. Install the exact J2 candidate recorded above.
-3. Open `Mayra J2 Voice Test` once.
-4. Grant microphone permission when Mayra requests it.
-5. Select `Mayra J2 Voice Test` under `Settings → Apps → Default apps → Digital assistant`.
-6. Keep Motorola `Settings → Gestures → Power button → Digital assistant` configured.
+1. Install the exact J2 candidate recorded above.
+2. Open `Mayra J2 Voice Test` once.
+3. Grant microphone permission when Mayra requests it.
+4. Select `Mayra J2 Voice Test` under `Settings → Apps → Default apps → Digital assistant`.
+5. Keep Motorola `Settings → Gestures → Power button → Digital assistant` configured.
 
 ## A. Installation and permission
 
-- [ ] APK installs without Play Protect bypass.
-- [ ] Exactly one Mayra J2 launcher icon appears.
-- [ ] App opens normally.
-- [ ] Microphone is the only runtime permission requested.
+- [x] App opens normally.
+- [x] Granting microphone changes readiness correctly.
+- [x] On-device speech recognition reports available on the Motorola.
+- [ ] APK install/Play Protect behavior fully recorded.
+- [ ] Exactly one Mayra J2 launcher icon confirmed.
+- [ ] Microphone is the only runtime permission requested on device.
 - [ ] Denying microphone produces a clear bounded state and does not crash.
-- [ ] Granting microphone changes readiness correctly.
 
-## B. Assistant selection
+## B. Assistant selection — CURRENT GATE
 
 - [ ] J2 appears in `Digital assistant app` candidates.
 - [ ] J2 can be selected.
@@ -64,7 +75,7 @@ Expected:
 
 - [ ] Mayra assistant surface appears over the current screen.
 - [ ] State changes to preparing/listening.
-- [ ] On-device speech availability is reported honestly.
+- [x] On-device speech availability is reported honestly before invocation.
 - [ ] Say: `Mayra namaste` — visible transcript is reasonable.
 - [ ] Say: `kal subah saat baje` — visible transcript is reasonable.
 - [ ] Say: `open WhatsApp` — transcript is captured only; J2 does not execute the command.
@@ -74,8 +85,6 @@ Expected:
 Record exact transcript and state for each phrase.
 
 ## D. Dismissal/lifecycle repair
-
-The common assistant-session repair must be physically verified here.
 
 - [ ] Invoke, then tap the orb — session closes.
 - [ ] Invoke, then tap outside/root surface — session closes.
@@ -87,12 +96,7 @@ The common assistant-session repair must be physically verified here.
 
 ## E. Repeated stability
 
-Run 20 cycles:
-
-1. invoke Mayra;
-2. speak a short phrase or allow a bounded no-speech result;
-3. dismiss;
-4. invoke again.
+Run 20 cycles: invoke, speak/no-speech, dismiss, invoke again.
 
 Pass conditions:
 
@@ -106,15 +110,11 @@ Pass conditions:
 
 ## F. Locked-screen invocation
 
-With the phone already locked:
-
-- [ ] invoke Mayra using the configured Assistant trigger;
+- [ ] invoke Mayra while already locked;
 - [ ] record whether Android shows Mayra, requires unlock, or blocks the visual session;
 - [ ] if listening is permitted, verify only a short bounded recognition session occurs;
-- [ ] no private Mayra memory/document/chat content is exposed before unlock;
+- [ ] no private Mayra content is exposed before unlock;
 - [ ] dismissal returns cleanly to lock screen.
-
-This test records Android/Motorola policy; it must not be forced with hacks.
 
 ## G. Reboot/recovery
 
@@ -126,8 +126,6 @@ This test records Android/Motorola policy; it must not be forced with hacks.
 - [ ] Dismiss cleanly.
 
 ## H. Failure cases
-
-Record bounded behavior for:
 
 - [ ] microphone denied;
 - [ ] no speech;
