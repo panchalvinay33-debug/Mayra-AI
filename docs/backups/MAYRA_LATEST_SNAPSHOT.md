@@ -2,166 +2,143 @@
 
 Snapshot date: 2026-08-03
 Branch: `agent/document-library-foundation`
-PR: #12 — Draft, open, unmerged
+PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
 Mandatory entry point: `START_HERE.md`
-Current phase: Jarvis Mode Phase J1 — Android Assistant-role foundation
-Current synchronized head after this snapshot commit: see PR #12 latest head
+Current phase: Jarvis J1 — Motorola device verification
 
-## Protected recovery baseline
+## Protected baselines
+
+### Pre-Jarvis
 
 - Branch: `baseline/mayra-0.2.1-green-1795`
 - Commit: `065e22524c835f3ddd3b2f56215a3616f071d4b3`
-- Android CI: #1795 — success
-- Scope: last fully green pre-Jarvis application state.
+- Android CI #1795: success
 
-This branch is immutable and is not used for development. Recovery rules are in `docs/MAYRA_BASELINE_AND_ROLLBACK.md`.
+### Jarvis J1 current baseline
 
-## Resume instruction
+- Branch: `baseline/mayra-0.2.1-jarvis-j1-green-1851`
+- Commit: `0d9435adb92b425bfb47a710d4f4516a6aaac398`
+- Android CI #1851: success
+- Project Governance #32: success
+- Immutable snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-03_JARVIS_J1_CI1851.md`
 
-Before new work:
+Protected branches are recovery markers, not development branches.
 
-1. read `START_HERE.md`;
-2. read `docs/MAYRA_PINPOINT_AUDIT.md`;
-3. read this snapshot and the active roadmap section;
-4. check exact PR head plus Android CI and Project Governance;
-5. repair/revert a red head before expanding scope;
-6. keep PR Draft/open/unmerged unless owner explicitly approves otherwise.
+## Authoritative J1 validation
 
-## Canonical control documents
-
-- `docs/MAYRA_PINPOINT_AUDIT.md` — whole-project gap/evidence register;
-- `docs/MAYRA_TEST_MATRIX.md` — evidence levels and mandatory test matrix;
-- `docs/MAYRA_BASELINE_AND_ROLLBACK.md` — baseline promotion and recovery;
-- `docs/MAYRA_BLUEPRINT.md` — architecture;
-- `docs/MAYRA_ROADMAP.md` — ordered execution;
-- `docs/MAYRA_IDEA_LEDGER.md` — idea lifecycle;
-- `docs/MAYRA_DECISIONS.md` — decisions/supersessions;
-- `docs/MAYRA_CHANGELOG.md` — milestone history;
-- `docs/MAYRA_FULL_APP_ACCEPTANCE.md` — Motorola evidence.
-
-## Last fully verified application truth
-
-Android CI #1795 passed version 0.2.1 before Jarvis commits. It verified:
+Android CI #1851 passed on exact head `0d9435adb92b425bfb47a710d4f4516a6aaac398`:
 
 - Debug, Personal Alpha and Full Test compilation;
-- complete unit tests;
-- lint across governed variants;
-- Personal Alpha APK package/label/permission/component/one-launcher audit;
+- complete debug unit-test suite;
+- lint across Debug, Personal Alpha, Full Test, Release and Document Test;
+- Personal Alpha assembly and package/permission/component/one-launcher audit;
 - minified non-debuggable final `ai.mayra.app` R8/manifest audit;
 - safe Full Test audit;
 - isolated zero-permission Document Test audit;
-- artifact/report upload.
+- report and APK artifact upload.
 
-Included features/fixes:
+Project Governance #32 passed the canonical record/update contract.
 
-- optional HTTPS provider and Keystore credentials;
-- scoped permission UX and live provider refresh;
-- memory/document/action foundations;
-- persistent reminders, Complete/Snooze/follow-up/reboot recovery;
-- confirmation expiry;
-- app-opening routing repair;
-- final release/signing scaffold.
+## J1 artifact provenance
 
-## Current Jarvis foundation
+Personal Alpha testing candidate:
 
-Committed:
+- Artifact: `mayra-personal-alpha-apk-1851`
+- Artifact ID: `8852147191`
+- ZIP size: 18,722,590 bytes
+- ZIP SHA-256: `ab7cb7d457ed9a034bab5ba394157cf263980b1444fd7c3cf178fc91186296af`
+- APK size: 19,162,094 bytes
+- APK SHA-256: `1459517f1aa375576afa353ba6683ceaf81ddbcb4e79fc6dd790a501f52307b8`
 
-- `VoiceInteractionService` foundation;
-- `VoiceInteractionSessionService` and animated native orb;
-- RecognitionService shell;
+Other artifacts:
+
+- Full Test `8852148204`, ZIP SHA-256 `d437181ac9c1b7c2c204a7cce66c29a53025b35a0e048b771d5e2b2990a0de0e`;
+- Document Test `8852148923`, ZIP SHA-256 `64c5c391c1f7876cc89616c0869e83a11c66969f33fc87c463068246a1d09fa7`;
+- Reports `8852146266`, ZIP SHA-256 `34a9f2e561349ff4f042801f5cf3b1d9b413132d71671be68eea77301156c2b3`.
+
+## J1 implementation truth
+
+CI/package verified:
+
+- Android VoiceInteractionService foundation;
+- VoiceInteractionSessionService;
+- native animated Mayra orb session;
+- RecognitionService shell with honest unavailable behavior;
 - assistant metadata and lock-screen declaration;
-- low-permission Full Test exclusion for assistant components.
+- assistant components excluded from low-permission Full Test;
+- compile repairs after CI #1833.
 
-### Failed validation retained
+Not yet proven:
 
-Android CI #1833 failed at compile on the synchronized governance/Jarvis head:
+- Mayra appears in Motorola Assistant settings;
+- selection/removal succeeds;
+- unlocked invocation;
+- locked invocation;
+- repeated session stability;
+- force-stop/reboot role recovery;
+- battery/OEM background behavior.
 
-1. `MayraRecognitionService.onCheckRecognitionSupport` overrode no available method;
-2. `repeatCount` was referenced through the base Animator type.
+Therefore J1 is `DEVICE_VERIFY`, not `DONE`.
 
-### Repair applied
+## Testing contract
 
-- RecognitionService now implements only mandatory callbacks and returns a deterministic unavailable error until the real recognizer exists.
-- Orb repeat behavior is configured directly on each ObjectAnimator.
+Use:
 
-This repaired head is `IN_PROGRESS`; it is not a baseline until full latest-head Android CI and Project Governance both pass.
+- `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md` for the next physical test;
+- `docs/MAYRA_TEST_MATRIX.md` for evidence levels;
+- `docs/MAYRA_PINPOINT_AUDIT.md` for full-project gaps;
+- `docs/MAYRA_BASELINE_AND_ROLLBACK.md` for failure recovery.
 
-## Governance truth
-
-Project Governance workflow has already completed a successful run after the initial governance rollout. It validates required documents, structure, update coupling and basic secret-leak patterns.
-
-New audit/recovery controls added in this batch:
-
-- canonical full-project pinpoint audit;
-- canonical test matrix with design→compile→automated→package→device→release evidence levels;
-- protected green baseline branch;
-- baseline promotion/repair/revert/restore playbook.
+Every failure must include exact steps, expected/actual result, screenshot/log where useful, app/source/APK provenance and whether restart/reboot reproduces it.
 
 ## Current capability status
 
-### Implemented / awaiting Motorola validation
+### Mature but device verification pending
 
-- one launcher and internal feature screens;
-- local deterministic chat and optional online provider;
-- Keystore credentials and offline fallback;
-- voice input/TTS foundation;
-- memory lifecycle/provenance;
-- TXT/PDF/DOCX intelligence;
-- app opening/contact resolution;
-- dialer/message-composer handoff;
-- persistent reminders and recovery;
-- Activity History/Device Readiness;
-- governed engineering/release variants.
+- conversation/provider;
+- voice input/TTS;
+- memory;
+- documents;
+- apps/contacts/dialer/composer;
+- reminders/recovery;
+- history/readiness;
+- one-app packaging.
 
-### In progress
+### J1 device verification pending
 
-- Assistant role packaging and API compatibility;
-- animated Assistant session;
-- unlocked/locked invocation;
-- Assistant component presence/absence hard CI audit.
+- Assistant role visibility/selection/removal;
+- unlocked/locked assistant session;
+- orb lifecycle;
+- reboot/stability/background behavior.
 
-### Planned after J1 stable baseline
+### Blocked until J1 evidence is processed
 
-- offline wake phrase and battery/thermal benchmark;
-- on-device local LLM benchmark/integration;
-- Owner Mode trust levels;
-- default Phone/InCallService and Call Screening;
-- incoming caller announce/answer/reject/silence/mute/speaker;
-- proactive summaries/routines;
-- private production signing/distribution.
+- offline wake phrase;
+- on-device local LLM;
+- Owner Mode expansion;
+- default Phone/InCallService;
+- Call Screening;
+- proactive call/notification routines.
 
-### Deferred/constrained
+## Failure history retained
 
-- scanned OCR;
-- legacy binary `.doc`;
-- exact alarms until physical need;
-- unrestricted root/accessibility automation;
-- hidden cellular recording;
-- arbitrary protected call-audio injection.
-
-## Current risks
-
-1. Assistant manifest/service contracts still require exact-head full CI and device role visibility proof.
-2. Full Test must remain free of Assistant-role/background components.
-3. Motorola battery management may affect background/lock-screen behavior.
-4. Wake word and local LLM must be selected through measured battery/thermal/RAM/quality evidence.
-5. Phone role requires a complete fallback call UI and emergency/lost-role testing.
-6. Core code is mature but physical acceptance is still the largest evidence gap.
+Android CI #1833 failed due to two new Assistant API/type issues. They were repaired forward. The failure is retained in audit/changelog and was superseded by complete success #1851.
 
 ## Exact next actions
 
-1. Run latest-head Android CI and Project Governance after compile repair/docs synchronization.
-2. Repair any exact remaining tests, lint, R8 or manifest audit failures.
-3. Enforce Assistant components present in Personal Alpha/final and absent in Full Test.
-4. Record exact green head/run/artifact IDs/digests.
-5. Create immutable J1 milestone snapshot and a new protected baseline only after dual-green.
-6. Generate Personal Alpha and perform Motorola Assistant-role tests.
-7. Update acceptance, audit, roadmap and snapshot from real results before J2.
+1. Install only Personal Alpha #1851 on the Motorola.
+2. Verify package/label/one launcher and first launch.
+3. Complete Assistant role visibility/selection/removal checks.
+4. Test unlocked and locked invocation.
+5. Run repeated invocation, force-stop/reboot and resource observations.
+6. Run J1 regression smoke.
+7. Return PASS/FAIL/BLOCKED evidence.
+8. Update acceptance/audit/roadmap/snapshot before any J2 coding.
 
 ## Merge and secret truth
 
 - PR #12 remains Draft/open/unmerged.
-- No ready/merge transition is authorized.
-- No API keys, keystores, passwords, tokens or private owner data belong in GitHub.
-- A failed/pending head is never presented as stable.
+- No merge/ready transition authorized.
+- No API keys, keystores, passwords, tokens or owner-private data belong in GitHub.
+- Device claims require actual Motorola evidence.
