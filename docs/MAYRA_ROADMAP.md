@@ -16,9 +16,9 @@ Play Protect evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
 |---|---|---|---|
 | Governance/backups | DONE | Canonical records, governance CI, immutable snapshots and protected baselines | Continuous synchronization |
 | Secure baselines | DONE | Pre-Jarvis #1795 and Jarvis J1 #1851 protected branches | Promote only exact-head dual-green milestones |
-| Zero-permission J1 test | IN_PROGRESS | `ai.mayra.app.j1` contains only Assistant activation + system assistant services/orb; first workflow run #16 found one full-onboarding API lint guard and it was repaired without suppression | Fresh CI green, artifact provenance, Motorola install/role test |
+| Zero-permission J1 test | IN_PROGRESS | `ai.mayra.app.j1` is isolated to Assistant activation/services/orb; run #16 fixed API lint and run #22 exposed inherited AndroidX infrastructure, now explicitly removed and audited | Fresh J1 CI green, artifact provenance, Motorola install/role test |
 | Full owner installation | BLOCKED / IN_PROGRESS | Full debug Personal Alpha was blocked by Play Protect; stable owner signing workflow exists | Configure private certificate and use trusted owner/Play Internal distribution |
-| Simple onboarding | IN_PROGRESS | Full app has two-step permissions + Assistant activation setup; API-29 role request now has direct runtime guard | Fresh lint and trusted-install device test |
+| Simple onboarding | IN_PROGRESS | Full app has two-step permissions + Assistant activation setup; API-29 request directly guarded | Fresh full CI and trusted-install device test |
 | One-app packaging | DEVICE_VERIFY | Final product remains one Mayra launcher; J1 is a temporary engineering proof package | Final owner build one-icon acceptance |
 | Core conversation | DEVICE_VERIFY | Local Hinglish foundation + optional provider | Trusted full-app long chat/voice test |
 | Local conversational brain | PLANNED | No local LLM integrated | Begin after J1 Assistant role proof |
@@ -55,17 +55,18 @@ Play Protect evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
 2. Google Play Protect blocked the full sideloaded Personal Alpha because it could request sensitive access.
 3. Play Protect must not be bypassed for this artifact.
 
-## Latest J1 workflow finding
+## J1 CI findings retained
 
-J1 Assistant Test run #16 compiled the new variant but lint stopped on `MayraOwnerSetupGate`: the API-29 `createRequestRoleIntent` call was hidden behind derived UI state instead of a direct SDK check. The call now has a direct `Build.VERSION.SDK_INT >= Q` guard and nullable RoleManager check. No lint baseline or suppression was added.
+- Run #16: lint caught an API-29 role-request guard; direct runtime guard added without suppression.
+- Run #22: compile/lint/assembly passed, but the manifest audit found AndroidX-inherited `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE`, an app-private dynamic-receiver permission, WorkManager/Startup/Room/ProfileInstaller components.
+- The J1 manifest now explicitly removes those permissions/components.
+- The workflow now permanently rejects the inherited infrastructure as well as broad Mayra features.
 
 ## Correct installation strategy
 
 ### Phase A — prove Android Assistant support
 
-Build and test `Mayra J1 Assistant Test` (`ai.mayra.app.j1`): zero permissions, one launcher, no broad Mayra features, only Assistant activation/status and orb/session foundation.
-
-Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
+Build and test `Mayra J1 Assistant Test` (`ai.mayra.app.j1`): no requested permissions, one launcher, no broad Mayra features, only Assistant activation/status and orb/session foundation.
 
 ### Phase B — full personal Mayra
 
