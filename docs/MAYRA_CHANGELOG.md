@@ -7,15 +7,18 @@ This changelog records meaningful user-visible and engineering milestones. It do
 - Recorded the Motorola Play Protect block against the full sideloaded Personal Alpha.
 - Stopped treating the full debug-signed Personal Alpha as the correct J1 installation path.
 - Added a dedicated `j1AssistantTest` package: `ai.mayra.app.j1`.
-- The J1 package requests zero Android runtime permissions and contains only:
+- The J1 package contains only:
   - a small Assistant activation/status screen;
   - Android VoiceInteractionService/session/recognition foundations;
   - the animated Mayra assistant orb/session.
 - Removed chat, provider, contacts, reminders, notification listener, boot recovery, document and memory screens from this test package.
 - Added a dedicated CI workflow that hard-fails on any requested permission, extra launcher or forbidden component.
+- J1 run #16 exposed and fixed an API-29 onboarding lint guard without suppression.
+- J1 run #22 exposed AndroidX-inherited WorkManager/Startup permissions and components; the J1 manifest now explicitly removes WAKE_LOCK, network-state, foreground-service, dynamic-receiver permission, WorkManager, Startup, Room and ProfileInstaller infrastructure.
+- The audit now rejects those inherited components permanently.
 - Full Mayra remains on the stable owner-signing / Play Internal Testing track.
 
-Validation state: J1 source and audit workflow committed; latest CI and Motorola installation evidence pending.
+Validation state: fresh exact-head CI and Motorola installation evidence pending.
 
 ## Unreleased — Simplified owner setup and stable updates
 
