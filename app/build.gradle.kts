@@ -96,6 +96,16 @@ android {
             buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
             matchingFallbacks += listOf("debug")
         }
+        create("j1AssistantTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j1"
+            versionNameSuffix = "-j1"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
+            matchingFallbacks += listOf("debug")
+        }
         create("fullTest") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".fulltest"
