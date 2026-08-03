@@ -7,6 +7,7 @@ Latest recovery state: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 Test contract: `docs/MAYRA_TEST_MATRIX.md`
 Rollback playbook: `docs/MAYRA_BASELINE_AND_ROLLBACK.md`
 J1 device sheet: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`
+Latest device result: `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`
 
 ## Overall program view
 
@@ -15,6 +16,8 @@ J1 device sheet: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`
 | Project governance/backups | DONE | Canonical records, governance CI, immutable snapshots and protected baselines | Continuous synchronization |
 | Full-project audit/testing | DONE | Pinpoint audit + evidence-level test matrix | Update after each real test |
 | Secure baselines | DONE | Pre-Jarvis #1795 and Jarvis J1 #1851 protected branches | Promote only exact-head dual-green milestones |
+| Owner installation/update path | IN_PROGRESS | #1851 clean install is possible after uninstall; upgrade failed because CI debug certificate changed | Configure stable owner signing secrets and pass install-over-install test |
+| Simple owner onboarding | IN_PROGRESS | New two-step setup requests required runtime permissions then Assistant role | Compile/lint and Motorola first-launch acceptance |
 | One-app packaging | DEVICE_VERIFY | One launcher; variants and internal screens audited | Latest Motorola acceptance |
 | Core conversation | DEVICE_VERIFY | Local Hinglish foundation + optional provider | Long chat/voice testing |
 | Local conversational brain | PLANNED | No local LLM integrated | Begin only after J1 device gate |
@@ -24,13 +27,13 @@ J1 device sheet: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`
 | Reminders | DEVICE_VERIFY | Persistent scheduling/actions/recovery | Doze/reboot timing test |
 | App/contact actions | DEVICE_VERIFY | Open apps, contacts, dialer/composer, expiry | Motorola end-to-end test |
 | Animated Mayra presence | DEVICE_VERIFY | CI #1851 green native assistant orb/session | Unlocked/locked device invocation |
-| Android Assistant role | DEVICE_VERIFY | J1 source/package green | Role visibility/select/remove on Motorola |
+| Android Assistant role | DEVICE_VERIFY | J1 source/package green; onboarding now exposes one activation step | Role visibility/select/remove on Motorola |
 | Lock-screen/background voice | DEVICE_VERIFY | Declaration/package green | Locked invocation evidence |
 | Offline wake phrase | PLANNED | Recognition shell only | Battery/thermal engine benchmark after J1 |
 | Incoming-call control | PLANNED | No Phone/InCallService yet | Start after J1/J2 stable baseline |
 | Call screening | PLANNED | Requirement only | Later optional role module |
 | AI caller message-taking | PLANNED_WITH_CONSTRAINTS | Protected cellular audio not assumed | Supported route design |
-| Production release | IN_PROGRESS | Minified release green; signing scaffold | Private signing/upgrade/provenance |
+| Production release | IN_PROGRESS | Minified release green; signing scaffold + dedicated stable owner workflow | Private signing/upgrade/provenance |
 
 ## Protected baselines
 
@@ -50,31 +53,47 @@ J1 device sheet: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`
 
 #1851 passed compile, complete tests, lint, Personal Alpha, minified final release, safe Full Test, isolated Document Test and all governed audits/artifact uploads.
 
+## Motorola install finding
+
+The owner attempted to install Personal Alpha #1851. Android rejected it with “package conflicts with an existing package.” The exact finding is recorded in `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`.
+
+Root cause: the same `ai.mayra.app.alpha` package existed with a different GitHub runner debug signing certificate.
+
+Immediate test recovery: uninstall the previous Personal Alpha, then install the new APK. This removes old test-package data.
+
+Permanent path now being implemented:
+
+- `personalAlpha` can use a stable owner signing configuration supplied only through environment/GitHub secrets;
+- `.github/workflows/owner-alpha.yml` builds and verifies a stable update-compatible owner APK;
+- signing certificate and APK digest are included in artifact evidence;
+- temporary CI debug APKs are not considered upgrade-compatible owner releases.
+
+## Simplified first-launch experience
+
+The accepted owner UX is intentionally small:
+
+1. one first-launch Mayra setup screen;
+2. one button requests microphone, contacts and notification permissions together;
+3. one button opens Android's Assistant-role selection;
+4. one button starts Mayra;
+5. no unrelated permission prompts or large settings maze.
+
+Internet and boot recovery permissions do not require runtime prompts. Special Android roles cannot be silently granted and therefore remain one explicit system step.
+
 ## Jarvis J1 device gate
 
-Status: `DEVICE_VERIFY`
+Status: `DEVICE_VERIFY / INSTALL RETEST REQUIRED`
 
-Candidate:
-
-- Personal Alpha artifact: `mayra-personal-alpha-apk-1851`
-- Artifact ID: `8852147191`
-- Source SHA: `0d9435adb92b425bfb47a710d4f4516a6aaac398`
-- APK SHA-256: `1459517f1aa375576afa353ba6683ceaf81ddbcb4e79fc6dd790a501f52307b8`
-
-Required Motorola sequence:
+Required Motorola sequence after a clean or stable-signed install:
 
 1. Verify install/package/label/one launcher.
-2. Find Mayra in Android default Assistant settings.
-3. Select and remove Mayra explicitly.
-4. Invoke while unlocked.
-5. Invoke while locked.
-6. Verify orb lifecycle and 10–20 repeated invocations.
-7. Force-stop/reopen and reboot with role selected.
-8. Check no hidden overlay, continuous microphone or role selection.
-9. Run core regression smoke.
-10. Record all evidence in `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
-
-Any failure creates a focused repair batch, full CI/governance rerun, new artifact provenance and retest. J2 stays blocked until J1 findings are documented.
+2. Complete the two-step owner setup.
+3. Find/select/remove Mayra in Android Assistant settings.
+4. Invoke while unlocked and locked.
+5. Verify orb lifecycle and repeated invocations.
+6. Force-stop/reopen and reboot with role selected.
+7. Run core regression smoke.
+8. Record evidence in the dedicated testing documents.
 
 ## Phase J2 — Local wake phrase and local brain
 
@@ -98,28 +117,6 @@ Status: `PLANNED`
 - optional Call Screening rules;
 - emergency/lost-role fallback tests.
 
-## Phase J4 — Proactive owner assistant
-
-Status: `PLANNED`
-
-- notification/call summaries;
-- owner-defined trusted routines;
-- missed-task follow-ups;
-- relevance/frequency controls;
-- Owner Mode trust levels.
-
-## Phase J5 — Final release
-
-Status: `PLANNED`
-
-- complete Motorola matrix;
-- OEM battery/background hardening;
-- private release signing;
-- signed APK/AAB provenance;
-- upgrade and rollback test;
-- owner-controlled distribution;
-- final branding/onboarding/accessibility/performance polish.
-
 ## Deferred/constrained
 
 - scanned OCR;
@@ -131,10 +128,11 @@ Status: `PLANNED`
 
 ## Immediate next actions
 
-1. Install only Personal Alpha #1851 for J1 testing.
-2. Complete the dedicated Motorola J1 sheet.
-3. Report screenshots/results for each PASS/FAIL/BLOCKED item.
-4. Update acceptance, pinpoint audit, roadmap and snapshot from actual evidence.
-5. Repair any blocker from the secure J1 baseline.
-6. Do not begin wake-word/local-model or Phone-role coding until J1 device evidence is processed.
-7. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Let the simplified setup/stable-signing code pass Android CI and Project Governance.
+2. For the current #1851 test only, uninstall the previous Personal Alpha and perform a clean install.
+3. Configure stable owner signing secrets once; never place the keystore/passwords in Git history or chat.
+4. Run the dedicated Stable Owner Alpha workflow.
+5. Pass clean-install and install-over-install data-retention tests.
+6. Complete the J1 Motorola role/invocation sheet.
+7. Update all evidence documents before J2 coding.
+8. Keep PR #12 Draft/open/unmerged until explicit owner approval.
