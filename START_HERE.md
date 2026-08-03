@@ -8,127 +8,116 @@ Last synchronized: **2026-08-03**
 Current development branch: **`agent/document-library-foundation`**
 Current pull request: **#12 — Draft, open, unmerged**
 Current app version: **0.2.1 / versionCode 4**
-Last fully verified pre-Jarvis milestone: **Android CI #1795 — green**
-Protected green baseline: **`baseline/mayra-0.2.1-green-1795`** at `065e22524c835f3ddd3b2f56215a3616f071d4b3`
-Current active phase: **Mayra Jarvis Mode / Android Assistant-role foundation**
+Current active phase: **J1 Android Assistant device proof achieved; J2 invocation-time voice foundation under fresh CI**
+Last stable full-app baseline: **`baseline/mayra-0.2.1-green-1795`** at `065e22524c835f3ddd3b2f56215a3616f071d4b3`
+Protected J1 zero-permission baseline: **`baseline/mayra-0.2.1-j1-zero-permission-green-44`** at `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
 
 ## 1. Product north star
 
-Mayra is a personal Android AI companion for the owner’s Motorola device—not merely a chat screen.
+Mayra is the owner’s personal Android AI companion, not merely a chat screen.
 
-The intended experience is:
+Target experience:
 
-- natural Hindi, Hinglish and English conversation;
-- an on-device local brain that keeps Mayra useful without an API key;
-- optional cloud providers as a stronger fallback, never as Mayra’s identity;
-- owner-approved memory and private document intelligence;
-- reminders, apps, contacts and supported phone actions;
-- an animated voice presence when the display is active;
-- voice-only/background operation when the display is off;
-- Android Assistant-role integration for reliable system-supported invocation;
-- optional default Phone/Call Screening roles for advanced incoming-call control;
-- one user-facing app and one launcher icon.
+- natural Hindi/Hinglish/English conversation;
+- a future on-device local conversational brain so Mayra is not dependent on OpenAI/API access;
+- optional cloud providers as boosters only;
+- owner-approved personal memory and private document intelligence;
+- reminders, apps, contacts and supported device actions;
+- Android Digital Assistant integration for system-supported availability;
+- animated listening/thinking/speaking presence while interacting;
+- voice/background behavior when Android permits it;
+- future optional default Phone/Call Screening role for supported incoming-call control;
+- one final user-facing Mayra app and one launcher.
 
-Movie-level unrestricted Jarvis behavior is not promised. The engineering goal is the maximum reliable personal-assistant experience permitted by the owner’s Android device and chosen system roles.
+Engineering goal: maximum reliable behavior on the owner’s Motorola Edge 70 Fusion using supported Android roles/APIs. Unsupported protected capabilities are not claimed.
 
 ## 2. Read these records in this order
 
-1. **`START_HERE.md`** — current entry point and resume instructions.
-2. **`docs/MAYRA_PINPOINT_AUDIT.md`** — whole-project source/test/package/device gap register.
-3. **`docs/MAYRA_BLUEPRINT.md`** — long-lived architecture, product boundaries and module design.
-4. **`docs/MAYRA_ROADMAP.md`** — current work status, completed milestones and next ordered gates.
-5. **`docs/backups/MAYRA_LATEST_SNAPSHOT.md`** — exact rolling recovery state: head, CI, artifacts, risks and next action.
-6. **`docs/MAYRA_TEST_MATRIX.md`** — required automated, packaging and Motorola evidence for every subsystem.
-7. **`docs/MAYRA_BASELINE_AND_ROLLBACK.md`** — protected baselines, promotion rules and recovery procedure.
-8. **`docs/MAYRA_IDEA_LEDGER.md`** — accepted, changed, deferred and removed ideas.
-9. **`docs/MAYRA_DECISIONS.md`** — architecture and product decision log with supersession history.
-10. **`docs/MAYRA_CHANGELOG.md`** — user-visible and engineering milestone history.
-11. **`docs/MAYRA_FULL_APP_ACCEPTANCE.md`** — Motorola physical-device acceptance checklist.
-12. **`docs/BLUEPRINT_UPDATE_POLICY.md`** — mandatory governance and documentation-update rules.
+1. **`START_HERE.md`** — entry point and resume rules.
+2. **`docs/MAYRA_PINPOINT_AUDIT.md`** — whole-project gap/evidence register.
+3. **`docs/MAYRA_BLUEPRINT.md`** — architecture and platform boundaries.
+4. **`docs/MAYRA_ROADMAP.md`** — active ordered work.
+5. **`docs/backups/MAYRA_LATEST_SNAPSHOT.md`** — rolling recovery truth.
+6. **`docs/MAYRA_TEST_MATRIX.md`** — evidence ladder and test requirements.
+7. **`docs/MAYRA_BASELINE_AND_ROLLBACK.md`** — protected baselines and recovery procedure.
+8. **`docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`** — real Assistant-role Motorola evidence.
+9. **`docs/feasibility/MAYRA_J2_VOICE_PREFLIGHT.md`** — current voice-phase feasibility gate.
+10. **`docs/MAYRA_IDEA_LEDGER.md`** — accepted/deferred/superseded ideas.
+11. **`docs/MAYRA_DECISIONS.md`** — architecture decisions and reasons.
+12. **`docs/MAYRA_CHANGELOG.md`** — milestone history.
+13. **`docs/MAYRA_FULL_APP_ACCEPTANCE.md`** — final Motorola app acceptance.
+14. **`docs/BLUEPRINT_UPDATE_POLICY.md`** — documentation/governance contract.
 
-Do not rely only on chat history, a PR description or an old APK. Those are supporting records, not the source of truth.
+Never reconstruct project truth from chat history or an old APK when these records exist.
 
 ## 3. Current implemented capability summary
 
-### Core and conversation
+### Core final-app foundations
 
-- Kotlin/Jetpack Compose Android app with one launcher.
-- Typed routing for conversational answers, document retrieval and controlled actions.
-- Hindi/Hinglish/English greetings, common offline commands and contextual fallback.
-- Voice input and text-to-speech foundation.
-- Optional OpenAI Responses-compatible HTTPS provider.
-- Android Keystore-protected provider credential storage.
-- Live provider enable/disable/key replacement without restarting Mayra.
-- Offline fallback when the remote provider is disabled or unavailable.
+- Kotlin/Jetpack Compose app with one final launcher.
+- Typed routing for conversation, documents and controlled actions.
+- Hindi/Hinglish/English local commands/greetings and contextual fallback.
+- Existing app-level voice input and TTS foundations.
+- Optional Responses-compatible HTTPS provider with Android Keystore-protected credentials and local fallback.
+- Owner-controlled personal memory lifecycle.
+- TXT/PDF/DOCX Library intelligence.
+- Persistent reminders, Complete/Snooze/follow-up and reboot recovery.
+- App opening, contact resolution and review-first dialer/message handoffs.
+- Minified/R8 final release audit and protected-secret signing scaffolds.
 
-### Personal intelligence
+### Android Assistant / J1 — physically proven on Motorola
 
-- Explicit personal-memory proposal and approval flow.
-- Local memory retrieval, edit, replace, expiry and delete controls.
-- Trusted structured memory-use metadata; documents/providers cannot spoof memory attribution through visible text.
-- TXT, PDF and DOCX import/index/search/summary/grounded-answer foundation.
-- Document freshness and health tooling.
+J1 package: `ai.mayra.app.j1`, zero requested Android permissions.
 
-### Device actions
+Physical evidence now proves:
 
-- Open installed applications.
-- Resolve contacts for calls/messages.
-- Review-first Android dialer and message-composer handoffs.
-- No silent direct-call or direct-SMS privilege in the current production boundary.
-- One-time, action-bound, expiring confirmation tokens.
-- Activity History and Device Readiness surfaces.
+- J1 installs/launches;
+- Android 16 recognizes Mayra as a Digital assistant candidate;
+- owner can select Mayra as default Digital assistant;
+- Motorola Power-button Digital assistant action invokes Mayra while unlocked;
+- Mayra’s animated orb/session renders over the current screen;
+- Back gesture dismisses the current session;
+- locking the phone dismisses the current session.
 
-### Reminders
+One device UX bug was found: tested J1 #68 had no direct orb/outside tap dismissal. Common source repair now adds root/orb/label tap-to-hide plus explicit Back-to-hide and lifecycle cleanup. Fresh CI/device retest is pending.
 
-- Hindi/Hinglish/English reminder parsing.
-- Persistent Mayra-owned reminder store.
-- WorkManager scheduling.
-- Notification actions: Complete and Snooze 10 minutes.
-- Follow-up notifications and missed state.
-- Reboot/app-update recovery with remaining follow-up delay.
-- Revision checks to prevent stale workers or notification actions from changing newer reminder state.
+Still pending for complete J1 proof: repeated invoke/dismiss cycles, invocation beginning while already locked, reboot role recovery and restored previous-assistant behavior.
 
-### Packaging and release engineering
+### J2 invocation-time voice — active implementation
 
-- Personal Alpha owner-device package: `ai.mayra.app.alpha`.
-- Safe Full Test package: `ai.mayra.app.fulltest`.
-- Isolated zero-permission Document Test package.
-- Minified/R8 final release candidate audit for `ai.mayra.app`.
-- Environment-only production signing scaffold; no signing secrets in source control.
-- Automated manifest, permission, component and one-launcher audits.
+J2 package: `ai.mayra.app.j2`, engineering-only.
 
-### Jarvis Mode currently in progress
+Purpose: prove a short real spoken request after explicit Mayra invocation while preserving J1 as a clean zero-permission rollback proof.
 
-- Android `VoiceInteractionService` foundation.
-- Voice interaction session service and animated assistant-session UI foundation.
-- Recognition-service shell and assistant metadata.
-- Lock-screen assistant-session declaration.
-- Assistant components excluded from the low-permission Full Test variant.
+Current J2 foundation:
 
-These Jarvis Mode items are **not yet device-verified** and must not be described as fully working until CI and Motorola acceptance are complete.
+- exactly `RECORD_AUDIO` intended as the only Android permission;
+- minimal setup/status screen;
+- same official Assistant/session foundation;
+- bounded voice state model;
+- invocation-time on-device `SpeechRecognizer` only when Android reports it available;
+- no continuous recognition/hotword loop;
+- recognition stops on hide/cancel/destroy;
+- dedicated J2 CI for compile/unit/lint/APK/permission/component audit.
+
+J2 does not yet claim a local conversational brain. First proof is simply: invoke Mayra → speak → see `Listening…` / `Heard: …` honestly.
 
 ## 4. Major remaining work
 
-Priority order is controlled by the roadmap, but the broad remaining program is:
+Ordered broad program:
 
-1. Complete and validate Android Assistant-role selection and invocation.
-2. Add a real offline wake-word pipeline with battery/thermal controls and explicit owner setup.
-3. Integrate and benchmark an on-device local language model suitable for the Motorola target.
-4. Connect the animated listening/thinking/speaking state to the real voice pipeline.
-5. Build optional default Phone/Call Screening role modules for incoming-call announce, answer, reject, silence, mute and speaker control.
-6. Design a lawful/reliable AI answering-message path; standard cellular call audio injection/recording cannot be assumed.
-7. Improve proactive context, notification summaries and owner-defined automation rules.
-8. Complete Motorola physical testing across provider, voice, memory, documents, reminders, reboot recovery and device actions.
-9. Configure private release signing and Play/Internal or owner-controlled distribution.
-10. Final branding, onboarding, battery guidance, accessibility and crash/performance hardening.
+1. Finish current exact-head J1/J2/Android/Governance validation.
+2. Run Motorola J2 real speech and repaired touch/session lifecycle tests.
+3. Finish locked-screen, repeated-cycle and reboot Assistant-role evidence.
+4. Complete a dedicated offline wake-word feasibility/benchmark; do not turn SpeechRecognizer into a permanent listener.
+5. Select and benchmark an on-device local LLM suitable for the Edge 70 Fusion RAM/storage/thermal budget.
+6. Connect recognized voice → Mayra local brain → response → TTS and animated listening/thinking/speaking states.
+7. Complete stable private owner signing and trusted install/update channel.
+8. Run full-app Motorola acceptance across provider, memory, documents, reminders and device actions.
+9. Only after dedicated preflight, build optional default Phone/InCallService/Call Screening support.
+10. For true AI caller message-taking, design a supported voicemail/VoIP/call-forwarding route rather than assuming protected SIM audio access.
 
-Deferred unless explicitly promoted:
-
-- scanned-image OCR;
-- legacy binary `.doc` parsing;
-- unrestricted cross-app UI automation;
-- root-only phone control;
-- hidden cellular call recording or protected call-audio injection.
+Deferred unless explicitly promoted: scanned OCR, legacy `.doc`, root-only control, generic autonomous Accessibility tapping and hidden cellular-call recording/audio injection.
 
 ## 5. Mandatory resume procedure
 
@@ -136,63 +125,64 @@ Every new work session—human or AI—must do this before coding:
 
 1. Read this file.
 2. Read `docs/MAYRA_PINPOINT_AUDIT.md` and `docs/backups/MAYRA_LATEST_SNAPSHOT.md`.
-3. Read the active section of `docs/MAYRA_ROADMAP.md`.
-4. Check PR #12 head, Draft/open/unmerged state and latest-head CI/Governance.
-5. Confirm the latest code does not contradict the blueprint, decision log or test matrix.
-6. Identify one coherent batch, its required tests and rollback point.
+3. Read the active section of `docs/MAYRA_ROADMAP.md` and any linked feasibility/test document.
+4. Check PR #12 head, Draft/open/unmerged state and all latest-head CI/Governance workflows.
+5. Confirm code, blueprint, decisions and physical-device evidence agree.
+6. Identify one coherent batch, required tests and rollback baseline.
 7. Never expand a red head; repair or revert first.
-8. Never claim physical-device success without owner-device evidence.
-9. Never merge or mark the PR ready without explicit owner approval.
+8. Never claim Motorola/device success without owner evidence.
+9. Never merge or mark PR #12 ready without explicit owner approval.
 
 ## 6. Mandatory completion procedure
 
-A coding batch is not complete until all applicable records are synchronized:
+A coding batch is not complete until applicable records are synchronized:
 
-- `docs/MAYRA_ROADMAP.md` — status and next gate;
-- `docs/backups/MAYRA_LATEST_SNAPSHOT.md` — exact recovery state;
-- `docs/MAYRA_PINPOINT_AUDIT.md` — changed subsystem evidence/gap;
-- `docs/MAYRA_TEST_MATRIX.md` — when a new test category or acceptance condition appears;
-- `docs/MAYRA_BLUEPRINT.md` — architecture/scope/privacy changes;
-- `docs/MAYRA_IDEA_LEDGER.md` — new, changed, deferred or removed ideas;
-- `docs/MAYRA_DECISIONS.md` — significant decisions and supersessions;
-- `docs/MAYRA_CHANGELOG.md` — meaningful delivered behavior;
-- `START_HERE.md` — when project entry truth/document map changes;
-- protected baseline + immutable snapshot — after major exact-head green milestones;
-- PR description — when scope/milestone truth materially changes.
+- `docs/MAYRA_ROADMAP.md`;
+- `docs/backups/MAYRA_LATEST_SNAPSHOT.md`;
+- `docs/MAYRA_PINPOINT_AUDIT.md`;
+- `docs/MAYRA_TEST_MATRIX.md` when evidence requirements change;
+- `docs/MAYRA_BLUEPRINT.md` for architecture/scope/privacy changes;
+- `docs/MAYRA_IDEA_LEDGER.md` for idea state changes;
+- `docs/MAYRA_DECISIONS.md` for significant technical/product decisions;
+- `docs/MAYRA_CHANGELOG.md` for meaningful behavior/build changes;
+- `START_HERE.md` when the project entry truth changes;
+- protected baseline + immutable snapshot after major exact-head green milestones;
+- PR description when scope/milestone truth materially changes.
 
-The governance workflow must remain green. A stale-document failure is a real project failure, not optional paperwork.
+Governance CI must remain green. Stale project records are treated as a real failure.
 
 ## 7. Status vocabulary
 
-- **DONE** — implementation and relevant automated checks passed.
-- **DEVICE_VERIFY** — code/CI passed; Motorola physical validation pending.
-- **IN_PROGRESS** — actively being implemented or latest-head validation pending.
+- **DONE** — implementation and applicable automated checks passed.
+- **DEVICE_VERIFY** — source/CI exists; Motorola proof is incomplete or partial.
+- **IN_PROGRESS** — active implementation/latest-head validation pending.
 - **PLANNED** — accepted but not implemented.
-- **DEFERRED** — intentionally postponed and non-blocking.
-- **REMOVED** — intentionally removed or superseded; reason recorded.
+- **DEFERRED** — intentionally postponed.
+- **REMOVED/SUPERSEDED** — intentionally retired; reason retained.
 
 ## 8. Safety and ownership truth
 
-Mayra is for personal owner use, so the project may pursue deeper Android roles and owner-granted access than a generic public app. Personal use does not remove Android platform boundaries or make destructive mistakes harmless.
+Mayra is personal-owner software, so the project can pursue deeper owner-granted Android roles than a generic public app. Personal use does not remove Android platform boundaries.
 
-The design preference is:
+Design preference:
 
-- maximum owner control;
-- official Android roles before fragile hacks;
-- no hidden secrets in GitHub;
-- no false claims about actions, calls, recordings or device validation;
-- confirmations can be reduced for routine owner-approved actions, but irreversible or broad destructive operations retain a clear guard;
-- the owner can always disable background, provider, memory or privileged-role behavior.
+- maximum owner control with minimal repeated setup;
+- request only permissions needed for the active product capability;
+- official roles/APIs first;
+- no secrets/private keys in GitHub;
+- no false call/audio/device claims;
+- routine owner-approved actions can be streamlined, while broad destructive actions retain bounded guards;
+- owner can disable provider, memory and privileged roles.
 
 ## 9. Backup model
 
-- Git history is the primary code/document backup.
+- Git history is primary code/document backup.
 - `baseline/*` branches are immutable known-green recovery markers, never development branches.
 - `docs/backups/MAYRA_LATEST_SNAPSHOT.md` is the rolling recovery point.
 - Immutable milestone snapshots live under `docs/backups/`.
-- CI artifacts are temporary evidence and must be recorded with source/run/digest before becoming an install candidate.
-- No API keys, keystores, passwords, tokens or private owner data belong in snapshots or Git history.
+- CI artifacts are temporary evidence; source/run/digest must be recorded before promotion.
+- No credentials, signing keys/passwords or private owner data belong in snapshots/Git.
 
 ## 10. Current immediate next action
 
-Validate the repaired Jarvis Assistant-role foundation through compile, complete tests, lint and all APK audits. Keep the failed CI #1833 recorded as evidence. Promote a new protected Jarvis baseline only after both Android CI and Project Governance pass on the exact same source head. Then perform Motorola Assistant-role selection/invocation testing before wake-word, local-model or Phone-role expansion.
+Settle the current touch-dismiss + J2 voice batch through **J1 Assistant Test, J2 Voice Test, full Android CI and Project Governance on the same synchronized head**. Fix any compiler/lint/package finding without weakening audits. When all required gates are green, create a protected baseline, produce the J2 Motorola artifact with provenance, then physically test microphone permission, on-device speech availability, invocation-time recognition, tap/Back/lock dismissal, repeat cycles, locked-screen behavior and reboot role recovery before starting wake-word or local-LLM implementation.
