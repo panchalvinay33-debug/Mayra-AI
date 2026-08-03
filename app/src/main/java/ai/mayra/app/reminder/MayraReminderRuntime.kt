@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit
 object MayraReminderRuntime {
     private const val WORK_PREFIX = "mayra-reminder-"
     private const val FOLLOW_UP_PREFIX = "mayra-reminder-follow-up-"
+    internal const val FOLLOW_UP_DELAY_MILLIS = 30L * 60L * 1_000L
 
     fun create(context: Context, parsed: ReminderParseResult.Parsed, now: Long = System.currentTimeMillis()): MayraReminder {
         val reminder = MayraReminder(
@@ -60,10 +61,14 @@ object MayraReminderRuntime {
         )
     }
 
-    fun scheduleFollowUp(context: Context, reminder: MayraReminder) {
+    fun scheduleFollowUp(
+        context: Context,
+        reminder: MayraReminder,
+        now: Long = System.currentTimeMillis()
+    ) {
         if (!reminder.followUpEnabled || reminder.state != ReminderState.DUE) return
         val request = OneTimeWorkRequestBuilder<MayraReminderFollowUpWorker>()
-            .setInitialDelay(30, TimeUnit.MINUTES)
+            .setInitialDelay(followUpDelayMillis(reminder, now), TimeUnit.MILLISECONDS)
             .setInputData(
                 Data.Builder()
                     .putString(MayraReminderWorker.KEY_ID, reminder.id)
@@ -77,6 +82,11 @@ object MayraReminderRuntime {
             ExistingWorkPolicy.REPLACE,
             request
         )
+    }
+
+    internal fun followUpDelayMillis(reminder: MayraReminder, now: Long): Long {
+        val anchor = reminder.lastNotifiedAt ?: now
+        return (anchor + FOLLOW_UP_DELAY_MILLIS - now).coerceAtLeast(0L)
     }
 
     fun cancel(context: Context, id: String, now: Long = System.currentTimeMillis()): MayraReminder? {
@@ -108,7 +118,7 @@ object MayraReminderRuntime {
         store.active().forEach { reminder ->
             when (ReminderRecoveryPolicy.decide(reminder, now)) {
                 ReminderRecoveryAction.SCHEDULE -> schedule(context, reminder, now)
-                ReminderRecoveryAction.SCHEDULE_FOLLOW_UP -> scheduleFollowUp(context, reminder)
+                ReminderRecoveryAction.SCHEDULE_FOLLOW_UP -> scheduleFollowUp(context, reminder, now)
                 ReminderRecoveryAction.MARK_MISSED_AND_NOTIFY -> {
                     val missed = store.markMissed(reminder.id, now) ?: return@forEach
                     if (MayraReminderNotifier.canNotify(context)) {
@@ -156,7 +166,7 @@ class MayraReminderWorker(appContext: Context, params: WorkerParameters) : Worke
         if (MayraReminderNotifier.canNotify(applicationContext)) {
             MayraReminderNotifier.show(applicationContext, updated)
         }
-        MayraReminderRuntime.scheduleFollowUp(applicationContext, updated)
+        MayraReminderRuntime.scheduleFollowUp(applicationContext, updated, now)
         return Result.success()
     }
 
@@ -198,8 +208,6 @@ object MayraReminderNotifier {
 
     @SuppressLint("MissingPermission", "NotificationPermission")
     fun show(context: Context, reminder: MayraReminder, followUp: Boolean = false) {
-        // The suppression documents the explicit guard below; it does not bypass Android's
-        // runtime permission model. All callers also use canNotify(), and this method re-checks.
         if (!canNotify(context)) return
         ensureChannel(context)
         val openIntent = PendingIntent.getActivity(
