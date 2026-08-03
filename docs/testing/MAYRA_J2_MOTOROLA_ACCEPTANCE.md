@@ -1,99 +1,95 @@
 # Mayra AI — Motorola J2 Voice Acceptance
 
-Status: DEVICE REPAIR ACTIVE — CI #90 INVOKES/MIC PASS, TRANSCRIPT STILL BLOCKED
+Status: DEVICE RETEST READY — SUPPORT-PROBE REPAIR CI #106 GREEN
 Date updated: 2026-08-03
 Target device: Motorola Edge 70 Fusion / Android 16
 
-## Last green retest candidate
+## New authoritative retest candidate
 
 - Label: `Mayra J2 Voice Test`
 - Package: `ai.mayra.app.j2`
 - Version: `0.2.1-j2`
-- Application source: `e706bdfb8f53006825404db99a51f466aa251fc4`
-- J2 Voice Test: #90 — success
-- J1 Assistant Test: #194 — success
-- Android CI: #2085 — success
-- Project Governance: #266 — success
-- Artifact: `mayra-j2-voice-apk-90`
-- Artifact ID: `8865632199`
-- APK size: `19,192,945` bytes
-- APK SHA-256: `2c1e00db4a2bfd98993eb87fe091c5373931153eb3b5ac2252914d4441ac230c`
-- Artifact ZIP SHA-256: `bbe4936bc5caec8a08d244ea28f82cf09daabceb49bde47b20ad1678933521b9`
-- Protected baseline: `baseline/mayra-0.2.1-j2-locale-repair-green-90`
-- Immutable snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-03_J2_LOCALE_REPAIR_CI90.md`
+- Application source: `a63ef1e7c3ddca06ce444502e5afd3a410d8fb18`
+- J2 Voice Test: #106 — success
+- J1 Assistant Test: #210 — success
+- Android CI: #2101 — success
+- Project Governance: #282 — success
+- Artifact: `mayra-j2-voice-apk-106`
+- Artifact ID: `8866441207`
+- APK size: `19,209,329` bytes
+- APK SHA-256: `d0917d17b50429a843f3a5e688580df66f3eea678be4806b44ef9f1535adeb6e`
+- Artifact ZIP SHA-256: `b2109366a0140a66f85fef3cd6a85a95263815643ae86076ba0a9f20194140db`
+- Protected baseline: `baseline/mayra-0.2.1-j2-speech-support-green-106`
 
-J2 #90 requests exactly `android.permission.RECORD_AUDIO` and excludes internet/provider, contacts, notifications, reminders, boot recovery, notification listener, WorkManager, Room, documents, personal memory, full chat runtime and call control.
+J2 requests exactly `android.permission.RECORD_AUDIO` and excludes internet/provider, contacts, notifications, reminders, boot recovery, notification listener, WorkManager, Room, documents, personal memory, full chat runtime and call control.
 
-## Physical evidence through 23:32 IST
+## Physical evidence so far
 
 PASS on Motorola:
 
-- J2 #90 clean-installed after the expected CI-signature package conflict was resolved by uninstalling only the engineering J2 package.
-- J2 opened normally.
-- J2 displayed `Assistant: Mayra J2 selected ✓`.
-- J2 displayed `Microphone: allowed ✓`.
-- J2 displayed `On-device speech: available ✓`.
-- Motorola Power-button Assistant invocation launched the Mayra J2 session over Home.
-- Mayra orb/label rendered.
+- J2 can clean-install and open.
+- J2 can be selected as Android Digital assistant.
+- microphone permission is allowed.
+- Android reports an on-device recognition service is available.
+- Motorola Power-button Assistant invocation launches Mayra over Home.
+- Mayra orb/label renders.
+- Back and phone-lock dismissal are physically proven in common Assistant behavior.
 
-Historical CI #18 failure:
+Known transcript failures:
 
-- visible state `Speech language unavailable`;
-- no transcript;
-- no crash and no false transcript.
+- CI #18: `Speech language unavailable`.
+- CI #90: `Speech recognizer unavailable`.
+- no false transcript and no crash in either failure.
 
-New CI #90 failure:
+## CI #106 repair now ready for device test
 
-- visible state changed to `Speech recognizer unavailable`;
-- no transcript was produced;
-- Assistant/orb invocation remained functional.
-
-This proves the explicit-locale repair moved past the original immediate language error, but the retry path still churned/recreated the OEM on-device recognizer and reached an unavailable/server state. CI-green therefore did not equal Motorola transcript acceptance.
-
-## Current source repair after CI #90 device failure
-
-The next source repair is intentionally not an owner candidate until fresh exact-head CI passes.
-
-Changes:
-
-- keep one on-device `SpeechRecognizer` instance for the bounded recognition attempt instead of destroy/recreate on every locale retry;
-- on Android 13+ use `SpeechRecognizer.checkRecognitionSupport()` to ask the OEM service which on-device languages are actually installed before listening;
-- prefer installed languages using Mayra's device/Hindi/India/English policy;
-- if no on-device language is installed but downloadable language support exists, surface `On-device speech language pack needed` instead of a vague recognizer error;
-- if the OEM cannot report recognition support, fall back to bounded locale trials;
-- reuse the recognizer and delay language retry by 450 ms to avoid immediate service churn;
-- still no cloud STT fallback and no endless retry loop.
-
-Official Android API basis:
-
-- `isOnDeviceRecognitionAvailable()` only proves an on-device recognition service exists; it does not prove a requested language model is installed.
-- Android 13+ `checkRecognitionSupport()` can report installed, downloadable/supported and pending on-device languages for a recognition request.
+- one on-device `SpeechRecognizer` instance for a bounded attempt instead of destroy/recreate on every locale retry;
+- Android 13+ uses `SpeechRecognizer.checkRecognitionSupport()` before listening;
+- Mayra prioritizes actually installed on-device languages;
+- installed-language preference follows device locale → `hi-IN` → `en-IN` → `en-US`;
+- if a language is supported but not installed, visible state becomes `On-device speech language pack needed`;
+- if OEM support discovery itself is unavailable, Mayra uses bounded delayed locale trials;
+- retry reuses the recognizer and waits 450 ms between language attempts;
+- no cloud STT fallback and no endless retry loop;
+- J2 #106, J1 #210, Android CI #2101 and Governance #282 all pass.
 
 ## A. Installation/update
 
-- [x] CI #90 installs without Play Protect bypass after removing only conflicting engineering J2 package.
-- [x] J2 #90 opens normally.
-- [x] microphone permission/readiness remains correct.
-- [x] on-device speech service reports available.
+Temporary CI signing can differ between hosted runners.
+
+- [ ] Try installing CI #106 over current J2.
+- [ ] If Android reports package/signature conflict, uninstall only `Mayra J2 Voice Test`, then clean-install #106.
+- [ ] Do not uninstall full Mayra/Personal Alpha for this engineering test.
+- [ ] J2 #106 opens normally.
+- [ ] microphone readiness remains correct.
+- [ ] on-device speech service still reports available.
 
 ## B. Assistant selection
 
-- [x] J2 appears as Digital assistant candidate.
-- [x] J2 #90 selected as default Digital assistant.
-- [x] Power-button action invokes Mayra J2.
+After clean reinstall Android may reset the role.
 
-## C. Unlocked transcript — CURRENT BLOCKER
+- [ ] `Settings → Apps → Default apps → Digital assistant app` shows J2.
+- [ ] select `Mayra J2 Voice Test` if required.
+- [ ] Power-button action remains configured as Digital assistant.
 
-- [x] assistant surface appears.
-- [x] microphone/on-device readiness is present before invocation.
-- [x] original CI #18 immediate `Speech language unavailable` failure reproduced and bounded.
-- [x] CI #90 moved to `Speech recognizer unavailable`, exposing recognizer lifecycle/support-discovery problem.
-- [ ] `Mayra namaste` transcript.
-- [ ] `kal subah saat baje` transcript.
-- [ ] `open WhatsApp` transcript only; J2 must not execute it.
-- [ ] short English transcript.
+## C. Unlocked transcript — CURRENT GATE
 
-Do not repeatedly retest CI #90; the device failure is now known and source-repaired. Wait for a new fully green artifact.
+From Home, invoke Mayra with the configured Power-button trigger and test in this order:
+
+1. `Mayra namaste`
+2. `kal subah saat baje`
+3. `open WhatsApp`
+4. `hello Mayra how are you`
+
+Pass conditions:
+
+- [ ] assistant surface appears;
+- [ ] microphone becomes active;
+- [ ] at least one reasonable transcript is produced;
+- [ ] `open WhatsApp` remains transcript-only in J2;
+- [ ] no false transcript on recognition failure.
+
+If the visible state is `On-device speech language pack needed`, record that exact screen. Do not enable hidden cloud recognition.
 
 ## D. Direct dismissal/lifecycle repair
 
@@ -102,22 +98,29 @@ After transcript proof:
 - [ ] orb tap closes session;
 - [ ] outside/root tap closes session;
 - [ ] `Mayra` label tap closes session;
-- [x] Back closes session in prior common-session device test.
-- [x] phone lock closes current session in prior common-session device test.
+- [ ] Back closes session;
+- [ ] phone lock closes session;
 - [ ] microphone privacy indicator disappears after dismissal;
 - [ ] no stuck/duplicate orb.
 
 ## E. Repeated stability
 
-Pending transcript proof. Run 20 cycles only after one successful transcript.
+After one successful transcript, run 20 invoke → speak/no-speech → dismiss cycles.
+
+- [ ] no app crash;
+- [ ] no System UI restart;
+- [ ] no permanently busy recognizer;
+- [ ] no duplicate orb;
+- [ ] mic indicator does not remain active;
+- [ ] animation returns on each invocation.
 
 ## F. Already-locked invocation
 
-Pending transcript proof. Record Motorola policy; do not force with hacks.
+Pending unlocked transcript proof. Record normal Motorola/Android behavior; do not force with hacks.
 
 ## G. Reboot/recovery
 
-Pending transcript proof.
+Pending unlocked transcript proof.
 
 ## H. Failure cases
 
@@ -125,7 +128,7 @@ Pending transcript proof.
 - [ ] no speech;
 - [x] language unavailable — CI #18 physical observation;
 - [x] recognizer unavailable — CI #90 physical observation;
-- [ ] language pack needed support-state;
+- [ ] language pack needed;
 - [ ] recognizer busy/error;
 - [ ] rapid invoke/dismiss;
 - [ ] screen lock while listening.
