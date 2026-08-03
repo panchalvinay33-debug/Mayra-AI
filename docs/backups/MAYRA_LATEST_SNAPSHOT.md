@@ -5,7 +5,7 @@ Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
 Mandatory entry point: `START_HERE.md`
-Current phase: repair Motorola Assistant activation after J1 #44 device failure
+Current phase: second Motorola Assistant activation repair after J1 #56 device failure
 Canonical product issue: #13
 Mandatory feasibility gate: #14
 Repository hygiene registry: #15
@@ -22,61 +22,69 @@ Repository hygiene registry: #15
 - `baseline/mayra-0.2.1-green-1795` at `065e22524c835f3ddd3b2f56215a3616f071d4b3`
 - `baseline/mayra-0.2.1-jarvis-j1-green-1851` at `0d9435adb92b425bfb47a710d4f4516a6aaac398`
 - `baseline/mayra-0.2.1-j1-zero-permission-green-44` at `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
+- `baseline/mayra-0.2.1-j1-activation-repair-green-56` at `ce96f8e83fe33b878d426c407715d4a3e1b0495a`
 
-## J1 #44 verified package
+## J1 #56 verified package
 
 - Package: `ai.mayra.app.j1`
 - Label: `Mayra J1 Assistant Test`
-- J1 #44, Android CI #1935 and Governance #116: success
+- J1 #56, Android CI #1947 and Governance #128: success
 - Zero requested Android permissions
 - Exactly one launcher
-- APK SHA-256: `edced64084537cd06ba55ddea0b2f80cdda2aaa322aa296379ac25d89ea66116`
+- APK SHA-256: `2def2acd55a0ea751c3cd70c9d78674c275f2c2d8e2e4e03ae527464cf48a318`
 
 ## Motorola device evidence
 
-### Install and launch
+### Install/update and launch
 
 PASS:
 
-- J1 #44 installed without bypassing Play Protect.
-- App opened normally.
-- Status showed `Mayra is not selected`.
+- #56 installed/updated and opened normally.
+- No runtime permission prompt appeared.
+- Visible activation diagnostic text rendered.
 
 ### Activate Mayra
 
 FAIL:
 
-- Tapping `Activate Mayra` produced no visible response.
-- No Android role-selection or settings screen appeared.
-- No diagnostic message appeared.
+- Tapping `Activate Mayra` still did not leave the J1 screen.
+- No usable Android Assistant/default-app selection screen appeared.
+- Status remained `Mayra is not selected`.
+- Owner screenshot received at approximately 19:46 IST on 2026-08-03.
 
 Evidence is recorded in `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
 
-## Root cause and repair
+## Pinpoint root cause after #56
 
-The J1 activity did not make intent resolution/launch failures visible. Motorola-specific failure therefore appeared as a dead button.
+Two concrete problems were found:
 
-Repair candidate:
+1. Shared voice-interaction metadata referenced `ai.mayra.app.MainActivity` as `settingsActivity`, but J1 removes `MainActivity`. J1 therefore had an invalid settings activity target.
+2. Motorola Edge 70 Fusion Android 16 documents the assistant-selection route as `Settings → Apps → Default apps → Digital assistant`; the earlier generic Voice Input/role-request fallback did not reliably reach that screen.
 
-- code commit: `2b06cf8fe92b12c2c9d36d5099d1695ea13a1cf9`;
-- resolve-check RoleManager request before launch;
-- try official settings screens in order: Voice input, Default apps, general Settings;
-- show visible status for every route and final failure;
-- no OEM-private component, root method or security bypass.
+## Second repair
 
-Device evidence update:
+- Added J1-specific `mayra_voice_interaction_service.xml` with `settingsActivity="ai.mayra.app.j1.J1AssistantTestActivity"`.
+- `Activate Mayra` now launches `Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS` directly.
+- On-screen instructions show the exact Motorola path: `Settings → Apps → Default apps → Digital assistant → Mayra`.
+- If Default apps cannot be launched, fallback is general Settings with the same manual path.
+- No OEM-private component, root method, Accessibility hack or security bypass is used.
 
-- `f44c0599cbca290614963270c6cca3da47077992`
+Code commits in this repair chain include:
 
-Roadmap synchronization followed. The repaired package is not test-ready until J1 CI, Android CI and Project Governance pass on the final synchronized head.
+- `dfe95331b65ba5d912653d8d43a1ddd55d124efe` — J1-specific valid settingsActivity.
+- `3a94d202b4cffe4e625d55a377e656d46010776b` — direct Motorola Default apps route.
+- Documentation synchronized afterward.
 
 ## Next exact gate
 
-1. Run all three workflows on the synchronized repair head.
-2. Share no APK unless all are green.
-3. Retest Activate Mayra and capture the visible system screen/message.
-4. Continue with role visibility, select/remove, unlocked/locked invocation and orb lifecycle.
-5. Keep local LLM, wake phrase and Phone role blocked until J1 evidence is complete.
+1. Run J1 Assistant Test, Android CI and Project Governance on the final synchronized second-repair head.
+2. Share no new APK unless all three are green.
+3. Install/update the new artifact over #56 where signing permits.
+4. Tap Activate Mayra; expect Android Default apps screen.
+5. Tap Digital assistant and record whether Mayra appears.
+6. If app navigation still fails, manually test `Settings → Apps → Default apps → Digital assistant` to separate navigation failure from candidate-eligibility failure.
+7. If Mayra appears, select it, refresh status, then test unlocked/locked invocation and orb lifecycle.
+8. Keep local LLM, wake phrase and Phone role blocked until J1 evidence is complete.
 
 ## Distribution truth
 
