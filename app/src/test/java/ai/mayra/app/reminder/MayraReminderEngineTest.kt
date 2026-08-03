@@ -4,6 +4,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,5 +50,14 @@ class MayraReminderEngineTest {
     @Test
     fun `blank reminder is invalid`() {
         assertTrue(parser.parse("   ") is ReminderParseResult.Invalid)
+    }
+
+    @Test
+    fun `due reminder can transition to missed for follow-up`() {
+        assertTrue(ReminderLifecyclePolicy.canMarkMissed(ReminderState.DUE))
+        assertTrue(ReminderLifecyclePolicy.canMarkMissed(ReminderState.SCHEDULED))
+        assertTrue(ReminderLifecyclePolicy.canMarkMissed(ReminderState.SNOOZED))
+        assertFalse(ReminderLifecyclePolicy.canMarkMissed(ReminderState.COMPLETED))
+        assertFalse(ReminderLifecyclePolicy.canMarkMissed(ReminderState.CANCELLED))
     }
 }
