@@ -5,98 +5,85 @@ Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
 Mandatory entry point: `START_HERE.md`
-Current phase: Motorola validation of the verified zero-permission J1 Assistant package
+Current phase: repair Motorola Assistant activation after J1 #44 device failure
 Canonical product issue: #13
-Mandatory major-feature feasibility gate: #14
+Mandatory feasibility gate: #14
 Repository hygiene registry: #15
 
 ## Canonical repository truth
 
 - PR #12 is the only active implementation PR.
-- PR #9 and PR #11 are closed and explicitly marked superseded.
-- Issue #10 is closed and explicitly marked superseded.
-- Issue #13 is the product North Star.
-- Issue #14 prevents major capabilities entering implementation before Android/Motorola/permission/performance/distribution/fallback review.
-- Issue #15 classifies every branch as active, protected, retained backup or delete candidate.
-- Protected baselines and required backups must not be deleted or force-moved.
+- PR #9 and #11 are closed as superseded.
+- Issue #10 is closed as superseded.
+- Protected baselines and retained backups must not be force-moved or deleted.
 
 ## Protected baselines
 
-### Pre-Jarvis
-- Branch: `baseline/mayra-0.2.1-green-1795`
-- Commit: `065e22524c835f3ddd3b2f56215a3616f071d4b3`
-- Android CI #1795: success
+- `baseline/mayra-0.2.1-green-1795` at `065e22524c835f3ddd3b2f56215a3616f071d4b3`
+- `baseline/mayra-0.2.1-jarvis-j1-green-1851` at `0d9435adb92b425bfb47a710d4f4516a6aaac398`
+- `baseline/mayra-0.2.1-j1-zero-permission-green-44` at `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
 
-### Jarvis J1 code baseline
-- Branch: `baseline/mayra-0.2.1-jarvis-j1-green-1851`
-- Commit: `0d9435adb92b425bfb47a710d4f4516a6aaac398`
-- Android CI #1851: success
-- Project Governance #32: success
+## J1 #44 verified package
 
-### Zero-permission J1 artifact baseline
-- Branch: `baseline/mayra-0.2.1-j1-zero-permission-green-44`
-- Commit: `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
-- J1 Assistant Test #44: success
-- Android CI #1935: success
-- Project Governance #116: success
-
-## Verified J1 artifact
-
-- Build type: `j1AssistantTest`
 - Package: `ai.mayra.app.j1`
 - Label: `Mayra J1 Assistant Test`
-- Requested Android permissions: zero, verified by APK audit
-- Launcher count: exactly one
-- Included: Assistant activation/status activity, VoiceInteractionService, session service/orb and RecognitionService shell
-- Excluded: full chat, provider, contacts, reminders, notifications, boot recovery, notification listener, documents, memory, WorkManager, AndroidX Startup, Room and ProfileInstaller receiver
-- Artifact name: `mayra-j1-zero-permission-apk-44`
-- Artifact ID: `8854905288`
-- Artifact ZIP SHA-256: `12f4e148fbac99e916b78321b9ae75d87a5b4b5cebe2060bfa6e6b5f7545be3b`
-- APK size: `19,192,842` bytes
+- J1 #44, Android CI #1935 and Governance #116: success
+- Zero requested Android permissions
+- Exactly one launcher
 - APK SHA-256: `edced64084537cd06ba55ddea0b2f80cdda2aaa322aa296379ac25d89ea66116`
 
-## Motorola evidence already received
+## Motorola device evidence
 
-- Personal Alpha update failed because old/new APKs used different temporary CI debug certificates.
-- Full Personal Alpha clean-install retry was blocked by Google Play Protect because that sideloaded debug app could request sensitive access.
-- Play Protect must not be disabled or bypassed for that artifact.
+### Install and launch
 
-Evidence:
-- `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`
-- `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
+PASS:
 
-## J1 engineering history
+- J1 #44 installed without bypassing Play Protect.
+- App opened normally.
+- Status showed `Mayra is not selected`.
 
-- Run #16 caught the API-29 role-request guard.
-- Run #22 caught inherited AndroidX permissions and background infrastructure.
-- Run #32 caught the lint/removal-model mismatch.
-- Run #38 proved the ProfileInstaller receiver still survived final manifest merging.
-- Run #44 passed compile, lint, assembly, zero-permission/component audit and artifact upload.
+### Activate Mayra
 
-## Current device gate
+FAIL:
 
-Use only J1 #44 for the next Motorola test:
+- Tapping `Activate Mayra` produced no visible response.
+- No Android role-selection or settings screen appeared.
+- No diagnostic message appeared.
 
-1. clean install;
-2. launch the single J1 icon;
-3. verify Mayra appears in Android Assistant selection;
-4. select and remove Mayra;
-5. invoke while unlocked;
-6. invoke while locked, where Motorola permits;
-7. observe orb creation/dismiss/repeated invocation;
-8. record PASS/FAIL/BLOCKED with screenshots and exact steps.
+Evidence is recorded in `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
 
-No local LLM, wake phrase or Phone/InCallService coding begins until this evidence is recorded and issue #14 preflight is complete.
+## Root cause and repair
 
-## Full owner-app distribution truth
+The J1 activity did not make intent resolution/launch failures visible. Motorola-specific failure therefore appeared as a dead button.
 
-The complete Mayra app still requires one stable private owner/release certificate, protected build secrets, signed APK/AAB provenance, trusted owner-controlled distribution (preferably Play Internal Testing), and install-over-install/local-data-retention proof.
+Repair candidate:
 
-Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases and must not be used to bypass Play Protect.
+- code commit: `2b06cf8fe92b12c2c9d36d5099d1695ea13a1cf9`;
+- resolve-check RoleManager request before launch;
+- try official settings screens in order: Voice input, Default apps, general Settings;
+- show visible status for every route and final failure;
+- no OEM-private component, root method or security bypass.
 
-## Merge and secret truth
+Device evidence update:
+
+- `f44c0599cbca290614963270c6cca3da47077992`
+
+Roadmap synchronization followed. The repaired package is not test-ready until J1 CI, Android CI and Project Governance pass on the final synchronized head.
+
+## Next exact gate
+
+1. Run all three workflows on the synchronized repair head.
+2. Share no APK unless all are green.
+3. Retest Activate Mayra and capture the visible system screen/message.
+4. Continue with role visibility, select/remove, unlocked/locked invocation and orb lifecycle.
+5. Keep local LLM, wake phrase and Phone role blocked until J1 evidence is complete.
+
+## Distribution truth
+
+The complete Mayra owner app still requires one stable private signing certificate and trusted distribution. Temporary debug Personal Alpha builds must not be used to bypass Play Protect.
+
+## Merge/secret truth
 
 - PR #12 remains Draft/open/unmerged.
-- No merge/ready transition is authorized.
-- No API keys, keystores, passwords, tokens or owner-private data belong in GitHub records or chat.
-- Device claims require actual Motorola evidence.
+- No merge or ready transition is authorized.
+- No API key, keystore, password or private owner data belongs in GitHub records.
