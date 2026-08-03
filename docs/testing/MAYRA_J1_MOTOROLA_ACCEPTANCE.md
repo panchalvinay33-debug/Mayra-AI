@@ -1,6 +1,6 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: ASSISTANT ROLE SELECTED — INVOCATION TEST NEXT
+Status: ASSISTANT ROLE SELECTED — POWER-KEY TRIGGER CONFIGURATION NEXT
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
@@ -65,7 +65,7 @@ Initial update attempt: BLOCKED by package signing conflict because CI debug cer
 
 Safe recovery used: uninstall the J1 test package, then clean-install #68. J1 contains no personal Mayra memory/documents/reminders and requests zero Android runtime permissions.
 
-### #68 Motorola device evidence — 20:44 to 20:45 IST
+### #68 Motorola device evidence — 20:44 to 20:47 IST
 
 Default Apps navigation: PASS.
 
@@ -75,10 +75,15 @@ Default Apps navigation: PASS.
 Assistant candidate/selection: PASS.
 
 - `Mayra J1 Assistant Test` appears as the selected `Digital assistant app` in Motorola Default Apps.
+- J1 itself shows `Status: Mayra is selected ✓`.
 - This proves Android 16 on the target Motorola recognizes the J1 `VoiceInteractionService` as a valid assistant candidate and accepts Mayra as the default digital assistant.
-- Owner screenshot received showing `Digital assistant app — Mayra J1 Assistant Test`.
 
-This clears the Assistant-role eligibility/selection blocker. The next gate is real assistant invocation and orb/session behavior.
+Initial invocation attempt: BLOCKED BY DEVICE TRIGGER CONFIGURATION.
+
+- Owner attempted normal assistant gestures/power-hold after selecting Mayra and reported that nothing launched.
+- This is not yet evidence that the Mayra `VoiceInteractionSession` is broken because Motorola exposes a separate power-key action setting.
+- Motorola Android 16 documentation for this device family requires `Settings → Gestures → Power key → Press & hold → Digital assistant` to bind press-and-hold to the selected digital assistant.
+- The next test must configure this trigger first, then retry invocation.
 
 Permanent signing repair:
 
@@ -88,26 +93,31 @@ Permanent signing repair:
 
 ## Next device test sequence
 
-### D. Unlocked invocation — CURRENT GATE
+### D. Configure Motorola invocation trigger — CURRENT GATE
 
-- [ ] Return to the home screen or any normal app.
-- [ ] Use Motorola's configured assistant gesture/button (for example the system assistant gesture/button supported on the device).
+- [ ] Open `Settings → Gestures → Power key → Press & hold`.
+- [ ] Select `Digital assistant`.
+- [ ] Optionally shorten the press-and-hold duration for easier testing.
+- [ ] Return to the home screen.
+- [ ] Press and hold the Power key.
+- [ ] Record exactly what appears.
+
+### E. Unlocked invocation and orb
+
 - [ ] Mayra assistant session opens without launching the full test activity.
 - [ ] Animated Mayra orb/session appears.
 - [ ] Dismissal stops the animation.
 - [ ] Repeat invoke/dismiss 10 times without crash, duplicate surface or System UI restart.
 
-Record exact invocation method and screenshot of the first Mayra orb/session.
-
-### E. Locked-screen invocation
+### F. Locked-screen invocation
 
 - [ ] Lock the phone normally.
-- [ ] Invoke the selected assistant using the supported Motorola method.
+- [ ] Press and hold Power with `Digital assistant` still configured.
 - [ ] Mayra follows Android lock-screen policy.
 - [ ] No private Mayra content is exposed before unlock.
 - [ ] Dismissal returns cleanly to lock screen.
 
-### F. Role state/recovery
+### G. Role state/recovery
 
 - [ ] Open J1 and tap `Refresh status`; it shows Mayra selected.
 - [ ] Reboot and verify assistant selection remains/recoverably returns.
@@ -115,4 +125,4 @@ Record exact invocation method and screenshot of the first Mayra orb/session.
 
 ## Promotion rule
 
-J1 moves to device-verified only after role selection, unlocked invocation, orb/session lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 moves to device-verified only after role selection, configured invocation trigger, unlocked invocation, orb/session lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
