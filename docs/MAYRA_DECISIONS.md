@@ -243,3 +243,15 @@ Any future Accessibility workflow must be narrow, deterministic and individually
 Repeated owner installs require one stable private signing identity. The preferred full-app owner test channel is Google Play Internal Testing once Play Console/signing setup is complete; a controlled owner-signed APK remains a recovery/test option.
 
 A→B install-over-install data-retention proof is mandatory. Play Protect is never disabled or bypassed. Ephemeral CI debug signing must never be labeled stable/update-compatible.
+
+---
+
+## ADR-027 — On-device speech support and language support are separate capabilities
+
+**Status:** Repair implemented; fresh CI and Motorola retest pending
+
+Android reporting `SpeechRecognizer.isOnDeviceRecognitionAvailable()` does not prove that the implicit/default speech language is installed or supported. Motorola J2 device testing proved this distinction: J2 showed on-device speech available and active microphone access, but the first recognition attempt returned `ERROR_LANGUAGE_UNAVAILABLE`.
+
+Mayra therefore uses an explicit bounded locale negotiation policy for invocation-time on-device recognition: device locale → `hi-IN` → `en-IN` → `en-US`, with duplicates removed. `ERROR_LANGUAGE_NOT_SUPPORTED` and `ERROR_LANGUAGE_UNAVAILABLE` advance to the next candidate; the chain is finite and never loops continuously.
+
+Reason: Hindi/Hinglish usage must remain resilient to device locale/model-pack differences without silently switching to cloud STT or pretending recognition succeeded.
