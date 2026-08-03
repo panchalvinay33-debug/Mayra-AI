@@ -69,6 +69,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -101,6 +103,9 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         }.getOrDefault(false)
     }
 
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        readinessRefresh++
+    }
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
     }
@@ -238,7 +243,13 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         AlertDialog(
             onDismissRequest = viewModel::cancelPendingAction,
             title = { Text("Confirm action") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(pending.prompt); Text(pending.message, fontWeight = FontWeight.SemiBold); Text("Only this exact request can use the one-time confirmation token.", style = MaterialTheme.typography.bodySmall) } },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(pending.prompt)
+                    Text(pending.message, fontWeight = FontWeight.SemiBold)
+                    Text("This approval is one-time, bound to this exact request, and expires automatically.", style = MaterialTheme.typography.bodySmall)
+                }
+            },
             confirmButton = { Button(onClick = viewModel::confirmPendingAction, enabled = !state.isThinking) { Text("Confirm") } },
             dismissButton = { TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) { Text("Cancel") } }
         )
