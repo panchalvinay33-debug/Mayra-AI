@@ -80,15 +80,15 @@ API credentials are encrypted with an Android Keystore-backed key and are never 
 
 Always-available Mayra is built around `VoiceInteractionService` / Android Digital Assistant role and `VoiceInteractionSession`, not a general overlay or unrestricted permanently running microphone service.
 
-Motorola evidence now proves Mayra can be selected as the target device’s Digital assistant and invoked through the configured Power-button assistant trigger.
+Motorola evidence proves Mayra can be selected as the target device’s Digital assistant and invoked through the configured Power-button assistant trigger.
 
 ---
 
 ## ADR-010 — Advanced call control uses official Phone/Call Screening roles
 
-**Status:** Accepted; not implemented
+**Status:** Accepted; implementation gated
 
-Caller announce, answer, reject, silence, mute and speaker operations should be implemented through default Phone/InCallService and Call Screening roles where supported.
+Caller announce, answer, reject, silence, mute and speaker operations use a complete default Phone/InCallService runtime where supported. Call Screening is an optional fast screening/identification layer, not the mechanism for waiting on a spoken owner decision.
 
 ---
 
@@ -146,13 +146,11 @@ Assistant-role compatibility is tested separately from the full sensitive-capabi
 
 ## ADR-017 — J2 voice proof is isolated from J1
 
-**Status:** Implemented foundation; CI/device validation pending
+**Status:** Exact-head CI green; Motorola voice acceptance pending
 
-J1 must remain the permanent zero-permission proof baseline. Real invocation-time voice therefore moves to a separate engineering package, `ai.mayra.app.j2`.
+J1 remains the zero-permission proof baseline. Real invocation-time voice uses the separate engineering package `ai.mayra.app.j2`.
 
-J2 may request exactly `RECORD_AUDIO` and must remove internet, contacts, notifications, reminders, WorkManager/Room/background listeners and the full Mayra runtime. A dedicated J2 CI gate enforces this one-permission boundary.
-
-Reason: if microphone/speech work breaks, J1 remains a clean known-good proof that Android Assistant selection/invocation itself works.
+J2 requests exactly `RECORD_AUDIO` and excludes internet, contacts, notifications, reminders, WorkManager/Room/background listeners and the full Mayra runtime. J2 Voice Test #18, J1 #122, Android CI #2013 and Governance #194 passed on source `ef809bbdaca80f3b953483499dc03de8e091339f`.
 
 ---
 
@@ -162,16 +160,86 @@ Reason: if microphone/speech work breaks, J1 remains a clean known-good proof th
 
 `SpeechRecognizer.createOnDeviceSpeechRecognizer()` is used only for a short visible/invoked assistant session when Android reports on-device recognition available.
 
-It must stop on result/error/cancel/hide/destroy and must not be looped continuously in the always-running `VoiceInteractionService`.
-
-A true always-awake `Mayra` hotword needs a separate dedicated wake-word detector and Issue #14 battery/background/privacy preflight.
+It stops on result/error/cancel/hide/destroy and is never looped continuously in the always-running `VoiceInteractionService`.
 
 ---
 
 ## ADR-019 — Assistant UI must always have a bounded exit
 
-**Status:** Repair implemented; device retest pending
+**Status:** Repair implemented and CI-green; device retest pending
 
 Every visible Mayra assistant session must be dismissible through reliable Android navigation and direct surface interaction. Back, orb tap, label tap and outside/root tap call `hide()`. Session hide/destroy stops recognition, keep-awake state and animations.
 
-Reason: the first J1 device invocation exposed that an orb with no click listener felt stuck even though Back and phone lock could dismiss it.
+---
+
+## ADR-020 — Production wake phrase uses a dedicated local KWS engine
+
+**Status:** Preflight complete; benchmark only
+
+The production `Mayra` wake phrase will use a dedicated lightweight local keyword-spotting engine, not an endless Android SpeechRecognizer loop.
+
+`sherpa-onnx` is the first benchmark candidate because it has Android/offline keyword-spotting support, but it is not selected until false-accept, false-reject, latency, memory, battery and lock-screen tests pass on the Motorola.
+
+Power-button Digital assistant invocation remains the permanent fallback.
+
+---
+
+## ADR-021 — Local conversational brain is benchmarked before model selection
+
+**Status:** Preflight complete; benchmark only
+
+The first Android runtime direction to evaluate is LiteRT-LM. Qwen3-1.7B is an initial model candidate, not a final model decision.
+
+The model stays outside privileged trust boundaries: deterministic Mayra routing continues to own actions, reminders, memory writes and document grounding. A local model failure must fall back to the deterministic local engine.
+
+Model distribution should use a separately versioned/checksummed downloadable asset rather than blindly inflating the base APK.
+
+---
+
+## ADR-022 — Default Phone role is requested only after complete call runtime exists
+
+**Status:** Accepted; owner-facing role request blocked
+
+Mayra will not expose `Make Mayra default Phone` until a complete Dialer/Incoming/Ongoing call UI, InCallService lifecycle, answer/reject/hang-up, mute, audio endpoint routing, lost-role handling and emergency fallback are already CI-green.
+
+Voice call commands are deterministic typed commands, not direct free-form LLM execution.
+
+---
+
+## ADR-023 — AI caller message-taking uses supported telephony routing
+
+**Status:** Accepted constraint; architecture research only
+
+For `Mayra talks to caller and takes a message`, the preferred architecture is carrier call forwarding to a Mayra-controlled VoIP/telephony endpoint, a Mayra-owned VoIP number, or another explicitly supported carrier voicemail path.
+
+The app does not pretend ordinary InCallService grants remote SIM-call audio capture/injection. Privacy, disclosure, retention and backend reliability must be defined before real deployment.
+
+---
+
+## ADR-024 — Notification intelligence is explicit and local-first
+
+**Status:** Preflight complete
+
+Notification intelligence uses Android Notification Access / `NotificationListenerService`, not Accessibility scraping. Sensitive notifications such as OTP, banking, authentication and security content are excluded from autonomous actions and broad cloud processing by default.
+
+Owner controls include enable/disable and app exclusions. Raw notification content is not kept indefinitely by default.
+
+---
+
+## ADR-025 — App automation uses supported APIs/intents before Accessibility
+
+**Status:** Preflight complete
+
+Workflow execution priority is official Android APIs/roles → documented app/provider API → standard intents/deep links → user-visible handoff.
+
+Any future Accessibility workflow must be narrow, deterministic and individually reviewed. A free-form LLM cannot become a generic screen-tapping engine, and authentication/payment/security flows are excluded.
+
+---
+
+## ADR-026 — Trusted owner distribution uses stable signing plus a trusted update channel
+
+**Status:** Architecture accepted; operational setup pending
+
+Repeated owner installs require one stable private signing identity. The preferred full-app owner test channel is Google Play Internal Testing once Play Console/signing setup is complete; a controlled owner-signed APK remains a recovery/test option.
+
+A→B install-over-install data-retention proof is mandatory. Play Protect is never disabled or bypassed. Ephemeral CI debug signing must never be labeled stable/update-compatible.
