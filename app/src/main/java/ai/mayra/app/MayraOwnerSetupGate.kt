@@ -3,6 +3,7 @@ package ai.mayra.app
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,15 +30,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
 
 private const val SETUP_PREFS = "mayra_owner_setup"
 private const val SETUP_COMPLETE = "complete_v1"
 
-/**
- * One-time owner setup. It intentionally keeps setup to two clear steps:
- * required runtime permissions, then Android Assistant role selection.
- */
+/** One-time owner setup: required runtime permissions, then Android Assistant role. */
 @Composable
 fun MayraOwnerSetupGate(content: @Composable () -> Unit) {
     val context = LocalContext.current
@@ -54,39 +51,26 @@ fun MayraOwnerSetupGate(content: @Composable () -> Unit) {
         buildList {
             add(Manifest.permission.RECORD_AUDIO)
             add(Manifest.permission.READ_CONTACTS)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
         }.toTypedArray()
     }
     val permissionsReady = remember(refresh) {
-        permissions.all { permission ->
-            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-        }
+        permissions.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
     }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) {
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         refresh++
     }
 
     val roleManager = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            context.getSystemService(RoleManager::class.java)
-        } else null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.getSystemService(RoleManager::class.java) else null
     }
     val assistantRoleAvailable = remember(refresh, roleManager) {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true
     }
     val assistantRoleHeld = remember(refresh, roleManager) {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
     }
-    val roleLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
+    val roleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refresh++
     }
 
@@ -109,10 +93,9 @@ fun MayraOwnerSetupGate(content: @Composable () -> Unit) {
                 Text("1. Required permissions", fontWeight = FontWeight.Bold)
                 Text(if (permissionsReady) "Ready ✓" else "Voice, contacts aur reminder notifications allow karein.")
                 if (!permissionsReady) {
-                    Button(
-                        onClick = { permissionLauncher.launch(permissions) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Allow required permissions") }
+                    Button(onClick = { permissionLauncher.launch(permissions) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Allow required permissions")
+                    }
                 }
             }
         }
@@ -131,7 +114,11 @@ fun MayraOwnerSetupGate(content: @Composable () -> Unit) {
                 if (assistantRoleAvailable && !assistantRoleHeld) {
                     Button(
                         onClick = {
-                            roleLauncher.launch(roleManager!!.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                roleManager?.let {
+                                    roleLauncher.launch(it.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
+                                }
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Activate Mayra") }
@@ -140,14 +127,10 @@ fun MayraOwnerSetupGate(content: @Composable () -> Unit) {
         }
 
         Spacer(Modifier.height(20.dp))
-        Button(onClick = ::finishSetup, modifier = Modifier.fillMaxWidth()) {
-            Text("Start Mayra")
-        }
+        Button(onClick = ::finishSetup, modifier = Modifier.fillMaxWidth()) { Text("Start Mayra") }
         if (!permissionsReady || (assistantRoleAvailable && !assistantRoleHeld)) {
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = ::finishSetup, modifier = Modifier.fillMaxWidth()) {
-                Text("Continue for now")
-            }
+            OutlinedButton(onClick = ::finishSetup, modifier = Modifier.fillMaxWidth()) { Text("Continue for now") }
         }
     }
 }
