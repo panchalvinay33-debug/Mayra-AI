@@ -47,28 +47,45 @@ Dedicated J1 build:
 - build type: `j1AssistantTest`;
 - package: `ai.mayra.app.j1`;
 - label: `Mayra J1 Assistant Test`;
-- requested Android permissions: zero;
+- intended requested Android permissions: zero;
 - one launcher;
 - included: small role activation/status activity, VoiceInteractionService, session service/orb and RecognitionService metadata shell;
 - excluded: full chat, provider, internet, contacts, reminders, notifications, boot recovery, notification listener, documents and memory.
 
 Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
 
-## Failure history and current repair
+## Failure history and repairs
 
-J1 Assistant Test workflow run #16:
+### J1 run #16
 
-- Kotlin compilation passed;
-- J1 lint failed on the full app's `MayraOwnerSetupGate` because `RoleManager.createRequestRoleIntent` requires API 29 and lint could not prove the call was guarded through derived Compose state;
-- no APK was produced or promoted.
+- compilation passed;
+- lint caught the API-29 Assistant role request lacking a directly visible SDK guard;
+- fixed with an explicit Android Q runtime check and no suppression/baseline.
 
-Repair:
+### J1 run #22
 
-- added a direct `Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q` guard inside the click handler;
-- retained nullable RoleManager handling;
-- added no lint suppression and no baseline.
+- compilation, lint and APK assembly passed;
+- hard manifest audit correctly rejected inherited AndroidX infrastructure:
+  - `WAKE_LOCK`;
+  - `ACCESS_NETWORK_STATE`;
+  - `FOREGROUND_SERVICE`;
+  - app-private dynamic receiver permission;
+  - AndroidX Startup, WorkManager, Room and ProfileInstaller components.
+- no APK was promoted.
 
-Current repair commit: `60ad83d3e09f5e4e55cc57094e4ee9b3a2d4f6f7`, followed by synchronized Roadmap/Snapshot commits. Fresh workflows are required on the final exact head.
+Current repair:
+
+- J1 manifest explicitly removes all listed permissions and unrelated AndroidX components;
+- J1 workflow now permanently lists those components as forbidden;
+- required Assistant services and the one J1 launcher remain.
+
+Relevant repair commits:
+
+- manifest cleanup: `e2826da364d3f26041f1f508e92f56d1ea8c9e85`;
+- stronger audit: `dc78e8898e6ca1566749c91b4750943f1d5ead86`;
+- followed by synchronized project records.
+
+Fresh workflows are required on the final exact head before an APK is shared.
 
 ## Full owner-app distribution truth
 
