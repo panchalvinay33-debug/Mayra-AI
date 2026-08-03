@@ -1,127 +1,166 @@
 # Mayra AI — Execution Roadmap
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
+Entry point: `START_HERE.md`
 Canonical blueprint: `docs/MAYRA_BLUEPRINT.md`
-Latest backup: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
-Owner-device checklist: `docs/MAYRA_FULL_APP_ACCEPTANCE.md`
+Latest recovery state: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
+Idea lifecycle: `docs/MAYRA_IDEA_LEDGER.md`
+Decision log: `docs/MAYRA_DECISIONS.md`
 
 ## Overall program view
 
-| Track | Status | Progress signal | Next gate |
+| Track | Status | Current truth | Next gate |
 |---|---|---|---|
-| Blueprint and backup discipline | DONE | Canonical blueprint, roadmap and rolling snapshot maintained | Keep updated after every authoritative green milestone |
-| Single-app packaging | CI_VERIFIED | Personal Alpha, safe Full Test and isolated Document Test all audited in CI #1753 | Owner-device install/launch validation |
-| Personal Alpha packaging | CI_VERIFIED | `ai.mayra.app.alpha`, one launcher, version 0.2.0-alpha, debug-signed owner candidate | Physical Motorola acceptance; production signing later |
-| Document intelligence | DEVICE_VERIFY | TXT/PDF/DOCX extraction, search, summaries, grounded Q&A and health tools implemented | PDF/DOCX owner-device acceptance; OCR/legacy DOC deferred |
-| Core routing and eligibility | DONE | Typed outcomes, capability gates, trusted assistant metadata and safe confirmation flow | Keep full regression suite green |
-| Personal memory | DEVICE_VERIFY | Explicit approval, provenance, edit/delete/expiry and protected storage implemented | Motorola save/use/edit/delete/recovery checks |
-| Conversational provider | CI_VERIFIED | Owner-disabled-by-default HTTPS provider, OpenAI Responses compatibility, bounded transport and Keystore credential storage | Owner API-key connection test and offline-fallback validation |
-| Search and fresh knowledge | PLANNED | No web-search completion claim | Add source/citation/freshness contract after provider device validation |
-| Phone actions | DEVICE_VERIFY | Calls use dialer handoff; messages use composer handoff; no direct CALL_PHONE/SEND_SMS permission | Contact resolution + confirmation + handoff checks on device |
-| Mayra reminders | CI_VERIFIED | Persistent store, Hindi/Hinglish parser, WorkManager schedule, notifications, Complete/Snooze, follow-up and reboot/update recovery | Physical timing/notification/reboot acceptance |
-| Voice intelligence | DEVICE_VERIFY | Microphone permission is requested on use; speech/TTS path preserved | Hindi/Hinglish physical evaluation |
-| Privacy and release | IN_PROGRESS | Separate capability-audited Personal Alpha, microphone-only Full Test and zero-permission Document Test | Production signing, release artifact provenance and owner acceptance |
+| Project governance and backups | IN_PROGRESS | START_HERE, blueprint, roadmap, rolling snapshot, idea/decision/changelog ledgers and governance CI added | Complete latest-head CI/governance validation |
+| One-app packaging | DEVICE_VERIFY | One launcher; Chat/Library/Memory/Provider/History internal; engineering variants separated | Motorola one-icon acceptance |
+| Core conversation | DEVICE_VERIFY | Hindi/Hinglish/English local foundation + optional online provider | Long conversation and physical voice validation |
+| Local conversational brain | PLANNED | Deterministic offline engine exists; no integrated local LLM yet | Benchmark suitable on-device model on Motorola |
+| Optional cloud provider | DEVICE_VERIFY | HTTPS Responses-compatible provider, Keystore credentials, live composition and fallback | Real owner-key/network failure test |
+| Personal memory | DEVICE_VERIFY | Approval, provenance, edit/replace/delete/expiry/recovery implemented | Motorola lifecycle and protected-storage checks |
+| Document intelligence | DEVICE_VERIFY | TXT/PDF/DOCX extraction/index/search/summary/grounding implemented | Physical PDF/DOCX acceptance |
+| Mayra reminders | DEVICE_VERIFY | Persistent WorkManager reminders, Complete/Snooze/follow-up/reboot recovery | Doze/timing/reboot device acceptance |
+| App and contact actions | DEVICE_VERIFY | App opening, contacts, dialer/composer handoff and expiring confirmations | Motorola end-to-end action checks |
+| Animated Mayra presence | IN_PROGRESS | VoiceInteractionSession animated orb foundation committed | Compile/lint/R8 + device session state wiring |
+| Android Assistant role | IN_PROGRESS | VoiceInteractionService/session/metadata/recognition shell committed | Select Mayra as Assistant and invoke on Motorola |
+| Offline wake phrase | PLANNED | Recognition shell only | Choose engine; battery/thermal benchmark |
+| Lock-screen/background voice | IN_PROGRESS | Assistant lock-screen declaration foundation | Assistant-role device proof |
+| Incoming-call control | PLANNED | No default Phone/InCallService module yet | Build optional role request, call UI and controller |
+| Call screening | PLANNED | Notification/call ideas recorded only | Add CallScreeningService owner rules |
+| AI caller message-taking | PLANNED_WITH_CONSTRAINTS | Cellular audio injection/recording not assumed | Voicemail/VoIP or documented device route design |
+| Production release | IN_PROGRESS | Non-debuggable minified release audit + secret-only signing scaffold | Private signing, provenance, distribution and acceptance |
 
-## Authoritative verification truth
+## Verified baseline
 
-### Personal Alpha milestone
+### Mayra 0.2.1 pre-Jarvis baseline
 
-Android CI #1753 passed on feature head `1aa031f8bb5213a9f3cacd88b7bfa3528489b132`.
+Android CI **#1795** completed successfully for version **0.2.1 / versionCode 4** before the Assistant-role/Jarvis commits.
 
-It verified on the same governed source state:
+It covered:
 
-1. Debug, `personalAlpha` and `fullTest` Kotlin compilation.
-2. Complete debug unit-test suite: 346 tests passed.
-3. Debug, Personal Alpha, Full Test and Document Test lint.
-4. Personal Alpha APK assembly.
-5. Personal Alpha package: `ai.mayra.app.alpha`.
-6. Personal Alpha label: `Mayra AI Personal Alpha`.
-7. Exactly one launcher: `ai.mayra.app.MainActivity`.
-8. Required Personal Alpha capabilities present: INTERNET, microphone, contacts, notifications and boot recovery.
-9. Direct CALL_PHONE, SEND_SMS, SMS-read/receive, WRITE_CONTACTS, exact-alarm, package-install and overlay permissions absent.
-10. Main Chat, Document Library, Memory Center, Provider Settings, Activity History, Boot Receiver, Notification Listener and reminder action receiver present.
-11. Safe Full Test APK assembly and permission/component audit remained green.
-12. Isolated minified Document Test APK and zero-permission/component audit remained green.
-13. All three APK artifacts plus CI reports were uploaded.
+- Debug, Personal Alpha and Full Test compilation;
+- complete unit-test suite;
+- Android lint across governed variants;
+- Personal Alpha APK and permission/component/one-launcher audit;
+- minified final `ai.mayra.app` release candidate and R8/manifest audit;
+- safe Full Test audit;
+- isolated zero-permission Document Test audit;
+- artifact/report upload.
 
-### Artifact evidence
+This baseline includes provider live refresh, scoped permission UX, confirmation expiry, app-opening routing repair, reminder follow-up repair and reboot remaining-delay recovery.
 
-`mayra-personal-alpha-apk-1753`:
+### Current latest-head truth
 
-- GitHub artifact id: `8834650772`
-- ZIP size: 18,712,293 bytes
-- ZIP SHA-256: `d81c1bb8a1ffa1c95e75481dad97213477530df53eb2219bc8ce162e91d1b5d9`
-- extracted APK: `app-personalAlpha.apk`
-- APK size: 19,160,566 bytes
-- APK SHA-256: `72411a46f39064db1a518fc9992a09138a501ef3afd490a6a84112ddf2bc42cb`
+After CI #1795, the branch added the Android Assistant-role/Jarvis foundation and the complete project-governance system. These newer commits require their own latest-head Android CI and Project Governance green evidence. Until that completes, Jarvis features remain `IN_PROGRESS`, not `DONE`.
 
-Other #1753 artifacts:
+## Delivered capability groups
 
-- `mayra-full-test-apk-1753` — ZIP SHA-256 `8d87855c8e399962e049d5e8a994aef7e789aee9f8c8a481f9537a156875d64a`
-- `mayra-document-test-apk-1753` — ZIP SHA-256 `957a4735aeb132cb68a9e88ce1078add2a73e4f78ec884b58f05c06b532c5e77`
-- `android-reports-1753` — ZIP SHA-256 `5774a5f4b6fca26a9e0e125adc2164e452741ffbef119ab0a040518b76c73dcc`
+### Conversation and provider
 
-## Current capability boundary
+- local deterministic commands and contextual offline fallback;
+- voice input and TTS foundation;
+- optional OpenAI Responses-compatible transport;
+- encrypted API-key storage;
+- live provider enable/disable/removal without restart;
+- bounded retries, cancellation and offline fallback.
 
-### Personal Alpha
+### Memory and documents
 
-Designed for owner-device functional testing with real Mayra capabilities. It is debug-signed and installs as a separate package; it is **not** a production release.
+- approval-first personal memory lifecycle;
+- trusted typed memory provenance;
+- TXT/PDF/DOCX import and extraction;
+- current-index search, summaries and grounded answers;
+- document freshness/health tooling.
 
-Present by design:
+### Actions and reminders
 
-- INTERNET for owner-enabled conversational provider
-- RECORD_AUDIO for voice
-- READ_CONTACTS for contact resolution
-- POST_NOTIFICATIONS for Mayra reminders
-- RECEIVE_BOOT_COMPLETED for reminder/background recovery
-- notification-listener component behind Android special-access consent
-- one launcher and all core internal Mayra screens
+- app opening;
+- contact resolution;
+- review-first dialer/composer;
+- exact-action expiring confirmations;
+- Mayra-owned persistent reminders;
+- Complete, Snooze, follow-up and reboot/update recovery.
 
-Absent by design:
+### Release engineering
 
-- direct CALL_PHONE
-- direct SEND_SMS
-- SMS read/receive
-- contact writes
-- exact-alarm permission
-- overlay permission
-- package-install permission
+- Personal Alpha owner candidate;
+- low-permission Full Test;
+- isolated Document Test;
+- minified final release audit;
+- environment-only signing scaffold;
+- automated permission/component/launcher audits.
 
-Calls and messages are review-first Android handoffs; the user performs the final dial/send action.
+## Active Jarvis Mode plan
 
-### Safe Full Test
+### Phase J1 — Assistant presence foundation
 
-Keeps the full visible Mayra UI plus microphone while stripping network, contacts, notifications and background recovery for lower-risk sideload testing.
+Status: `IN_PROGRESS`
 
-### Document Test
+- compile and lint VoiceInteractionService/session/metadata/recognition shell;
+- audit Personal Alpha/final manifest components;
+- keep those components absent from Full Test;
+- add owner-visible Assistant-role setup/status;
+- test invocation while unlocked and locked;
+- connect animated orb to real listening/thinking/speaking state.
 
-Remains an isolated, zero-permission regression APK. It is not the complete application.
+### Phase J2 — Local wake phrase and local brain
 
-## Implemented in the 0.2.0 milestone
+Status: `PLANNED`
 
-- versionCode 3 / versionName 0.2.0
-- OpenAI Responses-compatible bounded HTTPS conversational provider
-- default provider endpoint `https://api.openai.com/v1/responses`
-- owner-editable model/endpoint and remote enable/disable
-- API key encrypted with Android Keystore-backed AES-GCM storage
-- offline local fallback when provider is disabled, missing or unavailable
-- typed personal-memory attribution outside visible model text
-- review-first dialer and message-composer handoff instead of direct call/SMS privileges
-- Mayra-owned reminder parser and persistent store
-- WorkManager reminder scheduling with revision-safe stale-worker rejection
-- Complete and Snooze notification actions
-- reminder follow-up and reboot/app-update recovery
-- dedicated Personal Alpha CI packaging/audit path
+- benchmark wake-word engines under screen-off conditions;
+- measure idle battery, false triggers, thermal behavior and restart recovery;
+- benchmark small quantized local language models on the Motorola target;
+- add model storage/download integrity and fallback policy;
+- route privacy-sensitive/basic conversation to local brain;
+- keep cloud provider optional.
 
-## Immediate next priority
+### Phase J3 — Advanced phone role
 
-1. Install `Mayra AI Personal Alpha 0.2.0-alpha` on the Motorola owner device.
-2. Verify first launch and request permissions only when related features are invoked.
-3. Configure an API key in Provider Settings and test one English, Hindi and Hinglish online response plus offline fallback.
-4. Create `drinking water after 3 min`, `kal subah 7 baje` and a missing-time reminder; verify notification, Complete and Snooze.
-5. Reboot with a future reminder pending and verify recovery without duplicate alerts.
-6. Test contact resolution, call dialer handoff and message composer handoff; ensure Mayra never claims delivery/connection.
-7. Run Library, Memory, Activity History and voice acceptance checks.
-8. Only after device acceptance: add production signing/provenance and a non-debug release candidate.
+Status: `PLANNED`
 
-PR #12 remains Draft, open and unmerged. No ready-for-review or merge transition is authorized.
+- request optional default Phone role;
+- implement required incoming/ongoing call UI fallback;
+- announce caller;
+- support answer, reject, silence, mute and speaker/audio endpoint where Android exposes it;
+- add optional Call Screening role and owner rules;
+- test emergency/default-dialer failure boundaries.
+
+### Phase J4 — Proactive owner assistant
+
+Status: `PLANNED`
+
+- notification/call summaries;
+- owner-defined trusted routines;
+- missed-task and reminder follow-ups;
+- context relevance/frequency controls;
+- Owner Mode trust policy for routine low-risk actions.
+
+### Phase J5 — Final release
+
+Status: `PLANNED`
+
+- complete Motorola acceptance matrix;
+- fix OEM-specific background/battery issues;
+- configure private release signing;
+- produce signed APK/AAB with provenance;
+- owner-controlled distribution/Play Internal Testing;
+- final branding, onboarding, accessibility and performance polish.
+
+## Deferred or constrained work
+
+- OCR for scanned images: `DEFERRED`;
+- legacy binary `.doc`: `DEFERRED`;
+- exact alarm access: `DEFERRED` pending device need;
+- unrestricted root/accessibility automation: `DEFERRED`;
+- hidden cellular recording or arbitrary AI audio injection: not an assumed capability;
+- caller message-taking requires a supported voicemail/VoIP/device route.
+
+## Immediate ordered next actions
+
+1. Let latest Android CI and Project Governance CI run on the synchronized branch head.
+2. Repair exact compile/lint/manifest/governance failures without weakening the architecture.
+3. Record authoritative run IDs and head in the rolling snapshot.
+4. Add Assistant-role setup/status UI and manifest audits if not already covered by CI.
+5. Generate the next Personal Alpha only after latest-head green.
+6. Test role selection, unlocked invocation and locked invocation on the Motorola.
+7. Begin local wake-word/model benchmarking only after J1 is stable.
+8. Keep PR #12 Draft/open/unmerged until explicit owner approval.
