@@ -1,0 +1,84 @@
+name: Stable Owner Alpha
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-owner-alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Require and materialize stable owner signing
+        shell: bash
+        env:
+          OWNER_KEYSTORE_BASE64: ${{ secrets.MAYRA_OWNER_KEYSTORE_BASE64 }}
+          OWNER_STORE_PASSWORD: ${{ secrets.MAYRA_OWNER_STORE_PASSWORD }}
+          OWNER_KEY_ALIAS: ${{ secrets.MAYRA_OWNER_KEY_ALIAS }}
+          OWNER_KEY_PASSWORD: ${{ secrets.MAYRA_OWNER_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in OWNER_KEYSTORE_BASE64 OWNER_STORE_PASSWORD OWNER_KEY_ALIAS OWNER_KEY_PASSWORD; do
+            if [ -z "${!value:-}" ]; then
+              echo "Missing required GitHub secret: $value" >&2
+              exit 1
+            fi
+          done
+          KEYSTORE="$RUNNER_TEMP/mayra-owner.jks"
+          printf '%s' "$OWNER_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          {
+            echo "MAYRA_OWNER_STORE_FILE=$KEYSTORE"
+            echo "MAYRA_OWNER_STORE_PASSWORD=$OWNER_STORE_PASSWORD"
+            echo "MAYRA_OWNER_KEY_ALIAS=$OWNER_KEY_ALIAS"
+            echo "MAYRA_OWNER_KEY_PASSWORD=$OWNER_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Compile, test and lint owner candidate
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:compilePersonalAlphaKotlin :app:testDebugUnitTest :app:lintPersonalAlpha --stacktrace --console=plain
+
+      - name: Assemble stable owner APK
+        shell: bash
+        run: gradle --no-daemon :app:assemblePersonalAlpha --stacktrace --console=plain
+
+      - name: Verify package and signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/owner-signing
+          APK="$(find app/build/outputs/apk/personalAlpha -name '*.apk' -type f | head -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          test -f "$APK"
+          "$AAPT" dump badging "$APK" | tee build/owner-signing/badging.txt
+          grep -Fq "package: name='ai.mayra.app.alpha'" build/owner-signing/badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee build/owner-signing/signing-certificate.txt
+          cp "$APK" build/owner-signing/Mayra-AI-Owner-Update.apk
+          sha256sum build/owner-signing/Mayra-AI-Owner-Update.apk | tee build/owner-signing/apk-sha256.txt
+
+      - name: Upload stable owner APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayra-stable-owner-apk-${{ github.run_number }}
+          path: build/owner-signing/
+          if-no-files-found: error
+          retention-days: 30
