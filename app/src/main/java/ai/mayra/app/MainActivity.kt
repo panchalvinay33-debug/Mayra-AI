@@ -77,7 +77,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MayraAITheme { MayraHome() } }
+        setContent {
+            MayraAITheme {
+                MayraOwnerSetupGate { MayraHome() }
+            }
+        }
     }
 }
 
@@ -103,9 +107,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         }.getOrDefault(false)
     }
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        readinessRefresh++
-    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { readinessRefresh++ }
     LaunchedEffect(voiceState.transcript, voiceState.isListening) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
     }
@@ -123,28 +125,18 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         readinessRefresh++
         if (granted) voiceAssistant.startListening() else voiceState = VoiceState(error = "Microphone permission is required for voice input")
     }
-    val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        readinessRefresh++
-    }
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        readinessRefresh++
-    }
+    val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readinessRefresh++ }
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readinessRefresh++ }
+
     fun startVoice() {
         if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening() else microphoneLauncher.launch(MicrophonePermission.permission)
     }
-    fun requestContactsPermission() {
-        contactsLauncher.launch(Manifest.permission.READ_CONTACTS)
-    }
+    fun requestContactsPermission() { contactsLauncher.launch(Manifest.permission.READ_CONTACTS) }
     fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            readinessRefresh++
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        else readinessRefresh++
     }
-    fun openActivity(activity: Class<out ComponentActivity>) {
-        context.startActivity(Intent(context, activity))
-    }
+    fun openActivity(activity: Class<out ComponentActivity>) { context.startActivity(Intent(context, activity)) }
 
     val interactionEnabled = !state.isThinking && state.pendingConfirmation == null && state.pendingMemoryApproval == null
     Scaffold { padding ->
@@ -163,14 +155,9 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                         providerConfigured -> "● Online AI configured"
                         else -> "● Offline core ready"
                     })
-                    Text(
-                        if (providerConfigured) "Local privacy controls · online answers" else "Private on-device mode",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(if (providerConfigured) "Local privacy controls · online answers" else "Private on-device mode", style = MaterialTheme.typography.bodySmall)
                 }
-                if (state.messages.isNotEmpty()) {
-                    TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) { Text("Clear") }
-                }
+                if (state.messages.isNotEmpty()) TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) { Text("Clear") }
             }
             Spacer(Modifier.height(8.dp))
             FlowRow(
@@ -183,13 +170,11 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 AssistChip(onClick = { openActivity(MayraDocumentActivity::class.java) }, label = { Text("Library") })
                 AssistChip(onClick = { openActivity(MayraMemoryCenterActivity::class.java) }, label = { Text("Memory") })
                 AssistChip(onClick = { openActivity(MayraProviderSettingsActivity::class.java) }, label = { Text("Provider") })
-                AssistChip(onClick = { showReadiness = true }, label = { Text("Device") })
+                AssistChip(onClick = { showReadiness = true }, label = { Text("Setup") })
             }
             Spacer(Modifier.height(10.dp))
             LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.messages.isEmpty()) item {
-                    Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium)
-                }
+                if (state.messages.isEmpty()) item { Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium) }
                 items(state.messages, key = { it.timestamp }) { message ->
                     val label = if (message.sender == MayraMessage.Sender.USER) "You" else "Mayra"
                     Card(Modifier.fillMaxWidth()) {
@@ -198,13 +183,9 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                             Text(message.text)
                             if (message.usedPersonalMemoryKeys.isNotEmpty()) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    message.usedPersonalMemoryKeys.take(3).forEach { key ->
-                                        AssistChip(onClick = {}, label = { Text("🧠 $key") })
-                                    }
+                                    message.usedPersonalMemoryKeys.take(3).forEach { key -> AssistChip(onClick = {}, label = { Text("🧠 $key") }) }
                                 }
-                                if (message.usedPersonalMemoryKeys.size > 3) {
-                                    Text("+${message.usedPersonalMemoryKeys.size - 3} more approved memories", style = MaterialTheme.typography.bodySmall)
-                                }
+                                if (message.usedPersonalMemoryKeys.size > 3) Text("+${message.usedPersonalMemoryKeys.size - 3} more approved memories", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
@@ -258,7 +239,14 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         AlertDialog(
             onDismissRequest = viewModel::cancelPendingMemory,
             title = { Text(if (pending.previousValue == null) "Save this memory?" else "Replace this memory?") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(pending.key, fontWeight = FontWeight.Bold); pending.previousValue?.let { Text("Current: $it"); HorizontalDivider() }; Text("New: ${pending.newValue}"); Text(if (pending.previousValue == null) "Mayra will store this locally only after you tap Save." else "Saving will replace the current value and increase its revision.", style = MaterialTheme.typography.bodySmall) } },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(pending.key, fontWeight = FontWeight.Bold)
+                    pending.previousValue?.let { Text("Current: $it"); HorizontalDivider() }
+                    Text("New: ${pending.newValue}")
+                    Text(if (pending.previousValue == null) "Mayra will store this locally only after you tap Save." else "Saving will replace the current value and increase its revision.", style = MaterialTheme.typography.bodySmall)
+                }
+            },
             confirmButton = { Button(onClick = viewModel::savePendingMemory, enabled = !state.isThinking) { Text(if (pending.previousValue == null) "Save" else "Replace") } },
             dismissButton = { TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) { Text("Not now") } }
         )
@@ -290,34 +278,21 @@ private fun DeviceReadinessDialog(
     val notificationsReady = DevicePermission.POST_NOTIFICATIONS in grantedPermissions
     val appsReady = DevicePermission.QUERY_APPS in grantedPermissions
     val readyCount = listOf(microphoneReady, contactsReady, notificationsReady, appsReady).count { it }
-    val totalCount = 4
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Device readiness") },
+        title = { Text("Mayra setup") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("$readyCount of $totalCount capabilities ready")
+                Text("$readyCount of 4 capabilities ready")
                 Text("$installedAppsCount launchable apps detected")
                 HorizontalDivider()
-                ReadinessRow("Voice input", microphoneReady)
-                ReadinessRow("Find contacts", contactsReady)
-                if (!contactsReady) {
-                    OutlinedButton(onClick = onRequestContacts) { Text("Allow contacts when needed") }
-                }
-                ReadinessRow("Reminder notifications", notificationsReady)
-                if (!notificationsReady) {
-                    OutlinedButton(onClick = onRequestNotifications) { Text("Allow reminder notifications") }
-                }
-                ReadinessRow("Open installed apps", appsReady)
-                Text(
-                    "Microphone permission is requested only when you use Voice. Calls and messages open Android's dialer/composer for final review; Mayra never needs direct CALL_PHONE or SEND_SMS permission.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    "Mayra reminders use persistent WorkManager scheduling. Android may defer delivery slightly during battery-saving modes; Mayra does not request exact-alarm special access.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                ReadinessRow("Voice", microphoneReady)
+                ReadinessRow("Contacts", contactsReady)
+                if (!contactsReady) OutlinedButton(onClick = onRequestContacts) { Text("Allow contacts") }
+                ReadinessRow("Reminders", notificationsReady)
+                if (!notificationsReady) OutlinedButton(onClick = onRequestNotifications) { Text("Allow notifications") }
+                ReadinessRow("Open apps", appsReady)
             }
         },
         confirmButton = { TextButton(onClick = onRefresh) { Text("Refresh") } },
@@ -329,6 +304,6 @@ private fun DeviceReadinessDialog(
 private fun ReadinessRow(label: String, ready: Boolean) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, modifier = Modifier.weight(1f))
-        Text(if (ready) "Ready ✓" else "Permission needed")
+        Text(if (ready) "Ready ✓" else "Needed")
     }
 }
