@@ -1,6 +1,6 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: J1 #68 CLEAN-INSTALL REQUIRED, STABLE SIGNING FIX IN PROGRESS
+Status: ASSISTANT ROLE SELECTED — INVOCATION TEST NEXT
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
@@ -54,78 +54,65 @@ Activation navigation: FAIL — tapping `Activate Mayra` still did not leave the
 - APK size: `19,192,850` bytes
 - APK SHA-256: `0e1a36ff6b5e72c7d719430b5e04e87c3f7c3707d341a0527d6e488942d13cb9`
 
-#68 contains the two intended Motorola activation repairs:
+#68 contains the Motorola activation repairs:
 
-1. J1-specific voice-interaction metadata points `settingsActivity` to `ai.mayra.app.j1.J1AssistantTestActivity`, not the removed full-app `MainActivity`.
-2. `Activate Mayra` targets Android Default Apps with the documented Motorola manual path `Settings → Apps → Default apps → Digital assistant` shown in-app.
+1. J1-specific voice-interaction metadata points `settingsActivity` to `ai.mayra.app.j1.J1AssistantTestActivity`.
+2. `Activate Mayra` targets Android Default Apps with the Motorola path `Settings → Apps → Default apps → Digital assistant` shown in-app.
 
-### #68 installation result
+### #68 installation history
 
-Result: BLOCKED — package signing conflict.
+Initial update attempt: BLOCKED by package signing conflict because CI debug certificates changed between runs.
 
-Observed on the Motorola device:
+Safe recovery used: uninstall the J1 test package, then clean-install #68. J1 contains no personal Mayra memory/documents/reminders and requests zero Android runtime permissions.
 
-`App not installed as package conflicts with an existing package.`
+### #68 Motorola device evidence — 20:44 to 20:45 IST
 
-Root cause:
+Default Apps navigation: PASS.
 
-- CI J1 builds were hard-coded to the runner's temporary debug signing certificate.
-- The package name remained `ai.mayra.app.j1`, so Android correctly rejected a newer APK signed by a different certificate.
-- This is an installation/signing failure, not evidence that #68 activation code failed.
+- `Settings → Apps → Default apps` opened successfully.
+- `Digital assistant app` was visible in Motorola settings.
 
-Current safe test action:
+Assistant candidate/selection: PASS.
 
-- J1 contains no personal memory/documents/contacts/reminder data and requests zero Android runtime permissions.
-- Uninstall the currently installed `Mayra J1 Assistant Test` once, then clean-install the verified #68 APK.
-- Do not bypass Play Protect or signature checks.
+- `Mayra J1 Assistant Test` appears as the selected `Digital assistant app` in Motorola Default Apps.
+- This proves Android 16 on the target Motorola recognizes the J1 `VoiceInteractionService` as a valid assistant candidate and accepts Mayra as the default digital assistant.
+- Owner screenshot received showing `Digital assistant app — Mayra J1 Assistant Test`.
+
+This clears the Assistant-role eligibility/selection blocker. The next gate is real assistant invocation and orb/session behavior.
 
 Permanent signing repair:
 
-- Commit `2d1d78f477f9fcd592c67b7a63a3c22358efdf1c` changes `j1AssistantTest` to use the same `mayraOwner` signing configuration as Personal Alpha whenever owner signing secrets are available.
-- It falls back to debug signing only when owner signing is unavailable, and exposes `STABLE_OWNER_SIGNING` accordingly.
-- Stable owner secrets still need to be configured in GitHub Actions before CI-generated J1 APKs can be claimed as install-over-install stable.
+- Commit `2d1d78f477f9fcd592c67b7a63a3c22358efdf1c` changes `j1AssistantTest` to use the `mayraOwner` signing configuration whenever owner signing secrets are available.
+- Stable owner secrets still need to be configured in GitHub Actions before future CI J1 APKs are install-over-install stable.
 - No keystore/password/private key is committed to the repository.
 
-## Next retest sequence
+## Next device test sequence
 
-### A. Clean install #68
+### D. Unlocked invocation — CURRENT GATE
 
-- [ ] Uninstall the currently installed J1 test package.
-- [ ] Install the verified #68 APK.
-- [ ] App opens normally.
-- [ ] No runtime permission prompt appears.
-
-### B. Open Motorola Default apps
-
-- [ ] Tap `Activate Mayra`.
-- [ ] Android opens `Settings → Apps → Default apps`.
-- [ ] Tap `Digital assistant`.
-- [ ] Record whether `Mayra J1 Assistant Test` appears as an available choice.
-
-If the button still does not navigate, manually test:
-
-`Settings → Apps → Default apps → Digital assistant`.
-
-### C. Assistant role visibility
-
-- [ ] Mayra appears as an available assistant choice.
-- [ ] Mayra can be selected only through explicit owner action.
-- [ ] Returning to J1 and tapping `Refresh status` shows selected.
-- [ ] Mayra can be deselected and the previous assistant restored.
-
-### D. Unlocked invocation
-
-- [ ] System assistant gesture/button invokes Mayra.
-- [ ] Animated orb/session appears.
+- [ ] Return to the home screen or any normal app.
+- [ ] Use Motorola's configured assistant gesture/button (for example the system assistant gesture/button supported on the device).
+- [ ] Mayra assistant session opens without launching the full test activity.
+- [ ] Animated Mayra orb/session appears.
 - [ ] Dismissal stops the animation.
-- [ ] Ten repeated invoke/dismiss cycles do not crash or stack surfaces.
+- [ ] Repeat invoke/dismiss 10 times without crash, duplicate surface or System UI restart.
+
+Record exact invocation method and screenshot of the first Mayra orb/session.
 
 ### E. Locked-screen invocation
 
-- [ ] Supported Motorola gesture/button invokes Mayra according to lock-screen policy.
+- [ ] Lock the phone normally.
+- [ ] Invoke the selected assistant using the supported Motorola method.
+- [ ] Mayra follows Android lock-screen policy.
 - [ ] No private Mayra content is exposed before unlock.
 - [ ] Dismissal returns cleanly to lock screen.
 
+### F. Role state/recovery
+
+- [ ] Open J1 and tap `Refresh status`; it shows Mayra selected.
+- [ ] Reboot and verify assistant selection remains/recoverably returns.
+- [ ] Deselect Mayra and restore the previous assistant without errors.
+
 ## Promotion rule
 
-J1 moves to device-verified only after clean installation, activation, role visibility, select/remove, unlocked invocation, lock-screen behavior and orb lifecycle pass on one provenance-recorded artifact. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 moves to device-verified only after role selection, unlocked invocation, orb/session lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
