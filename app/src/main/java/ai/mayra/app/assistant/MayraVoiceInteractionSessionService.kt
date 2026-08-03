@@ -68,15 +68,19 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             }
         )
 
+        val scaleX = ObjectAnimator.ofFloat(orb, View.SCALE_X, 0.92f, 1.08f, 0.92f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val scaleY = ObjectAnimator.ofFloat(orb, View.SCALE_Y, 0.92f, 1.08f, 0.92f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val alpha = ObjectAnimator.ofFloat(orb, View.ALPHA, 0.72f, 1f, 0.72f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
         pulse = AnimatorSet().apply {
-            playTogether(
-                ObjectAnimator.ofFloat(orb, View.SCALE_X, 0.92f, 1.08f, 0.92f),
-                ObjectAnimator.ofFloat(orb, View.SCALE_Y, 0.92f, 1.08f, 0.92f),
-                ObjectAnimator.ofFloat(orb, View.ALPHA, 0.72f, 1f, 0.72f)
-            )
+            playTogether(scaleX, scaleY, alpha)
             duration = 1400L
             interpolator = android.view.animation.AccelerateDecelerateInterpolator()
-            childAnimations.forEach { it.repeatCount = ObjectAnimator.INFINITE }
             start()
         }
         return root
