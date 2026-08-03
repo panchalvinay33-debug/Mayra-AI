@@ -50,6 +50,11 @@ class MayraOnDeviceSpeechRecognizer(
 
     private fun startCurrentLocale(): Boolean {
         if (!active || localeIndex !in localeCandidates.indices) return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            active = false
+            onState(MayraVoiceSessionState.OnDeviceUnavailable)
+            return false
+        }
 
         destroyRecognizer()
         val created = try {
