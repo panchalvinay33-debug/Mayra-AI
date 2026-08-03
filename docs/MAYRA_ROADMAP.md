@@ -7,6 +7,7 @@ Latest recovery state: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
 Test contract: `docs/MAYRA_TEST_MATRIX.md`
 Rollback playbook: `docs/MAYRA_BASELINE_AND_ROLLBACK.md`
 J1 device sheet: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`
+J2 device sheet: `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`
 J2 preflight: `docs/feasibility/MAYRA_J2_VOICE_PREFLIGHT.md`
 Canonical product issue: #13
 Mandatory major-feature feasibility gate: #14
@@ -17,82 +18,97 @@ Repository hygiene registry: #15
 | Track | Status | Current truth | Next gate |
 |---|---|---|---|
 | Governance/backups | DONE / CONTINUOUS | Canonical records, governance CI and protected baselines exist | Sync every batch |
-| Repository clarity | IN_PROGRESS | PR #12 is the only active implementation PR; old PR tracks superseded; branches classified in issue #15 | Verify delete-candidate reachability before deletion |
-| Feasibility control | DONE / CONTINUOUS | Issue #14 blocks major features; J2 voice preflight is now recorded | Local-LLM and wake-word preflights later |
-| Secure baselines | DONE / CONTINUOUS | Pre-Jarvis #1795, Jarvis #1851, J1 #44 and activation-repair #56 protected | Promote next exact-head green/device milestone |
-| J1 Assistant role proof | DEVICE_VERIFY | Motorola accepts/selects Mayra; configured Power trigger invokes orb while unlocked; Back/lock dismiss | Touch-repair CI, repeated lifecycle, lock-screen and reboot evidence |
-| Animated Mayra presence | DEVICE_VERIFY | Orb physically rendered on Motorola; direct touch dismiss was missing and is repaired in source | Fresh CI then retest tap/repeat lifecycle, preferably through J2 |
-| J2 invocation-time voice | IN_PROGRESS | Isolated `.j2` variant, one-permission manifest, state model, on-device recognizer wrapper and CI workflow committed | J2 CI → Motorola microphone/on-device STT proof |
-| Wake phrase / always-awake voice | PLANNED | `SpeechRecognizer` continuous loop explicitly rejected; dedicated detector required | Engine/license/battery/lock-screen preflight after J2 |
-| Full owner installation | BLOCKED / IN_PROGRESS | Full debug Personal Alpha was blocked by Play Protect; stable signing path exists | Private certificate + trusted distribution |
-| Local conversational brain | PLANNED | No local LLM integrated | Model/license/RAM/storage/latency/thermal benchmark |
-| Background/lock-screen voice | DEVICE_VERIFY | Assistant framework and keyguard declaration exist; unlocked invocation proven | Locked-screen J1/J2 evidence |
+| Repository clarity | IN_PROGRESS | PR #12 is the only active implementation PR; stale PR tracks are closed/superseded; branches classified in issue #15 | Reachability review before deleting redundant refs |
+| Feasibility control | DONE / CONTINUOUS | Issue #14 blocks major capabilities; J2 voice preflight approved invocation-time speech only | Wake-word and local-LLM preflights before implementation |
+| Secure baselines | DONE / CONTINUOUS | Pre-Jarvis, Jarvis J1, J1 role proof and J2 voice baselines protected | Promote only exact-head green/device-evidenced milestones |
+| J1 Assistant role proof | DEVICE_VERIFY | Motorola accepts/selects Mayra; configured Power trigger invokes orb while unlocked; Back/lock dismiss | Touch repair/repeated lifecycle/locked-start/reboot evidence through J2 |
+| Animated Mayra presence | DEVICE_VERIFY | Orb physically rendered on Motorola; tap-dismiss repair is in green J2 baseline | Physical tap/repeat lifecycle verification |
+| J2 invocation-time voice | DEVICE_VERIFY | J2 #18, J1 #122, Android CI #2013 and Governance #194 all green; exactly RECORD_AUDIO only | Motorola microphone/on-device STT/lifecycle/reboot acceptance |
+| Wake phrase / always-awake voice | PLANNED | Continuous SpeechRecognizer loop rejected; dedicated wake detector required | Engine/license/battery/false-trigger/lock-screen preflight |
+| Full owner installation | BLOCKED / IN_PROGRESS | Full debug Personal Alpha was blocked by Play Protect; stable owner-signing path exists | Configure private certificate + trusted distribution + upgrade proof |
+| Local conversational brain | PLANNED | No local LLM integrated | Model/license/RAM/storage/latency/thermal benchmark and preflight |
+| Background/lock-screen voice | DEVICE_VERIFY | Assistant framework/keyguard declaration exist; unlocked invocation proven | Locked-screen J2 evidence |
 | Incoming-call control | PLANNED | No default Phone/InCallService yet | Dedicated feasibility review after voice foundation |
-| AI caller message-taking | PLANNED WITH CONSTRAINTS | Direct arbitrary SIM audio capture/injection is not assumed | Voicemail/VoIP/call-forwarding design |
-| Production release | IN_PROGRESS | Minified release/signing scaffold exist | Stable certificate, AAB/APK provenance, trusted channel |
+| AI caller message-taking | PLANNED WITH CONSTRAINTS | Arbitrary SIM audio capture/injection is not assumed | Voicemail/VoIP/call-forwarding architecture |
+| Production release | IN_PROGRESS | Minified release/signing scaffold exists | Stable certificate, AAB/APK provenance, trusted channel |
 
 ## Protected baselines
 
-### Pre-Jarvis
+### Pre-Jarvis full-app
 - `baseline/mayra-0.2.1-green-1795`
 - `065e22524c835f3ddd3b2f56215a3616f071d4b3`
+- Android CI #1795: success
 
 ### Jarvis J1 foundation
 - `baseline/mayra-0.2.1-jarvis-j1-green-1851`
 - `0d9435adb92b425bfb47a710d4f4516a6aaac398`
+- Android CI #1851: success
 
 ### Zero-permission J1 package
 - `baseline/mayra-0.2.1-j1-zero-permission-green-44`
 - `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
 - J1 #44, Android CI #1935, Governance #116: success
 
-### First activation repair
+### J1 activation repair
 - `baseline/mayra-0.2.1-j1-activation-repair-green-56`
 - `ce96f8e83fe33b878d426c407715d4a3e1b0495a`
 - J1 #56, Android CI #1947, Governance #128: success
 
-## Motorola evidence now established
+### J2 invocation-time voice
+- `baseline/mayra-0.2.1-j2-voice-green-18`
+- `ef809bbdaca80f3b953483499dc03de8e091339f`
+- J2 Voice Test #18: success
+- J1 Assistant Test #122: success
+- Android CI #2013: success
+- Project Governance #194: success
+- J2 APK SHA-256: `ef48c264f841efd7891e335848e90f38654a6dd25f70d10b0a3afd08b968ecbc`
+- Immutable snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-03_J2_VOICE_CI18.md`
 
-1. J1 clean installation and launch: PASS.
-2. Motorola Default Apps route opens: PASS.
-3. `Mayra J1 Assistant Test` appears as a valid Digital assistant candidate: PASS.
-4. Mayra can be selected as the default Digital assistant: PASS.
-5. J1 itself reports `Mayra is selected`: PASS.
-6. Motorola Power-button action can be configured to Digital assistant: PASS.
-7. Unlocked assistant invocation launches Mayra `VoiceInteractionSession`: PASS.
-8. Animated Mayra orb renders over the current screen: PASS.
-9. Back gesture dismisses the orb: PASS.
-10. Locking the phone dismisses the current unlocked orb: PASS.
-11. Direct orb/outside tap on the tested #68 build: FAIL because no click listener existed; source repair now adds bounded tap exits.
-12. Locked-screen invocation while already locked, repeated 10–20 cycles and reboot role recovery remain unverified.
+## Motorola evidence established
 
-Canonical evidence: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
+1. J1 clean install/launch: PASS.
+2. Motorola Default Apps route: PASS.
+3. Mayra appears as Digital assistant candidate: PASS.
+4. Mayra can be selected as default Digital assistant: PASS.
+5. Motorola Power-button Digital assistant trigger configured: PASS.
+6. Unlocked invocation launches Mayra VoiceInteractionSession: PASS.
+7. Animated orb renders over current screen: PASS.
+8. Back gesture dismisses: PASS.
+9. Locking phone dismisses current session: PASS.
+10. J1 #68 direct orb/outside tap: FAIL; root cause was missing click listeners.
+11. Common tap/Back/hide lifecycle repair is now compile/package-green in J2 baseline.
+12. Direct tap retest, 20-cycle stability, locked-start invocation and reboot persistence remain device-unverified.
 
-## J2 scope now under implementation
+Canonical J1 evidence: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
 
-J2 is deliberately smaller than the final Mayra app:
+## J2 verified engineering scope
+
+J2 is an engineering proof package, not a second product:
 
 - package `ai.mayra.app.j2`;
-- only `RECORD_AUDIO` permission;
-- one small setup/status activity;
-- same Android Assistant/session foundation;
-- invocation-time on-device speech recognizer only when Android reports it available;
+- exactly `RECORD_AUDIO` permission;
+- one setup/status launcher;
+- same official Android Assistant/session foundation;
+- bounded invocation-time on-device Android speech recognition when Android reports support;
+- explicit listening/result/error states;
+- recognition stop on hide/destroy;
+- tap/root/label/Back dismissal repair;
 - no continuous microphone loop;
-- no internet/provider, contacts, reminders, notifications, WorkManager/Room/background intelligence or full chat runtime;
-- transcript proof only: J2 shows what it heard and does not pretend a local LLM answered.
+- no internet/provider, contacts, notifications, reminders, WorkManager/Room, full chat, memory, documents or calls.
 
-Dedicated J2 CI must pass compile, unit tests, lint, APK assembly, exactly-one-permission audit, launcher/component audit and artifact upload.
+Artifact provenance and physical steps are fixed in `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`.
 
 ## Immediate next actions
 
-1. Settle fresh exact-head J1, J2, Android CI and Project Governance.
-2. Repair any compile/lint/manifest/audit finding; do not weaken checks to force green.
-3. If all gates pass, create a new protected code baseline before additional high-risk work.
-4. Prefer the new J2 package for the next owner test so J1 zero-permission evidence remains untouched.
-5. On Motorola J2: grant microphone, select Mayra J2 as Digital assistant, verify on-device recognition availability, invoke with Power trigger and speak short Hindi/Hinglish/English phrases.
-6. Verify tap/Back/lock dismissal and 20 repeat cycles in the same J2 test.
-7. Run locked-screen invocation and reboot/role recovery evidence.
-8. Only after J2 proof: complete dedicated wake-word feasibility; do not use continuous SpeechRecognizer as a hotword loop.
-9. In parallel, prepare local-model benchmark criteria; do not bundle a model before RAM/thermal/license evidence.
-10. Keep Phone/InCallService and AI-call-answering implementation blocked until their own preflights.
-11. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Install exact J2 CI #18 candidate on the Motorola without bypassing Play Protect.
+2. Grant microphone only when requested.
+3. Select `Mayra J2 Voice Test` as Digital assistant and retain Power-button Digital assistant trigger.
+4. Verify Android on-device speech availability and short Hindi/Hinglish/English transcripts.
+5. Verify repaired orb/root/label tap dismissal plus Back and lock dismissal.
+6. Run 20 invoke/listen/dismiss cycles; check microphone indicator, recognizer-busy state, crash/System UI stability and thermal behavior.
+7. Test invocation beginning from an already locked screen.
+8. Reboot and verify Assistant role + one speech cycle.
+9. Record all PASS/FAIL/BLOCKED evidence in the J2 acceptance sheet before calling J2 device-verified.
+10. In parallel, complete wake-word and local-model feasibility documents/benchmarks; do not integrate either before its gate passes.
+11. Keep Phone/InCallService and AI-call-answering implementation blocked until dedicated preflights.
+12. Keep PR #12 Draft/open/unmerged until explicit owner approval.
