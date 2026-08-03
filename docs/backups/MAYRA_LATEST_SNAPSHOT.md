@@ -5,7 +5,7 @@ Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
 Mandatory entry point: `START_HERE.md`
-Current phase: Jarvis J1 zero-permission installation proof and repository consolidation
+Current phase: Motorola validation of the verified zero-permission J1 Assistant package
 Canonical product issue: #13
 Mandatory major-feature feasibility gate: #14
 Repository hygiene registry: #15
@@ -16,111 +16,83 @@ Repository hygiene registry: #15
 - PR #9 and PR #11 are closed and explicitly marked superseded.
 - Issue #10 is closed and explicitly marked superseded.
 - Issue #13 is the product North Star.
-- Issue #14 prevents local LLM, wake phrase, call control, accessibility automation or other major capabilities from entering implementation before Android/Motorola/permission/performance/distribution/fallback review.
+- Issue #14 prevents major capabilities entering implementation before Android/Motorola/permission/performance/distribution/fallback review.
 - Issue #15 classifies every branch as active, protected, retained backup or delete candidate.
-- No branch deletion is claimed in this pass because the connected GitHub tool does not expose branch-ref deletion. Protected baselines and required backups must not be removed.
+- Protected baselines and required backups must not be deleted or force-moved.
 
 ## Protected baselines
 
 ### Pre-Jarvis
-
 - Branch: `baseline/mayra-0.2.1-green-1795`
 - Commit: `065e22524c835f3ddd3b2f56215a3616f071d4b3`
 - Android CI #1795: success
 
 ### Jarvis J1 code baseline
-
 - Branch: `baseline/mayra-0.2.1-jarvis-j1-green-1851`
 - Commit: `0d9435adb92b425bfb47a710d4f4516a6aaac398`
 - Android CI #1851: success
 - Project Governance #32: success
 
-These remain known-green rollback points. Current zero-permission J1 work is not a baseline until all latest-head workflows pass.
+### Zero-permission J1 artifact baseline
+- Branch: `baseline/mayra-0.2.1-j1-zero-permission-green-44`
+- Commit: `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
+- J1 Assistant Test #44: success
+- Android CI #1935: success
+- Project Governance #116: success
 
-## Motorola evidence received
+## Verified J1 artifact
+
+- Build type: `j1AssistantTest`
+- Package: `ai.mayra.app.j1`
+- Label: `Mayra J1 Assistant Test`
+- Requested Android permissions: zero, verified by APK audit
+- Launcher count: exactly one
+- Included: Assistant activation/status activity, VoiceInteractionService, session service/orb and RecognitionService shell
+- Excluded: full chat, provider, contacts, reminders, notifications, boot recovery, notification listener, documents, memory, WorkManager, AndroidX Startup, Room and ProfileInstaller receiver
+- Artifact name: `mayra-j1-zero-permission-apk-44`
+- Artifact ID: `8854905288`
+- Artifact ZIP SHA-256: `12f4e148fbac99e916b78321b9ae75d87a5b4b5cebe2060bfa6e6b5f7545be3b`
+- APK size: `19,192,842` bytes
+- APK SHA-256: `edced64084537cd06ba55ddea0b2f80cdda2aaa322aa296379ac25d89ea66116`
+
+## Motorola evidence already received
 
 - Personal Alpha update failed because old/new APKs used different temporary CI debug certificates.
-- Clean-install retry was blocked by Google Play Protect because the full sideloaded debug app could request sensitive access.
+- Full Personal Alpha clean-install retry was blocked by Google Play Protect because that sideloaded debug app could request sensitive access.
 - Play Protect must not be disabled or bypassed for that artifact.
 
 Evidence:
-
 - `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`
 - `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
 
-## Dedicated J1 package
+## J1 engineering history
 
-- build type: `j1AssistantTest`;
-- package: `ai.mayra.app.j1`;
-- label: `Mayra J1 Assistant Test`;
-- intended requested Android permissions: zero;
-- exactly one launcher;
-- included: Assistant activation/status activity, VoiceInteractionService, session service/orb and RecognitionService metadata shell;
-- excluded: full chat, provider, contacts, reminders, notifications, boot recovery, notification listener, documents and memory.
+- Run #16 caught the API-29 role-request guard.
+- Run #22 caught inherited AndroidX permissions and background infrastructure.
+- Run #32 caught the lint/removal-model mismatch.
+- Run #38 proved the ProfileInstaller receiver still survived final manifest merging.
+- Run #44 passed compile, lint, assembly, zero-permission/component audit and artifact upload.
 
-Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
+## Current device gate
 
-## J1 failure history and current repair
+Use only J1 #44 for the next Motorola test:
 
-### Run #16
+1. clean install;
+2. launch the single J1 icon;
+3. verify Mayra appears in Android Assistant selection;
+4. select and remove Mayra;
+5. invoke while unlocked;
+6. invoke while locked, where Motorola permits;
+7. observe orb creation/dismiss/repeated invocation;
+8. record PASS/FAIL/BLOCKED with screenshots and exact steps.
 
-Lint caught the API-29 Assistant role request without a directly visible SDK guard. Fixed with an explicit Android Q runtime check.
-
-### Run #22
-
-Compilation, lint and assembly passed, but the hard audit rejected inherited AndroidX permissions/components: Wake Lock, Network State, Foreground Service, app-private dynamic receiver permission, Startup, WorkManager, Room and ProfileInstaller infrastructure.
-
-### Run #32
-
-Lint rejected an unscoped ProfileInstaller removal declaration in the variant source model.
-
-### Run #38
-
-Compilation, lint and APK assembly passed. The final APK audit proved `androidx.profileinstaller.ProfileInstallReceiver` still survived manifest merging. No APK was promoted.
-
-Current repair:
-
-- `ProfileInstallReceiver` is explicitly removed again;
-- `MissingClass` is ignored only on that one removal node because lint and final APK merge expose different class models;
-- the final APK audit remains strict and will still fail if the receiver survives;
-- repair commit: `f090fcc73d7e7979fe82cb0bd7d808fa05383b72`;
-- Roadmap and this snapshot were synchronized afterward.
-
-Fresh exact-head Android CI, Project Governance and J1 Assistant Test runs are required before any APK is shared.
+No local LLM, wake phrase or Phone/InCallService coding begins until this evidence is recorded and issue #14 preflight is complete.
 
 ## Full owner-app distribution truth
 
-The complete Mayra app requires one stable private owner/release certificate, protected build secrets, signed APK/AAB provenance, trusted owner-controlled distribution (preferably Play Internal Testing), and install-over-install/local-data-retention proof.
+The complete Mayra app still requires one stable private owner/release certificate, protected build secrets, signed APK/AAB provenance, trusted owner-controlled distribution (preferably Play Internal Testing), and install-over-install/local-data-retention proof.
 
 Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases and must not be used to bypass Play Protect.
-
-## Major-feature entry rule
-
-Before implementation of local LLM, always-listening wake phrase, animated overlay expansion, incoming-call control, AI caller messaging, notification intelligence or accessibility automation:
-
-1. complete issue #14 preflight;
-2. document official Android path and hard platform boundaries;
-3. define Motorola tests, battery/RAM/thermal budget and fallback UX;
-4. record the exact secure baseline;
-5. only then move the capability from `PLANNED` to `IN_PROGRESS`.
-
-## Latest validation gates
-
-1. Android CI on the exact latest head.
-2. Project Governance on the exact latest head.
-3. J1 Assistant Test on the exact latest head.
-4. If all green, record artifact ID, source SHA, APK size and SHA-256.
-5. Motorola clean install of only the verified J1 APK.
-6. Assistant role visibility, select/remove, unlocked/locked invocation and orb lifecycle.
-7. Update physical evidence before local LLM, wake-word or Phone-role coding.
-8. Verify issue #15 delete candidates before removing any branch.
-
-## Current feature truth
-
-- Core Mayra features remain code/CI mature, but full-device acceptance is blocked by trusted installation/distribution.
-- Jarvis J1 services/orb are code/CI verified at baseline #1851 but not device verified.
-- The zero-permission J1 package is the next installation proof vehicle.
-- Local LLM, always-listening wake phrase and default Phone/InCallService remain planned and blocked until J1 evidence and issue #14 reviews are complete.
 
 ## Merge and secret truth
 
