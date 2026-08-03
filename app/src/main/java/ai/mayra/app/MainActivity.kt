@@ -118,11 +118,25 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         readinessRefresh++
         if (granted) voiceAssistant.startListening() else voiceState = VoiceState(error = "Microphone permission is required for voice input")
     }
-    val devicePermissionsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { readinessRefresh++ }
+    val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        readinessRefresh++
+    }
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        readinessRefresh++
+    }
     fun startVoice() {
         if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening() else microphoneLauncher.launch(MicrophonePermission.permission)
     }
-    fun requestDevicePermissions() { devicePermissionsLauncher.launch(runtimePermissionNames()) }
+    fun requestContactsPermission() {
+        contactsLauncher.launch(Manifest.permission.READ_CONTACTS)
+    }
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            readinessRefresh++
+        }
+    }
     fun openActivity(activity: Class<out ComponentActivity>) {
         context.startActivity(Intent(context, activity))
     }
@@ -238,19 +252,35 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             dismissButton = { TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) { Text("Not now") } }
         )
     }
-    if (showReadiness) DeviceReadinessDialog(microphoneReady, permissionSnapshot.granted, installedAppsCount, ::requestDevicePermissions, { readinessRefresh++ }, { showReadiness = false })
+    if (showReadiness) {
+        DeviceReadinessDialog(
+            microphoneReady = microphoneReady,
+            grantedPermissions = permissionSnapshot.granted,
+            installedAppsCount = installedAppsCount,
+            onRequestContacts = ::requestContactsPermission,
+            onRequestNotifications = ::requestNotificationPermission,
+            onRefresh = { readinessRefresh++ },
+            onDismiss = { showReadiness = false }
+        )
+    }
 }
 
 @Composable
-private fun DeviceReadinessDialog(microphoneReady: Boolean, grantedPermissions: Set<DevicePermission>, installedAppsCount: Int, onRequestPermissions: () -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit) {
-    val rows = listOf(
-        DevicePermission.READ_CONTACTS to "Find contacts",
-        DevicePermission.POST_NOTIFICATIONS to "Reminder notifications",
-        DevicePermission.SCHEDULE_EXACT_ALARM to "Exact reminders",
-        DevicePermission.QUERY_APPS to "Open installed apps"
-    )
-    val readyCount = rows.count { it.first in grantedPermissions } + if (microphoneReady) 1 else 0
-    val totalCount = rows.size + 1
+private fun DeviceReadinessDialog(
+    microphoneReady: Boolean,
+    grantedPermissions: Set<DevicePermission>,
+    installedAppsCount: Int,
+    onRequestContacts: () -> Unit,
+    onRequestNotifications: () -> Unit,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val contactsReady = DevicePermission.READ_CONTACTS in grantedPermissions
+    val notificationsReady = DevicePermission.POST_NOTIFICATIONS in grantedPermissions
+    val appsReady = DevicePermission.QUERY_APPS in grantedPermissions
+    val readyCount = listOf(microphoneReady, contactsReady, notificationsReady, appsReady).count { it }
+    val totalCount = 4
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Device readiness") },
@@ -260,26 +290,34 @@ private fun DeviceReadinessDialog(microphoneReady: Boolean, grantedPermissions: 
                 Text("$installedAppsCount launchable apps detected")
                 HorizontalDivider()
                 ReadinessRow("Voice input", microphoneReady)
-                rows.forEach { (permission, label) -> ReadinessRow(label, permission in grantedPermissions) }
+                ReadinessRow("Find contacts", contactsReady)
+                if (!contactsReady) {
+                    OutlinedButton(onClick = onRequestContacts) { Text("Allow contacts when needed") }
+                }
+                ReadinessRow("Reminder notifications", notificationsReady)
+                if (!notificationsReady) {
+                    OutlinedButton(onClick = onRequestNotifications) { Text("Allow reminder notifications") }
+                }
+                ReadinessRow("Open installed apps", appsReady)
                 Text(
-                    "Calls and messages use Android's dialer/composer for final review. Mayra does not need direct CALL_PHONE or SEND_SMS permission.",
+                    "Microphone permission is requested only when you use Voice. Calls and messages open Android's dialer/composer for final review; Mayra never needs direct CALL_PHONE or SEND_SMS permission.",
                     style = MaterialTheme.typography.bodySmall
                 )
-                Text("Exact reminders may require enabling special access from Android settings.", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "Mayra reminders use persistent WorkManager scheduling. Android may defer delivery slightly during battery-saving modes; Mayra does not request exact-alarm special access.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         },
-        confirmButton = { Button(onClick = onRequestPermissions) { Text("Allow permissions") } },
-        dismissButton = { Row { TextButton(onClick = onRefresh) { Text("Refresh") }; TextButton(onClick = onDismiss) { Text("Close") } } }
+        confirmButton = { TextButton(onClick = onRefresh) { Text("Refresh") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 }
 
 @Composable
 private fun ReadinessRow(label: String, ready: Boolean) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, modifier = Modifier.weight(1f)); Text(if (ready) "Ready ✓" else "Permission needed") }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, modifier = Modifier.weight(1f))
+        Text(if (ready) "Ready ✓" else "Permission needed")
+    }
 }
-
-private fun runtimePermissionNames(): Array<String> = buildList {
-    add(Manifest.permission.RECORD_AUDIO)
-    add(Manifest.permission.READ_CONTACTS)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
-}.toTypedArray()
