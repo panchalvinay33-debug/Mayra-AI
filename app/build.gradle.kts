@@ -102,8 +102,8 @@ android {
             versionNameSuffix = "-j1"
             isDebuggable = true
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
-            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
             matchingFallbacks += listOf("debug")
         }
         create("fullTest") {
