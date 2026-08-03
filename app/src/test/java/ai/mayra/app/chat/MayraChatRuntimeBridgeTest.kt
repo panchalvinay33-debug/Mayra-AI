@@ -38,11 +38,13 @@ class MayraChatRuntimeBridgeTest {
     }
 
     @Test
-    fun destructiveActionCreatesExactPendingConfirmation() {
+    fun destructiveActionCreatesExactPendingConfirmationWithExpiry() {
         val result = bridge().dispatch("Delete file report.pdf") as MayraChatBridgeResult.NeedsConfirmation
         assertEquals("Delete file report.pdf", result.pending.message)
         assertTrue(result.pending.token.isNotBlank())
         assertTrue(result.pending.prompt.contains("confirm", ignoreCase = true))
+        assertTrue(result.pending.expiresAtEpochMillis > System.currentTimeMillis())
+        assertTrue(!result.pending.isExpired())
     }
 
     @Test
@@ -52,6 +54,22 @@ class MayraChatRuntimeBridgeTest {
 
         assertEquals("action executed", bridge.confirm(pending).text)
         assertTrue(bridge.confirm(pending).text.contains("rejected", ignoreCase = true))
+    }
+
+    @Test
+    fun expiredPendingConfirmationIsRejectedBeforeRuntimeDispatch() {
+        val bridge = bridge("should not execute")
+        val expired = PendingChatConfirmation(
+            message = "Delete file report.pdf",
+            token = "expired-token",
+            prompt = "Confirm action",
+            expiresAtEpochMillis = 1L
+        )
+
+        val reply = bridge.confirm(expired).text
+
+        assertTrue(reply.contains("expired", ignoreCase = true))
+        assertTrue(reply.contains("request the action again", ignoreCase = true))
     }
 
     @Test
