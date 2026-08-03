@@ -5,6 +5,17 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val mayraReleaseStoreFile = System.getenv("MAYRA_RELEASE_STORE_FILE")?.takeIf(String::isNotBlank)
+val mayraReleaseStorePassword = System.getenv("MAYRA_RELEASE_STORE_PASSWORD")?.takeIf(String::isNotBlank)
+val mayraReleaseKeyAlias = System.getenv("MAYRA_RELEASE_KEY_ALIAS")?.takeIf(String::isNotBlank)
+val mayraReleaseKeyPassword = System.getenv("MAYRA_RELEASE_KEY_PASSWORD")?.takeIf(String::isNotBlank)
+val mayraReleaseSigningAvailable = listOf(
+    mayraReleaseStoreFile,
+    mayraReleaseStorePassword,
+    mayraReleaseKeyAlias,
+    mayraReleaseKeyPassword
+).all { it != null }
+
 android {
     namespace = "ai.mayra.app"
     compileSdk = 35
@@ -20,11 +31,27 @@ android {
 
     buildFeatures { compose = true }
 
+    signingConfigs {
+        if (mayraReleaseSigningAvailable) {
+            create("mayraRelease") {
+                storeFile = file(mayraReleaseStoreFile!!)
+                storePassword = mayraReleaseStorePassword
+                keyAlias = mayraReleaseKeyAlias
+                keyPassword = mayraReleaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfigs.findByName("mayraRelease")?.let { signingConfig = it }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
