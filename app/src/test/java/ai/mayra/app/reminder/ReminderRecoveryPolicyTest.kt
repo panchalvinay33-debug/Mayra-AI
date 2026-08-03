@@ -27,6 +27,26 @@ class ReminderRecoveryPolicyTest {
         )
     }
 
+    @Test fun `follow up recovery uses only the remaining thirty minute window`() {
+        val lastAlert = now - 25L * 60L * 1_000L
+        val due = reminder(ReminderState.DUE, now - 30L * 60L * 1_000L).copy(lastNotifiedAt = lastAlert)
+
+        assertEquals(5L * 60L * 1_000L, MayraReminderRuntime.followUpDelayMillis(due, now))
+    }
+
+    @Test fun `already overdue follow up is scheduled immediately`() {
+        val lastAlert = now - 35L * 60L * 1_000L
+        val due = reminder(ReminderState.DUE, now - 40L * 60L * 1_000L).copy(lastNotifiedAt = lastAlert)
+
+        assertEquals(0L, MayraReminderRuntime.followUpDelayMillis(due, now))
+    }
+
+    @Test fun `fresh due reminder receives full follow up window`() {
+        val due = reminder(ReminderState.DUE, now).copy(lastNotifiedAt = now)
+
+        assertEquals(MayraReminderRuntime.FOLLOW_UP_DELAY_MILLIS, MayraReminderRuntime.followUpDelayMillis(due, now))
+    }
+
     @Test fun `existing missed reminder is left alone on reboot`() {
         assertEquals(
             ReminderRecoveryAction.LEAVE_MISSED,
