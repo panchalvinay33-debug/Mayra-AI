@@ -1,6 +1,6 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: ASSISTANT ROLE + UNLOCKED INVOCATION PASS — STABILITY/LOCK-SCREEN NEXT
+Status: ASSISTANT ROLE + UNLOCKED INVOCATION PASS — ORB DISMISSAL REPAIR IN PROGRESS
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
@@ -89,6 +89,23 @@ Unlocked assistant invocation: PASS.
 - Owner screenshot shows the Mayra blue/purple orb with the `Mayra` label rendered over the current Settings screen.
 - This is direct device evidence that the Motorola system can launch Mayra's `VoiceInteractionSession` while unlocked and render the assistant orb without opening the full J1 activity.
 
+Orb dismissal by touch: FAIL.
+
+- Owner reported that tapping the orb did nothing.
+- Tapping outside the orb also did nothing.
+- Root cause in source: the assistant root/orb/label had no click listeners and there was no explicit Back dismissal handling.
+
+Repair candidate:
+
+- Commit `af593761ef68959c230b376e31e654f01e0ab9f5`.
+- Orb tap calls `hide()`.
+- Root/outside tap calls `hide()`.
+- Label tap calls `hide()`.
+- Back calls `hide()`.
+- Animation is cancelled on hide/destroy so the session does not remain active visually.
+
+This repair is not device-ready until fresh J1 Assistant Test, Android CI and Project Governance all pass on the synchronized head and a new artifact is recorded.
+
 Permanent signing repair:
 
 - Commit `2d1d78f477f9fcd592c67b7a63a3c22358efdf1c` changes `j1AssistantTest` to use the `mayraOwner` signing configuration whenever owner signing secrets are available.
@@ -97,13 +114,15 @@ Permanent signing repair:
 
 ## Next device test sequence
 
-### E. Unlocked invocation stability — CURRENT GATE
+### E. Orb dismissal retest — CURRENT GATE
 
-- [x] Mayra assistant session opens without launching the full test activity.
-- [x] Mayra orb/session appears.
-- [ ] Dismiss the orb, then invoke again.
+- [ ] Install the fresh repaired artifact after all three CI gates pass.
+- [ ] Invoke Mayra while unlocked.
+- [ ] Tap the orb; session closes.
+- [ ] Invoke again; tap outside/root; session closes.
+- [ ] Invoke again; Back gesture closes the session.
 - [ ] Repeat invoke/dismiss 10 times without crash, duplicate surface or System UI restart.
-- [ ] Confirm the orb disappears fully after dismissal.
+- [ ] Confirm the orb disappears fully after every dismissal.
 
 ### F. Locked-screen invocation
 
@@ -121,4 +140,4 @@ Permanent signing repair:
 
 ## Promotion rule
 
-J1 moves to device-verified only after role selection, unlocked invocation, repeated orb/session lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 moves to device-verified only after role selection, unlocked invocation, reliable dismissal/repeated orb lifecycle, locked-screen behavior and recovery pass on the target Motorola. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
