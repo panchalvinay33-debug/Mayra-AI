@@ -5,10 +5,11 @@ Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
 Mandatory entry point: `START_HERE.md`
-Current phase: second Motorola Assistant activation repair after J1 #56 device failure
+Current phase: J1 Motorola Assistant proof achieved; J2 invocation-time voice foundation under fresh CI
 Canonical product issue: #13
 Mandatory feasibility gate: #14
 Repository hygiene registry: #15
+J2 preflight: `docs/feasibility/MAYRA_J2_VOICE_PREFLIGHT.md`
 
 ## Canonical repository truth
 
@@ -16,6 +17,7 @@ Repository hygiene registry: #15
 - PR #9 and #11 are closed as superseded.
 - Issue #10 is closed as superseded.
 - Protected baselines and retained backups must not be force-moved or deleted.
+- Final product remains one Mayra app; J1/J2 are engineering proof packages only.
 
 ## Protected baselines
 
@@ -24,74 +26,98 @@ Repository hygiene registry: #15
 - `baseline/mayra-0.2.1-j1-zero-permission-green-44` at `a8a7a1dc338a1474cb9bc0f32de55f6c3b834976`
 - `baseline/mayra-0.2.1-j1-activation-repair-green-56` at `ce96f8e83fe33b878d426c407715d4a3e1b0495a`
 
-## J1 #56 verified package
+No new baseline is promoted until the current touch-dismiss/J2 batch is exact-head green.
+
+## Authoritative J1 device artifact
 
 - Package: `ai.mayra.app.j1`
 - Label: `Mayra J1 Assistant Test`
-- J1 #56, Android CI #1947 and Governance #128: success
-- Zero requested Android permissions
-- Exactly one launcher
-- APK SHA-256: `2def2acd55a0ea751c3cd70c9d78674c275f2c2d8e2e4e03ae527464cf48a318`
+- Tested Motorola-route artifact: J1 #68
+- Source: `8b0e7ee33a34b8784de6b555ff7b273ab11ac525`
+- J1 #68: success
+- Android CI #1959: success
+- Project Governance #140: success
+- Artifact ID: `8859497655`
+- APK SHA-256: `0e1a36ff6b5e72c7d719430b5e04e87c3f7c3707d341a0527d6e488942d13cb9`
 
 ## Motorola device evidence
 
-### Install/update and launch
-
 PASS:
 
-- #56 installed/updated and opened normally.
-- No runtime permission prompt appeared.
-- Visible activation diagnostic text rendered.
+- J1 installed and launched without bypassing Play Protect.
+- Motorola Default Apps opened.
+- `Mayra J1 Assistant Test` appeared as a valid Digital assistant.
+- Mayra was selected as the default Digital assistant.
+- J1 reported `Status: Mayra is selected`.
+- Motorola Power-button action was configured for Digital assistant.
+- Power-button invocation launched Mayra while unlocked.
+- Mayra blue/purple orb/session rendered over the current screen.
+- Back dismissed the session.
+- Locking the phone dismissed the current session.
 
-### Activate Mayra
+FAIL/repair:
 
-FAIL:
+- On J1 #68, tapping orb/outside produced no response because the initial surface had no click listeners.
+- Common assistant-session repair adds orb/root/label tap-to-hide and explicit Back-to-hide.
+- Hide/destroy now stop animation/keep-awake work; a later show restarts the pulse.
 
-- Tapping `Activate Mayra` still did not leave the J1 screen.
-- No usable Android Assistant/default-app selection screen appeared.
-- Status remained `Mayra is not selected`.
-- Owner screenshot received at approximately 19:46 IST on 2026-08-03.
+Still unverified:
 
-Evidence is recorded in `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
+- direct touch dismissal on repaired artifact;
+- 10–20 repeated invoke/dismiss cycles;
+- invocation starting from an already locked screen;
+- reboot persistence/recovery of Assistant role.
 
-## Pinpoint root cause after #56
+Evidence: `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md`.
 
-Two concrete problems were found:
+## Current J2 implementation batch
 
-1. Shared voice-interaction metadata referenced `ai.mayra.app.MainActivity` as `settingsActivity`, but J1 removes `MainActivity`. J1 therefore had an invalid settings activity target.
-2. Motorola Edge 70 Fusion Android 16 documents the assistant-selection route as `Settings → Apps → Default apps → Digital assistant`; the earlier generic Voice Input/role-request fallback did not reliably reach that screen.
+Goal: prove short real voice input after explicit Mayra invocation, locally where Android supports it.
 
-## Second repair
+Added:
 
-- Added J1-specific `mayra_voice_interaction_service.xml` with `settingsActivity="ai.mayra.app.j1.J1AssistantTestActivity"`.
-- `Activate Mayra` now launches `Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS` directly.
-- On-screen instructions show the exact Motorola path: `Settings → Apps → Default apps → Digital assistant → Mayra`.
-- If Default apps cannot be launched, fallback is general Settings with the same manual path.
-- No OEM-private component, root method, Accessibility hack or security bypass is used.
+- build type/package `j2VoiceTest` / `ai.mayra.app.j2`;
+- secret-backed owner-signing selection when protected owner secrets exist, otherwise debug fallback clearly remains non-stable;
+- J2 minimal Application and setup/status Activity;
+- J2-specific Assistant metadata pointing settingsActivity to J2;
+- exactly-one-permission manifest intent: `RECORD_AUDIO` only;
+- `MayraVoiceSessionState` bounded state model;
+- `MayraOnDeviceSpeechRecognizer` wrapper using on-device Android recognition only when reported available;
+- common session integration guarded by `BuildConfig.VOICE_SESSION_RECOGNITION_ENABLED` so J1/full app behavior is not silently changed to microphone listening;
+- stop recognition on hide/destroy;
+- unit tests for state semantics;
+- dedicated `J2 Voice Test` GitHub workflow with compile/test/lint/package/permission/component audits.
 
-Code commits in this repair chain include:
+J2 explicitly does NOT add:
 
-- `dfe95331b65ba5d912653d8d43a1ddd55d124efe` — J1-specific valid settingsActivity.
-- `3a94d202b4cffe4e625d55a377e656d46010776b` — direct Motorola Default apps route.
-- Documentation synchronized afterward.
+- continuous listening/hotword loop;
+- internet/cloud STT;
+- local LLM;
+- contacts, notifications, reminders or background listener;
+- call control;
+- raw audio persistence.
 
-## Next exact gate
+## Feasibility decision
 
-1. Run J1 Assistant Test, Android CI and Project Governance on the final synchronized second-repair head.
-2. Share no new APK unless all three are green.
-3. Install/update the new artifact over #56 where signing permits.
-4. Tap Activate Mayra; expect Android Default apps screen.
-5. Tap Digital assistant and record whether Mayra appears.
-6. If app navigation still fails, manually test `Settings → Apps → Default apps → Digital assistant` to separate navigation failure from candidate-eligibility failure.
-7. If Mayra appears, select it, refresh status, then test unlocked/locked invocation and orb lifecycle.
-8. Keep local LLM, wake phrase and Phone role blocked until J1 evidence is complete.
+Android’s selected `VoiceInteractionService` is the correct lightweight always-available assistant foundation, but Android `SpeechRecognizer` is not the future always-on wake-word engine. J2 uses SpeechRecognizer only after explicit invocation. A dedicated wake-word detector requires a separate preflight/battery benchmark.
+
+## Current exact gate
+
+1. Settle fresh J1 Assistant Test, J2 Voice Test, Android CI and Project Governance on the final synchronized head.
+2. Repair source/manifest/test issues rather than weakening the audits.
+3. Promote a new protected baseline only after all required gates are green.
+4. Then produce a J2 test artifact and record package/size/SHA/source provenance.
+5. Motorola J2 test: microphone grant → J2 Digital assistant selection → on-device recognition availability → Power invoke → short spoken phrase → visible `Listening…`/`Heard:` result → tap/Back/lock dismiss → repeat cycles → locked-screen/reboot tests.
 
 ## Distribution truth
 
-The complete Mayra owner app still requires one stable private signing certificate and trusted distribution. Temporary debug Personal Alpha builds must not be used to bypass Play Protect.
+- Full Mayra still requires one stable private owner/release certificate and trusted distribution.
+- J1/J2 can use the same owner signing path only after private signing secrets are configured.
+- Temporary CI debug artifacts are not update-stable across runners.
+- Play Protect/signature checks must not be bypassed.
 
 ## Merge/secret truth
 
 - PR #12 remains Draft/open/unmerged.
 - No merge or ready transition is authorized.
-- No API key, keystore, password or private owner data belongs in GitHub records.
+- No API key, keystore, password or owner-private data belongs in GitHub records.
