@@ -84,6 +84,14 @@ jobs:
             ai.mayra.app.document.MayraDocumentActivity
             ai.mayra.app.memory.MayraMemoryCenterActivity
             ai.mayra.app.core.MayraProviderSettingsActivity
+            androidx.startup.InitializationProvider
+            androidx.work.impl.background.systemjob.SystemJobService
+            androidx.work.impl.foreground.SystemForegroundService
+            androidx.work.impl.utils.ForceStopRunnable\$BroadcastReceiver
+            androidx.work.impl.background.systemalarm.RescheduleReceiver
+            androidx.work.impl.diagnostics.DiagnosticsReceiver
+            androidx.room.MultiInstanceInvalidationService
+            androidx.profileinstaller.ProfileInstallReceiver
           )
           for component in "${forbidden_components[@]}"; do
             if grep -Fq "$component" build/j1-ci/manifest.log; then
