@@ -15,21 +15,14 @@ import ai.mayra.app.brain.MayraRuntimeOrchestrator
 import ai.mayra.app.brain.MayraSkillRegistry
 import ai.mayra.app.brain.MayraTaskPlanner
 import ai.mayra.app.brain.registerBuiltInDeviceSkills
-import ai.mayra.app.core.ActionDispatcher
-import ai.mayra.app.core.AndroidMayraProviderCredentialStore
-import ai.mayra.app.core.AndroidMayraProviderSettingsStore
-import ai.mayra.app.core.LocalCommandEngine
-import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.core.MayraAndroidRuntimeComposition
 import ai.mayra.app.core.MayraAnswerProvider
 import ai.mayra.app.core.MayraAssistant
-import ai.mayra.app.core.MayraHttpConversationalProvider
-import ai.mayra.app.core.ResilientMayraProviderAssistant
-import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
+import ai.mayra.app.core.MayraAssistantComposition
+import ai.mayra.app.core.LocalMayraAssistant
 import ai.mayra.app.memory.AndroidMayraPendingMemoryProposalStore
 import ai.mayra.app.memory.AndroidMayraPersonalMemoryStore
 import ai.mayra.app.memory.MayraPersonalMemoryManager
-import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
 import ai.mayra.app.reminder.MayraReminderRuntime
 import android.app.Application
@@ -51,36 +44,10 @@ class MayraApplication : Application() {
         personalMemory.pendingProposals()
 
         val actionExecutor = AndroidActionExecutor(applicationContext)
-        val localCommandEngine = LocalCommandEngine(
-            actionDispatcher = ActionDispatcher(actionExecutor)
-        )
-        val localAssistant = LocalMayraAssistant(localCommandEngine)
-
-        val providerSettings = AndroidMayraProviderSettingsStore(applicationContext).read()
-        val providerCredentials = AndroidMayraProviderCredentialStore(applicationContext)
-        val providerConfig = providerSettings.validatedConfig().getOrNull()
-        val conversationalAssistant: MayraAssistant = if (
-            providerConfig?.enabled == true && providerCredentials.hasCredential()
-        ) {
-            ResilientMayraProviderAssistant(
-                provider = MayraHttpConversationalProvider(providerConfig, providerCredentials),
-                fallback = localAssistant,
-                timeoutMillis = providerConfig.readTimeoutMillis.toLong().coerceAtMost(60_000L),
-                maxAttempts = 2,
-                retryDelayMillis = 350
-            )
-        } else {
-            localAssistant
+        MayraAssistantComposition.rebuild(applicationContext).onFailure {
+            // Startup must remain available even if provider configuration is unexpectedly corrupt.
+            MayraRuntime.assistant = LocalMayraAssistant()
         }
-
-        val documentAssistant = DocumentInsightAwareMayraAssistant(
-            delegate = conversationalAssistant,
-            context = applicationContext
-        )
-        MayraRuntime.assistant = PersonalMemoryAwareMayraAssistant(
-            delegate = documentAssistant,
-            memory = personalMemory
-        )
 
         val typedRuntime = MayraAndroidRuntimeComposition(
             context = applicationContext,
