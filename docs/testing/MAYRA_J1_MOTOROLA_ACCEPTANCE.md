@@ -1,6 +1,6 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: SECOND ACTIVATION REPAIR IN PROGRESS
+Status: J1 #68 CLEAN-INSTALL REQUIRED, STABLE SIGNING FIX IN PROGRESS
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
@@ -32,7 +32,6 @@ Activation button: FAIL — no visible response.
 - Project Governance: #128 — success
 - Artifact: `mayra-j1-zero-permission-apk-56`
 - Artifact ID: `8856404389`
-- Artifact ZIP SHA-256: `18dfe69d34cd52f76fe63e26cff011b088a1ff95606e88a7ca577af99aec4300`
 - APK size: `19,192,842` bytes
 - APK SHA-256: `2def2acd55a0ea751c3cd70c9d78674c275f2c2d8e2e4e03ae527464cf48a318`
 - Protected baseline: `baseline/mayra-0.2.1-j1-activation-repair-green-56`
@@ -43,32 +42,56 @@ Installation/update and launch: PASS.
 Visible diagnostic text: PASS.
 Activation navigation: FAIL — tapping `Activate Mayra` still did not leave the J1 screen or open a usable system selection screen.
 
-Owner screenshot evidence was received at approximately 19:46 IST on 2026-08-03. The app still showed `Status: Mayra is not selected` and the visible instruction text, but no system screen opened.
+## J1 #68 Motorola-route artifact
 
-## Root-cause review after #56
+- Package: `ai.mayra.app.j1`
+- Source: `8b0e7ee33a34b8784de6b555ff7b273ab11ac525`
+- J1 Assistant Test #68: success
+- Android CI #1959: success
+- Project Governance #140: success
+- Artifact: `mayra-j1-zero-permission-apk-68`
+- Artifact ID: `8859497655`
+- APK size: `19,192,850` bytes
+- APK SHA-256: `0e1a36ff6b5e72c7d719430b5e04e87c3f7c3707d341a0527d6e488942d13cb9`
 
-Two concrete issues were identified:
+#68 contains the two intended Motorola activation repairs:
 
-1. The shared voice-interaction metadata declared `android:settingsActivity="ai.mayra.app.MainActivity"`, but J1 intentionally removes `MainActivity`. J1 therefore had an invalid settings activity target inside its assistant metadata.
-2. The generic Voice Input/role-request route is not the documented Motorola Edge 70 Fusion Android 16 path for changing the assistant. Motorola documents `Settings → Apps → Default apps → Digital assistant`.
+1. J1-specific voice-interaction metadata points `settingsActivity` to `ai.mayra.app.j1.J1AssistantTestActivity`, not the removed full-app `MainActivity`.
+2. `Activate Mayra` targets Android Default Apps with the documented Motorola manual path `Settings → Apps → Default apps → Digital assistant` shown in-app.
 
-Android assistant-role qualification remains valid because J1 exposes a `VoiceInteractionService` gated by `android.permission.BIND_VOICE_INTERACTION`, with session and recognition services.
+### #68 installation result
 
-## Second repair candidate
+Result: BLOCKED — package signing conflict.
 
-- J1-specific `mayra_voice_interaction_service.xml` now points `settingsActivity` to `ai.mayra.app.j1.J1AssistantTestActivity`.
-- `Activate Mayra` now opens `Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS` directly.
-- On-screen instructions now show the exact Motorola path: `Settings → Apps → Default apps → Digital assistant → Mayra`.
-- If Android does not expose Default apps, the only fallback is general Settings with the same manual path shown.
-- No hidden Motorola component, private API, root, Accessibility hack or security bypass is used.
+Observed on the Motorola device:
 
-The second repair is not device-ready until J1 CI, Android CI and Project Governance all pass on the synchronized exact head and a new APK provenance is recorded.
+`App not installed as package conflicts with an existing package.`
+
+Root cause:
+
+- CI J1 builds were hard-coded to the runner's temporary debug signing certificate.
+- The package name remained `ai.mayra.app.j1`, so Android correctly rejected a newer APK signed by a different certificate.
+- This is an installation/signing failure, not evidence that #68 activation code failed.
+
+Current safe test action:
+
+- J1 contains no personal memory/documents/contacts/reminder data and requests zero Android runtime permissions.
+- Uninstall the currently installed `Mayra J1 Assistant Test` once, then clean-install the verified #68 APK.
+- Do not bypass Play Protect or signature checks.
+
+Permanent signing repair:
+
+- Commit `2d1d78f477f9fcd592c67b7a63a3c22358efdf1c` changes `j1AssistantTest` to use the same `mayraOwner` signing configuration as Personal Alpha whenever owner signing secrets are available.
+- It falls back to debug signing only when owner signing is unavailable, and exposes `STABLE_OWNER_SIGNING` accordingly.
+- Stable owner secrets still need to be configured in GitHub Actions before CI-generated J1 APKs can be claimed as install-over-install stable.
+- No keystore/password/private key is committed to the repository.
 
 ## Next retest sequence
 
-### A. Update/install
+### A. Clean install #68
 
-- [ ] Install the new repaired artifact over #56, or uninstall only if Android reports a signing conflict.
+- [ ] Uninstall the currently installed J1 test package.
+- [ ] Install the verified #68 APK.
 - [ ] App opens normally.
 - [ ] No runtime permission prompt appears.
 
@@ -79,7 +102,7 @@ The second repair is not device-ready until J1 CI, Android CI and Project Govern
 - [ ] Tap `Digital assistant`.
 - [ ] Record whether `Mayra J1 Assistant Test` appears as an available choice.
 
-If the button still does not navigate, manually test the documented Motorola path before declaring candidate visibility failure:
+If the button still does not navigate, manually test:
 
 `Settings → Apps → Default apps → Digital assistant`.
 
@@ -103,29 +126,6 @@ If the button still does not navigate, manually test the documented Motorola pat
 - [ ] No private Mayra content is exposed before unlock.
 - [ ] Dismissal returns cleanly to lock screen.
 
-### F. Recognition honesty
-
-- [ ] No invented transcript.
-- [ ] No endless listening loop.
-- [ ] No claim that wake phrase is implemented.
-
-### G. Process/reboot recovery
-
-- [ ] Force-stop does not create a crash loop.
-- [ ] Reboot preserves or visibly recovers role state.
-- [ ] Removing Mayra restores previous assistant behavior.
-
-### H. Permission boundary
-
-- [x] #44 and #56 CI verified zero requested Android permissions.
-- [x] Exactly one launcher verified.
-- [x] No WorkManager, Startup, Room, notification listener or boot receiver.
-- [ ] Motorola shows no unexpected permission request on the next artifact.
-
-## Failure protocol
-
-Every failure must record exact steps, expected/actual behavior, screenshot or recording, repeatability after restart/reboot, artifact source SHA and APK SHA-256.
-
 ## Promotion rule
 
-J1 moves to device-verified only after activation, role visibility, select/remove, unlocked invocation, lock-screen behavior and orb lifecycle pass on one provenance-recorded repaired APK. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
+J1 moves to device-verified only after clean installation, activation, role visibility, select/remove, unlocked invocation, lock-screen behavior and orb lifecycle pass on one provenance-recorded artifact. Local LLM, wake phrase and Phone-role implementation remain blocked until that evidence is processed.
