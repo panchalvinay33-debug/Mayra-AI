@@ -26,31 +26,24 @@ These remain known-green rollback points. Current zero-permission J1 work is not
 
 ## Motorola evidence received
 
-### Signature conflict
+- Personal Alpha update failed because old/new APKs used different temporary CI debug certificates.
+- Clean-install retry was blocked by Google Play Protect because the full sideloaded debug app could request sensitive access.
+- Play Protect must not be disabled or bypassed for that artifact.
 
-An update attempt for `ai.mayra.app.alpha` failed because the old and new APKs used different temporary GitHub runner debug certificates.
+Evidence:
 
-Evidence: `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`.
+- `docs/testing/MAYRA_J1_INSTALL_RESULT_2026-08-03.md`
+- `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`
 
-### Play Protect block
-
-Google Play Protect blocked the full sideloaded Personal Alpha because it could request sensitive data. The app was not installed.
-
-Evidence: `docs/testing/MAYRA_PLAY_PROTECT_BLOCK_2026-08-03.md`.
-
-Instruction: do not disable or bypass Play Protect for this artifact.
-
-## Current corrective implementation
-
-Dedicated J1 build:
+## Dedicated J1 package
 
 - build type: `j1AssistantTest`;
 - package: `ai.mayra.app.j1`;
 - label: `Mayra J1 Assistant Test`;
 - intended requested Android permissions: zero;
-- one launcher;
-- included: small role activation/status activity, VoiceInteractionService, session service/orb and RecognitionService metadata shell;
-- excluded: full chat, provider, internet, contacts, reminders, notifications, boot recovery, notification listener, documents and memory.
+- exactly one launcher;
+- included: Assistant activation/status activity, VoiceInteractionService, session service/orb and RecognitionService metadata shell;
+- excluded: full chat, provider, contacts, reminders, notifications, boot recovery, notification listener, documents and memory.
 
 Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
 
@@ -58,34 +51,21 @@ Dedicated workflow: `.github/workflows/j1-assistant-test.yml`.
 
 ### J1 run #16
 
-- compilation passed;
-- lint caught the API-29 Assistant role request lacking a directly visible SDK guard;
-- fixed with an explicit Android Q runtime check and no suppression/baseline.
+Lint caught the API-29 Assistant role request without a directly visible SDK guard. Fixed with an explicit Android Q runtime check and no suppression/baseline.
 
 ### J1 run #22
 
-- compilation, lint and APK assembly passed;
-- hard manifest audit correctly rejected inherited AndroidX infrastructure:
-  - `WAKE_LOCK`;
-  - `ACCESS_NETWORK_STATE`;
-  - `FOREGROUND_SERVICE`;
-  - app-private dynamic receiver permission;
-  - AndroidX Startup, WorkManager, Room and ProfileInstaller components.
-- no APK was promoted.
+Compilation, lint and assembly passed, but the hard audit rejected inherited AndroidX permissions/components: Wake Lock, Network State, Foreground Service, app-private dynamic receiver permission, Startup, WorkManager, Room and ProfileInstaller infrastructure. No APK was promoted.
 
-Current repair:
+### J1 run #32
 
-- J1 manifest explicitly removes all listed permissions and unrelated AndroidX components;
-- J1 workflow now permanently lists those components as forbidden;
-- required Assistant services and the one J1 launcher remain.
+Lint rejected the explicit removal declaration for `androidx.profileinstaller.ProfileInstallReceiver` because that class was absent from the actual dependency graph. The invalid removal declaration was removed. All real inherited permission/component removals and strict workflow audits remain.
 
-Relevant repair commits:
+Current source repair commit:
 
-- manifest cleanup: `e2826da364d3f26041f1f508e92f56d1ea8c9e85`;
-- stronger audit: `dc78e8898e6ca1566749c91b4750943f1d5ead86`;
-- followed by synchronized project records.
+- `2e35d1ff44fbcfa582e2621bbc28bd2830b48d3c`
 
-Fresh workflows are required on the final exact head before an APK is shared.
+Roadmap and rolling snapshot were synchronized afterward. Fresh exact-head workflows are required before an APK is shared.
 
 ## Full owner-app distribution truth
 
@@ -97,15 +77,15 @@ Temporary CI debug-signed Personal Alpha APKs are not long-term owner releases a
 
 1. Android CI on the exact latest head.
 2. Project Governance on the exact latest head.
-3. J1 Assistant Test workflow on the exact latest head.
+3. J1 Assistant Test on the exact latest head.
 4. If all green, record artifact ID, source SHA, APK size and SHA-256.
-5. Motorola clean install of only the zero-permission J1 APK.
+5. Motorola clean install of only the verified J1 APK.
 6. Assistant role visibility, select/remove, unlocked/locked invocation and orb lifecycle.
-7. Update device evidence before local LLM, wake-word or Phone-role coding.
+7. Update physical evidence before local LLM, wake-word or Phone-role coding.
 
 ## Current feature truth
 
-- Core Mayra features remain code/CI mature but full-device acceptance is blocked by trusted installation/distribution.
+- Core Mayra features remain code/CI mature, but full-device acceptance is blocked by trusted installation/distribution.
 - Jarvis J1 services/orb are code/CI verified at baseline #1851 but not device verified.
 - The zero-permission J1 package is the next installation proof vehicle.
 - Local LLM, always-listening wake phrase and default Phone/InCallService remain planned and blocked until J1 evidence is processed.
