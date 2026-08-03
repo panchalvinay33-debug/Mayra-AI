@@ -38,6 +38,7 @@ This ledger records product ideas from acceptance through delivery, deferral, re
 | IDEA-018 | Production-signed final Mayra | IN_PROGRESS | Minified release audit and environment-only signing scaffold implemented | Private signing, provenance and distribution |
 | IDEA-019 | Stable owner APK updates without uninstall | IN_PROGRESS | Personal Alpha supports secret-backed stable signing; dedicated workflow added | Configure secrets and pass A→B update/data-retention test |
 | IDEA-020 | Very simple first-start setup | IN_PROGRESS | Two-step permission + Assistant-role onboarding committed | Compile/lint and Motorola first-launch test |
+| IDEA-021 | Zero-permission J1 Assistant test APK | IN_PROGRESS | Dedicated `ai.mayra.app.j1` build contains only Assistant activation and orb/session foundations; CI rejects any requested permission or extra feature component | Complete J1 workflow and Motorola installation/role invocation test |
 
 ## Deferred ideas
 
