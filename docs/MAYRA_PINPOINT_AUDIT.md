@@ -14,80 +14,84 @@ Each subsystem is checked against five truths:
 4. APK/manifest/permission/package boundary.
 5. Motorola physical validation evidence.
 
-Status meanings follow `START_HERE.md`.
-
 ## Executive result
 
-- Last fully green secure baseline: `baseline/mayra-0.2.1-green-1795` at `065e22524c835f3ddd3b2f56215a3616f071d4b3`.
-- Current Jarvis/governance head is not a baseline until latest Android CI and Project Governance are both green.
-- Governance workflow is operational and has passed.
-- Android CI #1833 found two compile incompatibilities in the new Assistant foundation; both were repaired forward without weakening the design.
+- Pre-Jarvis protected baseline: `baseline/mayra-0.2.1-green-1795` at `065e22524c835f3ddd3b2f56215a3616f071d4b3`.
+- Current Jarvis J1 protected baseline: `baseline/mayra-0.2.1-jarvis-j1-green-1851` at `0d9435adb92b425bfb47a710d4f4516a6aaac398`.
+- Android CI #1851: success.
+- Project Governance #32: success.
+- Personal Alpha #1851 is provenance-recorded and ready for Motorola J1 testing.
 - No merge/ready transition is authorized.
 
 ## Pinpoint module register
 
-| Area | Source state | Automated evidence | Packaging evidence | Device evidence | Status / exact gap |
-|---|---|---|---|---|---|
-| One launcher / internal screens | Implemented | CI audits | Personal Alpha/Full Test/release audits | Early Full Test launch only | DEVICE_VERIFY — repeat on latest owner candidate |
-| Local deterministic chat | Implemented | Regression tests | Included | Partial screenshots | DEVICE_VERIFY — longer Hinglish/context tests |
-| Local LLM brain | Not integrated | None | None | None | PLANNED — benchmark model/runtime first |
-| Optional cloud provider | Implemented | transport/settings/fallback tests | INTERNET only in capable variants | Not tested with real owner key | DEVICE_VERIFY |
-| Provider credential security | Keystore AES-GCM | tests/lint | backup off/HTTPS only | Not recovery-tested | DEVICE_VERIFY |
-| Personal memory | Implemented | lifecycle/provenance tests | Internal screen | Not fully tested | DEVICE_VERIFY |
-| TXT/PDF/DOCX library | Implemented | extraction/search/health tests | isolated Document Test | Partial/old evidence | DEVICE_VERIFY |
-| OCR / legacy DOC | Not implemented | explicit unsupported paths | None | None | DEFERRED |
-| App opening | Implemented | routing collision tests | query visibility audited | Not retested latest | DEVICE_VERIFY |
-| Contact resolution | Implemented | resolver/action tests | READ_CONTACTS only capable variants | Not tested latest | DEVICE_VERIFY |
-| Calls/messages | Dialer/composer review-first | intent/confirmation tests | no CALL_PHONE/SEND_SMS | Not tested latest | DEVICE_VERIFY |
-| Reminder parser/store | Implemented | language/time/state tests | notification/boot components | Not tested on Motorola | DEVICE_VERIFY |
-| Reminder follow-up/recovery | Implemented and repaired | DUE→MISSED and remaining-delay tests | WorkManager/receiver audit | Doze/reboot pending | DEVICE_VERIFY |
-| Confirmation expiry | Implemented | replay/mismatch/expiry tests | N/A | UI expiry pending physical check | DEVICE_VERIFY |
-| Activity History | Implemented | persistence tests | internal screen | Not tested latest | DEVICE_VERIFY |
-| Voice input/TTS | Implemented foundation | limited logic tests | RECORD_AUDIO capable variants | Physical quality pending | DEVICE_VERIFY |
-| Animated assistant session | Foundation implemented | compile/lifecycle validation pending | assistant components intended capable variants only | None | IN_PROGRESS |
-| Android Assistant role | Foundation implemented | manifest/API compilation pending latest CI | role services/meta-data need explicit audit | None | IN_PROGRESS |
-| Lock-screen assistant | Declaration foundation | no device automation | manifest only | None | IN_PROGRESS |
-| Wake phrase / always listening | Not integrated | None | None | None | PLANNED — battery/thermal gate required |
-| Notification intelligence | Listener foundation exists | limited tests | special-access service in capable variants | Not accepted | DEVICE_VERIFY/PLANNED expansion |
-| Default Phone role | Not implemented | None | None | None | PLANNED |
-| Incoming call answer/reject/speaker | Not implemented | None | None | None | PLANNED after Phone role |
-| Call screening | Not implemented | None | None | None | PLANNED |
-| Caller message-taking | Architecture constrained | None | None | None | PLANNED_WITH_CONSTRAINTS |
-| Release minification | Implemented | R8 CI gate | final `ai.mayra.app` audited | unsigned/no upgrade test | IN_PROGRESS |
-| Release signing | Environment scaffold | config compile only | no signed production artifact | None | PLANNED finalization |
-| Project docs/governance | Implemented | Project Governance green | N/A | N/A | DONE, continuous maintenance |
-| Baseline/rollback | Protected branch + playbook | Git reference | N/A | Device rollback not yet exercised | DONE for code; DEVICE_VERIFY for install rollback |
+| Area | Source state | Automated/package evidence | Device evidence | Status / exact gap |
+|---|---|---|---|---|
+| One launcher / internal screens | Implemented | #1851 package/launcher audits | Latest candidate pending | DEVICE_VERIFY |
+| Local deterministic chat | Implemented | Regression tests green | Partial old evidence | DEVICE_VERIFY |
+| Local LLM brain | Not integrated | None | None | PLANNED after J1 |
+| Optional cloud provider | Implemented | transport/settings/fallback + package audits | Real owner key pending | DEVICE_VERIFY |
+| Provider credential security | Keystore AES-GCM | tests/lint/backup-off/HTTPS-only | Recovery pending | DEVICE_VERIFY |
+| Personal memory | Implemented | lifecycle/provenance tests | Full Motorola lifecycle pending | DEVICE_VERIFY |
+| TXT/PDF/DOCX library | Implemented | extraction/search/health + Document Test | Latest physical files pending | DEVICE_VERIFY |
+| OCR / legacy DOC | Not implemented | explicit unsupported paths | None | DEFERRED |
+| App opening | Implemented | routing collision tests | Latest test pending | DEVICE_VERIFY |
+| Contact resolution | Implemented | resolver/action tests | Latest test pending | DEVICE_VERIFY |
+| Calls/messages | Dialer/composer review-first | intent/confirmation + forbidden-permission audits | Pending | DEVICE_VERIFY |
+| Reminder parser/store | Implemented | language/time/state tests | Pending | DEVICE_VERIFY |
+| Reminder follow-up/recovery | Implemented/repaired | DUE→MISSED + remaining-delay tests | Doze/reboot pending | DEVICE_VERIFY |
+| Confirmation expiry | Implemented | replay/mismatch/expiry tests | UI pending | DEVICE_VERIFY |
+| Activity History | Implemented | persistence tests | Pending | DEVICE_VERIFY |
+| Voice input/TTS | Foundation implemented | compile/lint | Quality pending | DEVICE_VERIFY |
+| Animated assistant session | Implemented foundation | #1851 compile/tests/lint/package green | No physical invocation yet | DEVICE_VERIFY |
+| Android Assistant role | Implemented foundation | #1851 source/package green | Role visibility/selection pending | DEVICE_VERIFY |
+| Lock-screen assistant | Declaration foundation | #1851 manifest/package green | Locked invocation pending | DEVICE_VERIFY |
+| Wake phrase / always listening | Not integrated | Recognition shell only | None | PLANNED |
+| Notification intelligence | Listener foundation | package audit | Special-access behavior pending | DEVICE_VERIFY/PLANNED expansion |
+| Default Phone role | Not implemented | None | None | PLANNED |
+| Incoming answer/reject/speaker | Not implemented | None | None | PLANNED after Phone role |
+| Call screening | Not implemented | None | None | PLANNED |
+| Caller message-taking | Constrained architecture | None | None | PLANNED_WITH_CONSTRAINTS |
+| Release minification | Implemented | #1851 final R8/manifest audit green | signed upgrade pending | IN_PROGRESS |
+| Release signing | Environment scaffold | build config green | no signed artifact | PLANNED finalization |
+| Project docs/governance | Implemented | Governance #32 green | N/A | DONE/continuous |
+| Baseline/rollback | Two protected branches + playbook | Git references | device rollback not exercised | DONE code / DEVICE_VERIFY install |
 
-## Critical sequencing findings
+## Key findings and sequencing
 
-1. **Do not start wake-word/local-model work on a red Assistant foundation.** J1 must compile, lint, package and pass device role-selection first.
-2. **Default Phone work must be isolated behind optional role selection.** It must not silently change current dialer/composer safety or the safe Full Test variant.
-3. **Local LLM must not receive direct action authority.** It may propose structured intents; deterministic policy executes them.
-4. **Every device claim needs artifact provenance.** Version/package/SHA/source/CI must be recorded before testing.
-5. **Current PR is large.** Future work should remain coherent and baseline-promoted regularly to avoid unrecoverable drift.
-6. **CI must audit assistant components explicitly.** Presence in Personal Alpha/final and absence in Full Test should become a hard gate.
-7. **Physical acceptance is the largest remaining evidence gap.** Core features are mostly coded but not fully proven on the Motorola target.
+1. J1 is now CI/package verified, so the next valid step is Motorola testing—not wake-word speculation.
+2. Local LLM and wake phrase remain blocked until role invocation, animation lifecycle, reboot and battery observations are recorded.
+3. Phone role must be optional and isolated behind explicit owner selection.
+4. Free-form models may propose intents but never receive direct memory/action authority.
+5. Every install candidate requires package/version/source/CI/artifact/digest provenance.
+6. Physical acceptance remains the largest evidence gap across mature core features.
 
-## Current repair batch
+## Failure and repair history
 
-CI #1833 failures:
+Android CI #1833 caught two Assistant compile issues:
 
-- `MayraRecognitionService.onCheckRecognitionSupport` did not match the project SDK API surface.
-- assistant orb attempted to set `repeatCount` through the base `Animator` type.
+- unavailable optional RecognitionService override;
+- animation repeat property set through base Animator.
 
-Repairs:
+Both were repaired without weakening the design. Android CI #1851 then passed the complete governed pipeline.
 
-- keep only mandatory `RecognitionService` abstract callbacks until the real recognizer is connected;
-- configure repeat behavior on each `ObjectAnimator` before adding it to the set.
+## Current testing gate
 
-Promotion remains blocked until full latest-head green.
+Use `docs/testing/MAYRA_J1_MOTOROLA_ACCEPTANCE.md` with Personal Alpha #1851:
 
-## Next required gates
+- source: `0d9435adb92b425bfb47a710d4f4516a6aaac398`;
+- artifact ID: `8852147191`;
+- APK SHA-256: `1459517f1aa375576afa353ba6683ceaf81ddbcb4e79fc6dd790a501f52307b8`.
 
-1. Full Android CI latest-head green.
-2. Project Governance latest-head green.
-3. Add hard CI assertions for Assistant service/session/recognition metadata and Full Test exclusion.
-4. Create next protected baseline branch only after both workflows pass.
-5. Generate provenance-recorded Personal Alpha artifact.
-6. Execute J1 Motorola test sheet: role visibility, selection/removal, unlocked/locked invocation, animation lifecycle, reboot and battery observation.
-7. Update this audit, roadmap, latest snapshot and acceptance evidence from actual results before J2 begins.
+Required evidence:
+
+1. install/one-launcher sanity;
+2. Assistant role visibility and owner selection/removal;
+3. unlocked invocation;
+4. locked invocation;
+5. animation lifecycle and repeated invocation stability;
+6. force-stop/reboot recovery;
+7. no hidden role selection, overlay or continuous microphone use;
+8. core regression smoke after role selection.
+
+J2 cannot begin until device results are written back into acceptance, audit, roadmap and latest snapshot.
