@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ReminderRecoveryPolicyTest {
-    private val now = 1_000_000L
+    private val now = 10_000_000L
 
     @Test fun `future scheduled reminder is rescheduled`() {
         assertEquals(
