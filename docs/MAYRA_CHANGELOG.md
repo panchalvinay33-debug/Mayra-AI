@@ -2,6 +2,19 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
+## Unreleased — J2 Motorola speech-locale repair
+
+- Motorola device testing proved J2 can install, obtain microphone permission, report on-device recognition available, become the selected Digital assistant and launch a mic-active Mayra Assistant session.
+- The first real transcript attempt returned `Speech language unavailable` instead of a transcript.
+- Root cause: the CI #18 request relied on an implicit/default speech language even though on-device recognizer availability does not guarantee that language model is available.
+- Added `MayraSpeechLocalePolicy` with finite locale order: device locale → `hi-IN` → `en-IN` → `en-US`.
+- Added explicit recognition language/language-preference extras.
+- Language-not-supported/language-unavailable errors now retry the next bounded locale only; there is no endless listener/retry loop and no silent cloud STT fallback.
+- Added unit tests for locale order, duplicate removal and blank device locale.
+- Device failure and repair are recorded in `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`.
+
+Validation state: fresh J2/J1/Android/Governance CI pending; replacement owner APK must not be shared until green.
+
 ## Unreleased — J1 Motorola proof and J2 invocation-time voice
 
 - Motorola Android 16 physically accepted `Mayra J1 Assistant Test` as the selected Digital assistant.
@@ -20,7 +33,7 @@ This changelog records meaningful user-visible and engineering milestones. It do
 - Added dedicated J2 CI to compile, unit-test, lint, assemble and audit the one-permission/component boundary.
 - Added secret-backed owner-signing compatibility to J1/J2 where owner signing secrets are configured.
 
-Validation state: fresh exact-head J1/J2/Android/Governance CI pending after this batch; J2 Motorola speech proof pending.
+Verified application baseline: J2 #18, J1 #122, Android CI #2013 and Governance #194 on `ef809bbdaca80f3b953483499dc03de8e091339f`; protected as `baseline/mayra-0.2.1-j2-voice-green-18`.
 
 ## Unreleased — Play Protect recovery and zero-permission J1 test
 
