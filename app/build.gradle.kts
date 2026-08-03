@@ -21,6 +21,15 @@ android {
     buildFeatures { compose = true }
 
     buildTypes {
+        getByName("release") {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
         create("personalAlpha") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".alpha"
