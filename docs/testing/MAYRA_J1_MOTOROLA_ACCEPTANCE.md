@@ -1,6 +1,6 @@
 # Mayra AI — Motorola Jarvis J1 Acceptance
 
-Status: ASSISTANT ROLE SELECTED — POWER-KEY TRIGGER CONFIGURATION NEXT
+Status: ASSISTANT ROLE SELECTED — POWER KEY STILL MAPPED TO POWER MENU
 Date updated: 2026-08-03
 Target device: Motorola owner device / Android 16
 
@@ -65,7 +65,7 @@ Initial update attempt: BLOCKED by package signing conflict because CI debug cer
 
 Safe recovery used: uninstall the J1 test package, then clean-install #68. J1 contains no personal Mayra memory/documents/reminders and requests zero Android runtime permissions.
 
-### #68 Motorola device evidence — 20:44 to 20:47 IST
+### #68 Motorola device evidence — 20:44 to 20:52 IST
 
 Default Apps navigation: PASS.
 
@@ -78,12 +78,13 @@ Assistant candidate/selection: PASS.
 - J1 itself shows `Status: Mayra is selected ✓`.
 - This proves Android 16 on the target Motorola recognizes the J1 `VoiceInteractionService` as a valid assistant candidate and accepts Mayra as the default digital assistant.
 
-Initial invocation attempt: BLOCKED BY DEVICE TRIGGER CONFIGURATION.
+Power-key invocation attempt: BLOCKED BY DEVICE TRIGGER CONFIGURATION.
 
-- Owner attempted normal assistant gestures/power-hold after selecting Mayra and reported that nothing launched.
-- This is not yet evidence that the Mayra `VoiceInteractionSession` is broken because Motorola exposes a separate power-key action setting.
-- Motorola Android 16 documentation for this device family requires `Settings → Gestures → Power key → Press & hold → Digital assistant` to bind press-and-hold to the selected digital assistant.
-- The next test must configure this trigger first, then retry invocation.
+- Owner pressed and held the physical Power key after Mayra was selected.
+- The phone displayed the standard Motorola Power menu with `Emergency`, `Lockdown`, `Power off`, and `Restart`.
+- This proves the Power key is still mapped to `Power menu`, not `Digital assistant`; it is not evidence that the Mayra `VoiceInteractionSession` failed.
+- Motorola's documented Android 16 path is `Settings → Gestures → Power key → Press & hold → Digital assistant`.
+- Gesture-navigation alternative: swipe diagonally inward from either lower corner to invoke the selected digital assistant.
 
 Permanent signing repair:
 
@@ -96,11 +97,16 @@ Permanent signing repair:
 ### D. Configure Motorola invocation trigger — CURRENT GATE
 
 - [ ] Open `Settings → Gestures → Power key → Press & hold`.
-- [ ] Select `Digital assistant`.
+- [ ] Select `Digital assistant` instead of `Power menu`.
 - [ ] Optionally shorten the press-and-hold duration for easier testing.
 - [ ] Return to the home screen.
 - [ ] Press and hold the Power key.
 - [ ] Record exactly what appears.
+
+Alternative invocation:
+
+- [ ] With gesture navigation enabled, swipe diagonally inward from either lower screen corner.
+- [ ] Record whether Mayra session/orb appears.
 
 ### E. Unlocked invocation and orb
 
