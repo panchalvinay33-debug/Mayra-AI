@@ -2,92 +2,73 @@
 
 Last updated: 2026-08-03
 Entry point: `START_HERE.md`
+Pinpoint audit: `docs/MAYRA_PINPOINT_AUDIT.md`
 Canonical blueprint: `docs/MAYRA_BLUEPRINT.md`
 Latest recovery state: `docs/backups/MAYRA_LATEST_SNAPSHOT.md`
-Idea lifecycle: `docs/MAYRA_IDEA_LEDGER.md`
-Decision log: `docs/MAYRA_DECISIONS.md`
+Test contract: `docs/MAYRA_TEST_MATRIX.md`
+Rollback playbook: `docs/MAYRA_BASELINE_AND_ROLLBACK.md`
 
 ## Overall program view
 
 | Track | Status | Current truth | Next gate |
 |---|---|---|---|
-| Project governance and backups | IN_PROGRESS | START_HERE, blueprint, roadmap, rolling snapshot, idea/decision/changelog ledgers and governance CI added | Complete latest-head CI/governance validation |
-| One-app packaging | DEVICE_VERIFY | One launcher; Chat/Library/Memory/Provider/History internal; engineering variants separated | Motorola one-icon acceptance |
+| Project governance and backups | DONE | Canonical records + governance CI + protected baseline/rollback playbook | Keep synchronized every batch |
+| Full-project audit discipline | DONE | Pinpoint source/test/package/device matrix added | Update evidence/gaps after every milestone |
+| Secure baseline | DONE | `baseline/mayra-0.2.1-green-1795` points to known-green commit `065e225...` | Promote next baseline only after exact-head dual-green |
+| One-app packaging | DEVICE_VERIFY | One launcher; Chat/Library/Memory/Provider/History internal; variants separated | Motorola one-icon acceptance |
 | Core conversation | DEVICE_VERIFY | Hindi/Hinglish/English local foundation + optional online provider | Long conversation and physical voice validation |
-| Local conversational brain | PLANNED | Deterministic offline engine exists; no integrated local LLM yet | Benchmark suitable on-device model on Motorola |
-| Optional cloud provider | DEVICE_VERIFY | HTTPS Responses-compatible provider, Keystore credentials, live composition and fallback | Real owner-key/network failure test |
-| Personal memory | DEVICE_VERIFY | Approval, provenance, edit/replace/delete/expiry/recovery implemented | Motorola lifecycle and protected-storage checks |
-| Document intelligence | DEVICE_VERIFY | TXT/PDF/DOCX extraction/index/search/summary/grounding implemented | Physical PDF/DOCX acceptance |
+| Local conversational brain | PLANNED | Deterministic offline engine exists; no integrated local LLM | Benchmark suitable on-device model after J1 |
+| Optional cloud provider | DEVICE_VERIFY | HTTPS provider, Keystore credentials, live composition/fallback | Real owner-key/network failure test |
+| Personal memory | DEVICE_VERIFY | Approval, provenance, edit/replace/delete/expiry/recovery | Motorola lifecycle/protected-storage checks |
+| Document intelligence | DEVICE_VERIFY | TXT/PDF/DOCX extraction/index/search/summary/grounding | Physical PDF/DOCX acceptance |
 | Mayra reminders | DEVICE_VERIFY | Persistent WorkManager reminders, Complete/Snooze/follow-up/reboot recovery | Doze/timing/reboot device acceptance |
-| App and contact actions | DEVICE_VERIFY | App opening, contacts, dialer/composer handoff and expiring confirmations | Motorola end-to-end action checks |
-| Animated Mayra presence | IN_PROGRESS | VoiceInteractionSession animated orb foundation committed | Compile/lint/R8 + device session state wiring |
-| Android Assistant role | IN_PROGRESS | VoiceInteractionService/session/metadata/recognition shell committed | Select Mayra as Assistant and invoke on Motorola |
-| Offline wake phrase | PLANNED | Recognition shell only | Choose engine; battery/thermal benchmark |
+| App and contact actions | DEVICE_VERIFY | App opening, contacts, dialer/composer handoff, expiring confirmations | Motorola end-to-end checks |
+| Animated Mayra presence | IN_PROGRESS | Native animated VoiceInteractionSession; compile incompatibility repaired | Latest full CI then device session wiring |
+| Android Assistant role | IN_PROGRESS | Service/session/metadata/recognition shell; API mismatch repaired | CI package audit + Motorola role selection |
+| Offline wake phrase | PLANNED | Recognition shell only | Engine battery/thermal benchmark after J1 |
 | Lock-screen/background voice | IN_PROGRESS | Assistant lock-screen declaration foundation | Assistant-role device proof |
-| Incoming-call control | PLANNED | No default Phone/InCallService module yet | Build optional role request, call UI and controller |
-| Call screening | PLANNED | Notification/call ideas recorded only | Add CallScreeningService owner rules |
-| AI caller message-taking | PLANNED_WITH_CONSTRAINTS | Cellular audio injection/recording not assumed | Voicemail/VoIP or documented device route design |
-| Production release | IN_PROGRESS | Non-debuggable minified release audit + secret-only signing scaffold | Private signing, provenance, distribution and acceptance |
+| Incoming-call control | PLANNED | No default Phone/InCallService module | Build only after J1/J2 baseline |
+| Call screening | PLANNED | Requirement recorded only | Add CallScreeningService owner rules later |
+| AI caller message-taking | PLANNED_WITH_CONSTRAINTS | Cellular audio injection/recording not assumed | Supported voicemail/VoIP route design |
+| Production release | IN_PROGRESS | Minified release audit + secret-only signing scaffold | Private signing/provenance/distribution |
 
 ## Verified baseline
 
-### Mayra 0.2.1 pre-Jarvis baseline
+### Mayra 0.2.1 pre-Jarvis protected baseline
 
-Android CI **#1795** completed successfully for version **0.2.1 / versionCode 4** before the Assistant-role/Jarvis commits.
+- Branch: `baseline/mayra-0.2.1-green-1795`
+- Commit: `065e22524c835f3ddd3b2f56215a3616f071d4b3`
+- Android CI: `#1795` success
+- Version: `0.2.1` / versionCode `4`
 
-It covered:
+Verified gates:
 
 - Debug, Personal Alpha and Full Test compilation;
 - complete unit-test suite;
-- Android lint across governed variants;
-- Personal Alpha APK and permission/component/one-launcher audit;
-- minified final `ai.mayra.app` release candidate and R8/manifest audit;
+- lint across governed variants;
+- Personal Alpha APK package/permission/component/launcher audit;
+- minified final `ai.mayra.app` R8/manifest audit;
 - safe Full Test audit;
 - isolated zero-permission Document Test audit;
 - artifact/report upload.
 
-This baseline includes provider live refresh, scoped permission UX, confirmation expiry, app-opening routing repair, reminder follow-up repair and reboot remaining-delay recovery.
+The protected baseline is never a development branch and must not be force-moved.
 
-### Current latest-head truth
+## Current latest-head truth
 
-After CI #1795, the branch added the Android Assistant-role/Jarvis foundation and the complete project-governance system. These newer commits require their own latest-head Android CI and Project Governance green evidence. Until that completes, Jarvis features remain `IN_PROGRESS`, not `DONE`.
+Jarvis Assistant-role and governance work was added after #1795.
 
-## Delivered capability groups
+Android CI **#1833 failed at compilation** on two exact new-code incompatibilities:
 
-### Conversation and provider
+1. optional `RecognitionService.onCheckRecognitionSupport` override was not available in the project API surface;
+2. orb animation set `repeatCount` through the base Animator type.
 
-- local deterministic commands and contextual offline fallback;
-- voice input and TTS foundation;
-- optional OpenAI Responses-compatible transport;
-- encrypted API-key storage;
-- live provider enable/disable/removal without restart;
-- bounded retries, cancellation and offline fallback.
+Both were repaired forward:
 
-### Memory and documents
+- RecognitionService now keeps mandatory abstract callbacks only until the real recognizer is connected;
+- each ObjectAnimator owns its repeat configuration before entering the AnimatorSet.
 
-- approval-first personal memory lifecycle;
-- trusted typed memory provenance;
-- TXT/PDF/DOCX import and extraction;
-- current-index search, summaries and grounded answers;
-- document freshness/health tooling.
-
-### Actions and reminders
-
-- app opening;
-- contact resolution;
-- review-first dialer/composer;
-- exact-action expiring confirmations;
-- Mayra-owned persistent reminders;
-- Complete, Snooze, follow-up and reboot/update recovery.
-
-### Release engineering
-
-- Personal Alpha owner candidate;
-- low-permission Full Test;
-- isolated Document Test;
-- minified final release audit;
-- environment-only signing scaffold;
-- automated permission/component/launcher audits.
+The failed run remains part of project evidence. The repaired head is **not stable until complete latest-head Android CI and Project Governance are both green**.
 
 ## Active Jarvis Mode plan
 
@@ -95,34 +76,39 @@ After CI #1795, the branch added the Android Assistant-role/Jarvis foundation an
 
 Status: `IN_PROGRESS`
 
-- compile and lint VoiceInteractionService/session/metadata/recognition shell;
-- audit Personal Alpha/final manifest components;
-- keep those components absent from Full Test;
-- add owner-visible Assistant-role setup/status;
-- test invocation while unlocked and locked;
-- connect animated orb to real listening/thinking/speaking state.
+Required order:
+
+1. compile Debug, Personal Alpha and Full Test;
+2. pass complete tests and lint;
+3. pass Personal Alpha and final release manifest/component audits;
+4. prove Assistant components are absent from Full Test;
+5. expose owner-visible Assistant role setup/status;
+6. generate provenance-recorded Personal Alpha;
+7. test role visibility, selection/removal, unlocked invocation, locked invocation, reboot and animation lifecycle on Motorola;
+8. record results in acceptance checklist/audit/snapshot;
+9. create new protected baseline only after exact-head dual-green and milestone snapshot.
 
 ### Phase J2 — Local wake phrase and local brain
 
 Status: `PLANNED`
 
-- benchmark wake-word engines under screen-off conditions;
-- measure idle battery, false triggers, thermal behavior and restart recovery;
-- benchmark small quantized local language models on the Motorola target;
-- add model storage/download integrity and fallback policy;
-- route privacy-sensitive/basic conversation to local brain;
+- choose and benchmark wake-word engine;
+- measure screen-off idle battery, false triggers, thermal and restart behavior;
+- benchmark small quantized local models on Motorola;
+- enforce model checksum/storage and bounded context/output;
+- keep deterministic action/memory policy outside free-form model authority;
 - keep cloud provider optional.
 
 ### Phase J3 — Advanced phone role
 
 Status: `PLANNED`
 
-- request optional default Phone role;
-- implement required incoming/ongoing call UI fallback;
-- announce caller;
-- support answer, reject, silence, mute and speaker/audio endpoint where Android exposes it;
-- add optional Call Screening role and owner rules;
-- test emergency/default-dialer failure boundaries.
+- optional default Phone role request/status;
+- required incoming/ongoing call UI fallback;
+- caller announce;
+- answer/reject/silence/mute/speaker/audio endpoint where Android permits;
+- optional Call Screening owner rules;
+- emergency/lost-role fallback tests.
 
 ### Phase J4 — Proactive owner assistant
 
@@ -130,37 +116,49 @@ Status: `PLANNED`
 
 - notification/call summaries;
 - owner-defined trusted routines;
-- missed-task and reminder follow-ups;
-- context relevance/frequency controls;
+- missed-task/reminder follow-ups;
+- frequency/relevance controls;
 - Owner Mode trust policy for routine low-risk actions.
 
 ### Phase J5 — Final release
 
 Status: `PLANNED`
 
-- complete Motorola acceptance matrix;
-- fix OEM-specific background/battery issues;
-- configure private release signing;
-- produce signed APK/AAB with provenance;
-- owner-controlled distribution/Play Internal Testing;
-- final branding, onboarding, accessibility and performance polish.
+- complete Motorola matrix;
+- fix OEM background/battery issues;
+- private release signing;
+- signed APK/AAB provenance;
+- upgrade/rollback testing;
+- owner-controlled distribution;
+- final branding/onboarding/accessibility/performance polish.
+
+## Testing and promotion rule
+
+`docs/MAYRA_TEST_MATRIX.md` is mandatory. A capability progresses through design, compile, automated, package, device and release evidence levels. No status may exceed its evidence.
+
+A new baseline may be promoted only when:
+
+- Android CI green;
+- Project Governance green;
+- roadmap/snapshot/audit current;
+- major transition has immutable snapshot;
+- physical claims have Motorola evidence.
 
 ## Deferred or constrained work
 
-- OCR for scanned images: `DEFERRED`;
+- scanned OCR: `DEFERRED`;
 - legacy binary `.doc`: `DEFERRED`;
 - exact alarm access: `DEFERRED` pending device need;
 - unrestricted root/accessibility automation: `DEFERRED`;
-- hidden cellular recording or arbitrary AI audio injection: not an assumed capability;
+- hidden cellular recording or arbitrary AI audio injection: not assumed;
 - caller message-taking requires a supported voicemail/VoIP/device route.
 
 ## Immediate ordered next actions
 
-1. Let latest Android CI and Project Governance CI run on the synchronized branch head.
-2. Repair exact compile/lint/manifest/governance failures without weakening the architecture.
-3. Record authoritative run IDs and head in the rolling snapshot.
-4. Add Assistant-role setup/status UI and manifest audits if not already covered by CI.
-5. Generate the next Personal Alpha only after latest-head green.
-6. Test role selection, unlocked invocation and locked invocation on the Motorola.
-7. Begin local wake-word/model benchmarking only after J1 is stable.
-8. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Run complete latest-head Android CI and Project Governance after Assistant compile repair and documentation sync.
+2. Repair exact remaining test/lint/R8/manifest failures without weakening checks.
+3. Add hard Assistant component presence/absence audits if not yet enforced.
+4. Record authoritative exact-head run IDs and artifact provenance.
+5. Promote a new Jarvis J1 baseline only after dual-green.
+6. Perform Motorola J1 acceptance before wake-word/local-model work.
+7. Keep PR #12 Draft/open/unmerged until explicit owner approval.
