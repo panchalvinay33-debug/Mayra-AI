@@ -2,43 +2,59 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
+## Unreleased — J1 Motorola proof and J2 invocation-time voice
+
+- Motorola Android 16 physically accepted `Mayra J1 Assistant Test` as the selected Digital assistant.
+- Configuring the Motorola Power-button Digital assistant action successfully invoked Mayra’s `VoiceInteractionSession` while unlocked.
+- Device screenshot proved the animated Mayra orb/session renders over the current screen.
+- Back navigation and phone lock were confirmed to dismiss the J1 session.
+- Device testing exposed that the first orb had no direct tap/outside dismiss listener.
+- Added bounded session exits: orb tap, label tap, root/outside tap and Back call `hide()`; hide/destroy stop animation and keep-awake state.
+- Hardened repeat-show behavior so the orb animation restarts cleanly after a previous hide.
+- Added J2 voice feasibility preflight under Issue #14.
+- Added isolated `j2VoiceTest` package `ai.mayra.app.j2`.
+- J2 requests only `RECORD_AUDIO` and removes internet, contacts, notifications, reminders, WorkManager, Room and unrelated full-app/background components.
+- Added a bounded voice-session state model for permission, on-device availability, preparing, listening, partial transcript, processing, heard text and errors.
+- Added invocation-time `SpeechRecognizer.createOnDeviceSpeechRecognizer()` wrapper; no continuous recognizer loop.
+- J2 stops recognition on hide/cancel/destroy and never claims a wake phrase is implemented.
+- Added dedicated J2 CI to compile, unit-test, lint, assemble and audit the one-permission/component boundary.
+- Added secret-backed owner-signing compatibility to J1/J2 where owner signing secrets are configured.
+
+Validation state: fresh exact-head J1/J2/Android/Governance CI pending after this batch; J2 Motorola speech proof pending.
+
 ## Unreleased — Play Protect recovery and zero-permission J1 test
 
 - Recorded the Motorola Play Protect block against the full sideloaded Personal Alpha.
 - Stopped treating the full debug-signed Personal Alpha as the correct J1 installation path.
 - Added a dedicated `j1AssistantTest` package: `ai.mayra.app.j1`.
-- The J1 package contains only:
-  - a small Assistant activation/status screen;
-  - Android VoiceInteractionService/session/recognition foundations;
-  - the animated Mayra assistant orb/session.
-- Removed chat, provider, contacts, reminders, notification listener, boot recovery, document and memory screens from this test package.
-- Added a dedicated CI workflow that hard-fails on any requested permission, extra launcher or forbidden component.
-- J1 run #16 exposed and fixed an API-29 onboarding lint guard without suppression.
-- J1 run #22 exposed AndroidX-inherited WorkManager/Startup permissions and components; the J1 manifest now explicitly removes WAKE_LOCK, network-state, foreground-service, dynamic-receiver permission, WorkManager, Startup, Room and ProfileInstaller infrastructure.
-- The audit now rejects those inherited components permanently.
-- Full Mayra remains on the stable owner-signing / Play Internal Testing track.
-
-Validation state: fresh exact-head CI and Motorola installation evidence pending.
+- The J1 package contains only Assistant activation/status and Android VoiceInteraction service/session/recognition foundations.
+- Removed chat, provider, contacts, reminders, notification listener, boot recovery, document and memory screens from J1.
+- Added dedicated CI that hard-fails on any requested permission, extra launcher or forbidden component.
+- J1 run #16 fixed an API-29 onboarding lint guard.
+- J1 run #22 exposed AndroidX-inherited WorkManager/Startup permissions/components and hardened the manifest boundary.
+- J1 run #38 proved ProfileInstaller still survived final manifest merging; the final audit was tightened until #44 passed.
+- J1 #44 became the first verified zero-permission package baseline.
+- Activation repair #56 added visible diagnostics; Motorola-route #68 corrected J1 metadata and used the proven Default Apps → Digital assistant path.
+- Full Mayra remains on the stable owner-signing / trusted-distribution track.
 
 ## Unreleased — Simplified owner setup and stable updates
 
-- Recorded the real Motorola install failure where Personal Alpha #1851 could not update an older `ai.mayra.app.alpha` signed by another temporary CI debug certificate.
-- Added a stable secret-backed owner signing configuration for Personal Alpha.
-- Added a dedicated `Stable Owner Alpha` GitHub workflow that requires protected signing secrets, verifies the certificate, records APK SHA-256 and uploads an update-compatible artifact.
-- Added a one-time two-step Mayra setup screen for the full owner app.
-- Renamed the main `Device` chip to `Setup` and simplified its wording.
-- Added install-over-install data-retention testing.
+- Recorded the Motorola install failure where Personal Alpha #1851 could not update an older `ai.mayra.app.alpha` signed by another temporary CI debug certificate.
+- Added a stable secret-backed owner signing configuration for Personal Alpha and engineering variants where configured.
+- Added a dedicated `Stable Owner Alpha` GitHub workflow that requires protected signing secrets, verifies certificate provenance and records APK SHA-256.
+- Added a small first-launch setup for the full owner app.
+- Added install-over-install data-retention testing requirements.
 
 ## Jarvis Mode foundation and recovery hardening
 
 - Added Android Assistant-role architecture foundation.
 - Added `VoiceInteractionService`, session service and assistant metadata foundation.
 - Added animated Mayra voice-session orb foundation.
-- Added RecognitionService shell for future offline wake-word/speech pipeline.
+- Added RecognitionService shell for future wake-word/speech pipeline.
 - Declared lock-screen assistant-session support.
 - Added governance, pinpoint audit, test matrix, rollback playbook and protected baselines.
 
-Verified Jarvis J1 baseline: Android CI #1851 and Project Governance #32 green on `0d9435adb92b425bfb47a710d4f4516a6aaac398`.
+Verified Jarvis J1 code baseline: Android CI #1851 and Project Governance #32 green on `0d9435adb92b425bfb47a710d4f4516a6aaac398`.
 
 ## 0.2.1 — Owner Alpha hardening
 
