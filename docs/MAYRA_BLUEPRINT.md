@@ -8,7 +8,7 @@ Entry point: `START_HERE.md`
 
 Mayra is the owner’s personal Android AI companion: a local-first, voice-capable assistant that can converse naturally, remember approved personal context, reason over private documents, manage reminders, coordinate supported phone actions and remain available through official Android system roles.
 
-Mayra is not merely an OpenAI client or chat screen. Cloud intelligence is optional. The long-term identity, personality and essential capabilities belong to Mayra’s on-device runtime.
+Cloud intelligence is optional. The long-term identity, personality and essential capabilities belong to Mayra’s on-device runtime.
 
 ## Experience target
 
@@ -32,6 +32,7 @@ The project targets the maximum reliable experience supported by Android and the
 12. PR #12 remains Draft/unmerged without explicit owner authorization.
 13. Owner setup should be as small and understandable as Android permits.
 14. Owner APK upgrades require one stable signing certificate.
+15. Play Protect is never bypassed; test scope is isolated when distribution trust blocks a broad debug build.
 
 ## System architecture
 
@@ -45,12 +46,12 @@ The project targets the maximum reliable experience supported by Android and the
 
 ### 2. Minimal owner setup
 
-The first-start path is intentionally limited to two owner-facing steps:
+The full Mayra first-start path is intentionally limited to two owner-facing steps:
 
 1. request microphone, contacts and notification runtime permissions together;
 2. open Android's Assistant-role selector.
 
-The owner may continue temporarily if a permission or role is skipped. Internet and boot recovery do not require runtime dialogs. Android roles/special access cannot be silently granted, so Mayra presents the smallest possible explicit system step rather than a large settings maze.
+Internet and boot recovery do not require runtime dialogs. Android roles/special access cannot be silently granted.
 
 ### 3. Assistant-role / Jarvis layer
 
@@ -60,7 +61,29 @@ The owner may continue temporarily if a permission or role is skipped. Internet 
 - Owner-triggered Assistant-role selection.
 - Future offline wake-word engine with battery, thermal and privacy policy.
 
-### 4. Local brain
+### 4. Isolated J1 compatibility proof
+
+The engineering-only package `ai.mayra.app.j1` exists to prove Motorola Assistant-role support independently of the full app.
+
+Included:
+
+- one Assistant activation/status activity;
+- VoiceInteractionService;
+- VoiceInteractionSessionService and animated orb;
+- RecognitionService metadata shell.
+
+Excluded:
+
+- every requested Android permission;
+- internet/provider;
+- contacts;
+- reminders and notifications;
+- notification listener and boot receiver;
+- documents, memory, history and full chat runtime.
+
+A dedicated workflow hard-fails on any requested permission, extra launcher or forbidden component. This package is temporary engineering evidence, not a second Mayra product.
+
+### 5. Local brain
 
 Current:
 
@@ -76,7 +99,7 @@ Required future:
 - model integrity/storage/version controls;
 - graceful smaller-model/rule fallback.
 
-### 5. Optional provider
+### 6. Optional provider
 
 - Responses-compatible bounded HTTPS transport.
 - Android Keystore-protected credentials.
@@ -84,20 +107,12 @@ Required future:
 - Cancellation, bounded retries and local fallback.
 - Provider output cannot execute actions or write personal memory directly.
 
-### 6. Personal memory
+### 7. Personal memory and documents
 
-- Explicit local proposal/approval.
-- Inspect, replace, edit, expire and delete.
-- Honest storage-health behavior.
+- Explicit local memory proposal/approval; inspect, replace, edit, expire and delete.
 - Trusted structured memory-use metadata.
-- Future category-specific Owner Mode rules remain owner-controlled.
-
-### 7. Documents
-
-- TXT, PDF and DOCX import/extraction/indexing.
-- Current-index search, grounded answers, summary, freshness and health.
+- TXT, PDF and DOCX import/extraction/indexing, grounded answers, summary, freshness and health.
 - OCR and legacy `.doc` deferred.
-- Private content stays local unless a future bounded remote feature is explicitly enabled.
 
 ### 8. Actions and reminders
 
@@ -120,35 +135,29 @@ Planned optional privileged role:
 - Call Screening rules;
 - complete fallback call UI.
 
-Arbitrary protected cellular audio capture, secret recording and reliable TTS injection into SIM calls are not assumed. AI message-taking requires a documented voicemail/VoIP/device route.
+Protected cellular audio capture, secret recording and arbitrary TTS injection into SIM calls are not assumed. AI message-taking requires a documented voicemail/VoIP/device route.
 
-### 10. Background and proactive layer
-
-- Boot/update recovery for reminders.
-- Notification listener only behind special-access consent.
-- Owner-defined proactive rules with relevance/frequency controls.
-- No unrestricted permanent microphone service.
-
-### 11. Packaging, signing, testing and release
+### 10. Packaging, signing, testing and release
 
 Packages:
 
-- Personal Alpha: owner-capability package `ai.mayra.app.alpha`.
+- J1 Assistant Test: `ai.mayra.app.j1`, zero-permission role proof only.
+- Personal Alpha: `ai.mayra.app.alpha`, full owner-capability engineering candidate.
 - Full Test: lower-permission UI regression package.
 - Document Test: isolated zero-permission document regression package.
 - Final release: `ai.mayra.app`, non-debuggable, minified/R8 and audited.
 
-Signing policy:
+Signing/distribution policy:
 
-- temporary hosted-runner debug certificates are acceptable only for disposable clean-install tests;
-- repeated owner installs must use one stable owner certificate;
-- stable keystore material and passwords are supplied only through protected environment/GitHub secrets;
-- `.github/workflows/owner-alpha.yml` builds the stable owner artifact;
-- every stable artifact records package, signing certificate and APK SHA-256;
-- clean-install and install-over-install data-retention tests are required before promotion;
-- production release signing remains distinct and private.
+- temporary hosted-runner debug certificates are disposable only;
+- repeated owner installs use one stable private owner certificate;
+- keystore material/passwords come only from protected secrets;
+- every stable artifact records package, certificate and APK SHA-256;
+- install-over-install data retention is mandatory;
+- full Mayra should use Play Internal Testing or another trusted owner-controlled signed channel when sideload trust blocks installation;
+- Play Protect is not disabled or bypassed.
 
-Both Android CI and Project Governance CI are required for promotion.
+Android CI, J1 Assistant Test CI and Project Governance CI are required where applicable.
 
 ## Current module status
 
@@ -160,14 +169,15 @@ Both Android CI and Project Governance CI are required for promotion.
 | Reminders | DEVICE_VERIFY | Persistent scheduling/actions/recovery implemented |
 | App/contact actions | DEVICE_VERIFY | App open and review-first handoffs implemented |
 | Provider | DEVICE_VERIFY | HTTPS/Keystore/live composition implemented |
-| Minimal first-start setup | IN_PROGRESS | Two-step setup committed; CI/device proof pending |
-| Stable owner updates | IN_PROGRESS | Secret-backed build path committed; secrets/update test pending |
-| Animated Mayra presence | DEVICE_VERIFY | J1 CI foundation green; invocation pending |
-| Android Assistant role | DEVICE_VERIFY | Services/metadata CI green; Motorola selection pending |
+| Minimal full-app setup | IN_PROGRESS | Two-step setup committed; trusted-install/device proof pending |
+| Stable owner updates | IN_PROGRESS | Secret-backed build path committed; private setup/update test pending |
+| J1 zero-permission proof | IN_PROGRESS | Isolated build/workflow committed; CI/device proof pending |
+| Animated Mayra presence | DEVICE_VERIFY | J1 code baseline green; invocation pending |
+| Android Assistant role | DEVICE_VERIFY | Services/metadata code green; Motorola selection pending |
 | Offline wake word | PLANNED | Recognition shell only |
 | Local conversational model | PLANNED | Benchmark pending |
 | Incoming-call control | PLANNED | Phone/Call Screening roles required |
-| Production release | IN_PROGRESS | R8/signing scaffold implemented; private signing pending |
+| Production release | IN_PROGRESS | R8/signing scaffold implemented; private signing/distribution pending |
 
 ## Milestone completion rule
 
