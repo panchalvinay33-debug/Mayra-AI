@@ -12,13 +12,18 @@ import ai.mayra.app.memory.PendingMemoryApproval
 data class PendingChatConfirmation(
     val message: String,
     val token: String,
-    val prompt: String
+    val prompt: String,
+    val expiresAtEpochMillis: Long
 ) {
     init {
         require(message.isNotBlank())
         require(token.isNotBlank())
         require(prompt.isNotBlank())
+        require(expiresAtEpochMillis > 0L)
     }
+
+    fun isExpired(nowEpochMillis: Long = System.currentTimeMillis()): Boolean =
+        nowEpochMillis >= expiresAtEpochMillis
 }
 
 sealed interface MayraChatBridgeResult {
@@ -54,9 +59,13 @@ class MayraChatRuntimeBridge(
     }
 
     fun confirm(pending: PendingChatConfirmation): MayraChatBridgeResult.Reply =
-        MayraChatBridgeResult.Reply(
-            runtime.confirmAndDispatch(pending.message, pending.token).userText()
-        )
+        if (pending.isExpired()) {
+            MayraChatBridgeResult.Reply("That confirmation expired. Please request the action again so Mayra can create a fresh approval.")
+        } else {
+            MayraChatBridgeResult.Reply(
+                runtime.confirmAndDispatch(pending.message, pending.token).userText()
+            )
+        }
 
     fun approveMemory(pending: PendingMemoryApproval): MayraChatBridgeResult.Reply =
         MayraChatBridgeResult.Reply(
@@ -73,11 +82,17 @@ class MayraChatRuntimeBridge(
     private fun MayraRoutingRuntimeResult.toChatResult(message: String): MayraChatBridgeResult = when (this) {
         is MayraRoutingRuntimeResult.ConfirmationRequired -> {
             val tokenValue = token?.value
-            if (tokenValue.isNullOrBlank()) {
+            val tokenExpiry = token?.expiresAt?.toEpochMilli()
+            if (tokenValue.isNullOrBlank() || tokenExpiry == null) {
                 MayraChatBridgeResult.Reply("Mayra could not create a valid confirmation. Please try again.")
             } else {
                 MayraChatBridgeResult.NeedsConfirmation(
-                    PendingChatConfirmation(message, tokenValue, prompt)
+                    PendingChatConfirmation(
+                        message = message,
+                        token = tokenValue,
+                        prompt = prompt,
+                        expiresAtEpochMillis = tokenExpiry
+                    )
                 )
             }
         }
