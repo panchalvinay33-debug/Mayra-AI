@@ -40,6 +40,7 @@ android {
         versionCode = 4
         versionName = "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "VOICE_SESSION_RECOGNITION_ENABLED", "false")
     }
 
     buildFeatures {
@@ -104,6 +105,17 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
             buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
+        create("j2VoiceTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j2"
+            versionNameSuffix = "-j2"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            buildConfigField("boolean", "VOICE_SESSION_RECOGNITION_ENABLED", "true")
             matchingFallbacks += listOf("debug")
         }
         create("fullTest") {
