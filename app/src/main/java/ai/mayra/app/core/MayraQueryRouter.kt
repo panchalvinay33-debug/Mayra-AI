@@ -94,6 +94,23 @@ object MayraQueryRouter {
             normalized.startsWithMarker(it) || normalized.containsMarker(it)
         }
 
+        // Generic installed-app opens belong to LocalCommandEngine/AndroidActionExecutor, which can
+        // resolve the requested app and launch it safely. The typed action executor is deliberately
+        // narrower and currently owns only file-manager/document state actions.
+        if (
+            documentSignals.isEmpty() &&
+            actionSignals.any { it in APP_OPEN_MARKERS }
+        ) {
+            return MayraRoutingDecision(
+                route = MayraQueryRoute.DELEGATE,
+                confidence = 100,
+                matchedSignals = actionSignals.distinct(),
+                outcome = MayraRoutingOutcome.ANSWER,
+                reason = "Installed-app opening is handled by the local device-action assistant.",
+                requiredCapability = MayraRequiredCapability.CORE_ASSISTANT
+            )
+        }
+
         if (actionSignals.isNotEmpty() && insightSignals.isEmpty() && questionSignals.isEmpty()) {
             return MayraRoutingDecision(
                 route = MayraQueryRoute.DELEGATE,
@@ -171,6 +188,8 @@ object MayraQueryRouter {
         "open", "launch", "share", "delete", "rename", "move",
         "खोलो", "शेयर", "हटाओ", "नाम बदलो"
     )
+
+    private val APP_OPEN_MARKERS = setOf("open", "launch", "खोलो")
 
     private val DESTRUCTIVE_ACTION_MARKERS = listOf(
         "delete", "rename", "move", "share", "हटाओ", "नाम बदलो", "शेयर"
