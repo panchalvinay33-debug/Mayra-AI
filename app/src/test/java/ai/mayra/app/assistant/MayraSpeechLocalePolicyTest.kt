@@ -39,4 +39,26 @@ class MayraSpeechLocalePolicyTest {
             MayraSpeechLocalePolicy.candidates("und")
         )
     }
+
+    @Test
+    fun `installed locales follow preferred order before extra installed languages`() {
+        assertEquals(
+            listOf("hi-IN", "en-IN", "fr-FR"),
+            MayraSpeechLocalePolicy.installedCandidates(
+                preferred = listOf("gu-IN", "hi-IN", "en-IN", "en-US"),
+                installed = listOf("fr-fr", "EN_in", "HI-in")
+            )
+        )
+    }
+
+    @Test
+    fun `empty installed locale list stays empty`() {
+        assertEquals(
+            emptyList<String>(),
+            MayraSpeechLocalePolicy.installedCandidates(
+                preferred = listOf("hi-IN", "en-IN", "en-US"),
+                installed = emptyList()
+            )
+        )
+    }
 }
