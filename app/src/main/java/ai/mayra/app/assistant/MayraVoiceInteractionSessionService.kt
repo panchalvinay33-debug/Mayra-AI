@@ -35,6 +35,10 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
         val density = context.resources.displayMetrics.density
         val root = FrameLayout(context).apply {
             setPadding(24.dp(density), 24.dp(density), 24.dp(density), 48.dp(density))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Mayra assistant surface. Tap to close."
+            setOnClickListener { hide() }
         }
 
         val orb = View(context).apply {
@@ -43,7 +47,9 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
                 setColor(Color.rgb(76, 90, 220))
                 setStroke(3.dp(density), Color.argb(180, 220, 225, 255))
             }
-            contentDescription = "Mayra assistant"
+            contentDescription = "Mayra assistant. Tap to close."
+            isClickable = true
+            setOnClickListener { hide() }
         }
         val orbSize = 104.dp(density)
         root.addView(
@@ -59,6 +65,8 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             textSize = 18f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
+            isClickable = true
+            setOnClickListener { hide() }
         }
         root.addView(
             label,
@@ -68,6 +76,34 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             }
         )
 
+        startPulse(orb)
+        return root
+    }
+
+    override fun onShow(args: Bundle?, showFlags: Int) {
+        super.onShow(args, showFlags)
+        setKeepAwake(true)
+    }
+
+    override fun onBackPressed() {
+        hide()
+    }
+
+    override fun onHide() {
+        setKeepAwake(false)
+        pulse?.cancel()
+        pulse = null
+        super.onHide()
+    }
+
+    override fun onDestroy() {
+        pulse?.cancel()
+        pulse = null
+        super.onDestroy()
+    }
+
+    private fun startPulse(orb: View) {
+        pulse?.cancel()
         val scaleX = ObjectAnimator.ofFloat(orb, View.SCALE_X, 0.92f, 1.08f, 0.92f).apply {
             repeatCount = ObjectAnimator.INFINITE
         }
@@ -83,23 +119,6 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             interpolator = android.view.animation.AccelerateDecelerateInterpolator()
             start()
         }
-        return root
-    }
-
-    override fun onShow(args: Bundle?, showFlags: Int) {
-        super.onShow(args, showFlags)
-        setKeepAwake(true)
-    }
-
-    override fun onHide() {
-        setKeepAwake(false)
-        super.onHide()
-    }
-
-    override fun onDestroy() {
-        pulse?.cancel()
-        pulse = null
-        super.onDestroy()
     }
 
     private fun Int.dp(density: Float): Int = (this * density).toInt()
