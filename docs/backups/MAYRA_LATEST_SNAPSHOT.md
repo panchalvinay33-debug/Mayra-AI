@@ -4,7 +4,7 @@ Snapshot date: 2026-08-03
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: J2 physical voice acceptance; CI #90 invocation/readiness passes but transcript remains blocked by OEM recognizer lifecycle/support discovery
+Current phase: J2 physical voice acceptance; support-probe/single-recognizer repair is fully green and awaiting Motorola transcript retest
 Canonical product issue: #13
 Mandatory feasibility gate: #14
 J2 device sheet: `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`
@@ -18,16 +18,16 @@ J2 device sheet: `docs/testing/MAYRA_J2_MOTOROLA_ACCEPTANCE.md`
 
 ## Latest protected J2 baseline
 
-- `baseline/mayra-0.2.1-j2-locale-repair-green-90`
-- application source `e706bdfb8f53006825404db99a51f466aa251fc4`
-- J2 #90 success
-- J1 #194 success
-- Android CI #2085 success
-- Governance #266 success
-- artifact `mayra-j2-voice-apk-90`, ID `8865632199`
-- APK size `19,192,945` bytes
-- APK SHA-256 `2c1e00db4a2bfd98993eb87fe091c5373931153eb3b5ac2252914d4441ac230c`
-- ZIP SHA-256 `bbe4936bc5caec8a08d244ea28f82cf09daabceb49bde47b20ad1678933521b9`
+- `baseline/mayra-0.2.1-j2-speech-support-green-106`
+- application source `a63ef1e7c3ddca06ce444502e5afd3a410d8fb18`
+- J2 #106 success
+- J1 #210 success
+- Android CI #2101 success
+- Governance #282 success
+- artifact `mayra-j2-voice-apk-106`, ID `8866441207`
+- APK size `19,209,329` bytes
+- APK SHA-256 `d0917d17b50429a843f3a5e688580df66f3eea678be4806b44ef9f1535adeb6e`
+- ZIP SHA-256 `b2109366a0140a66f85fef3cd6a85a95263815643ae86076ba0a9f20194140db`
 - package boundary remains exactly `RECORD_AUDIO`.
 
 ## Motorola evidence through 23:32 IST
@@ -47,9 +47,7 @@ FAIL history:
 
 No false transcript or crash was observed.
 
-## Current source repair after CI #90
-
-The new source is not yet an owner candidate.
+## J2 #106 repair now validated by CI
 
 - one on-device recognizer instance per bounded attempt instead of destroy/recreate for each language;
 - Android 13+ `checkRecognitionSupport()` queries actual installed on-device language support;
@@ -58,14 +56,15 @@ The new source is not yet an owner candidate.
 - if the OEM cannot report support, use bounded delayed locale trials;
 - reuse recognizer with 450 ms fallback delay;
 - no cloud STT fallback, no endless speech loop, no added permission;
-- tests cover installed-language selection/canonicalization.
+- tests cover installed-language selection/canonicalization;
+- exact-head J2/J1/full Android/Governance all pass.
 
 ## Current exact gate
 
-1. Fresh J2/J1/Android/Governance CI on the synchronized support-probe repair head.
-2. No APK sharing until all gates are green.
-3. Record exact artifact ID, APK hash and ZIP hash.
-4. Motorola retest `Mayra namaste`.
+1. Install J2 #106; if package signature conflicts, uninstall only engineering J2 then clean-install.
+2. Re-select J2 as Digital assistant if required.
+3. Invoke from Home and say `Mayra namaste`.
+4. Record exact transcript/error.
 5. If successful, continue Hindi/Hinglish/English transcripts, direct tap dismissal, 20-cycle stability, already-locked invocation and reboot recovery.
 6. If a language pack is required, implement explicit model-download/user guidance rather than hidden cloud recognition.
 
