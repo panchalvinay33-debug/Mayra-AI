@@ -173,6 +173,7 @@ object ReminderLifecyclePolicy {
     fun canCancel(state: ReminderState): Boolean = state in mutableStates
     fun canSnooze(state: ReminderState): Boolean = state in mutableStates
     fun canNotify(state: ReminderState): Boolean = state in setOf(ReminderState.SCHEDULED, ReminderState.SNOOZED, ReminderState.MISSED)
+    fun canMarkMissed(state: ReminderState): Boolean = state in mutableStates
     fun validSnooze(duration: Duration): Boolean = !duration.isZero && !duration.isNegative && duration <= Duration.ofDays(30)
 }
 
@@ -247,7 +248,7 @@ class MayraReminderStore(context: Context, private val maxEntries: Int = 500) {
     }
 
     fun markMissed(id: String, now: Long = System.currentTimeMillis()): MayraReminder? = update(id) {
-        if (!ReminderLifecyclePolicy.canNotify(it.state)) return@update null
+        if (!ReminderLifecyclePolicy.canMarkMissed(it.state)) return@update null
         it.nextRevision(state = ReminderState.MISSED, now = now)
     }
 
