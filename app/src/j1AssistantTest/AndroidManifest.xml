@@ -46,7 +46,7 @@
         <receiver android:name=".reminder.MayraReminderActionReceiver" tools:node="remove" />
         <receiver android:name=".background.MayraBootReceiver" tools:node="remove" />
 
-        <!-- Remove AndroidX startup/work/room/profile infrastructure not needed by this test. -->
+        <!-- Remove AndroidX startup/work/room infrastructure not needed by this test. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             tools:node="remove" />
@@ -67,9 +67,6 @@
             tools:node="remove" />
         <service
             android:name="androidx.room.MultiInstanceInvalidationService"
-            tools:node="remove" />
-        <receiver
-            android:name="androidx.profileinstaller.ProfileInstallReceiver"
             tools:node="remove" />
     </application>
 </manifest>
