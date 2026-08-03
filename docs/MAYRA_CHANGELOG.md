@@ -2,7 +2,7 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
-## Unreleased — Jarvis Mode foundation
+## Unreleased — Jarvis Mode foundation and recovery hardening
 
 - Added Android Assistant-role architecture foundation.
 - Added `VoiceInteractionService`, session service and assistant metadata foundation.
@@ -11,8 +11,14 @@ This changelog records meaningful user-visible and engineering milestones. It do
 - Declared lock-screen assistant-session support.
 - Kept Assistant-role components out of the low-permission Full Test variant.
 - Added canonical project governance records and automated documentation-drift protection.
+- Added `START_HERE.md` as the mandatory project-resume entry point.
+- Added full-project pinpoint audit, canonical test matrix and secure baseline/rollback playbook.
+- Created protected known-green recovery branch `baseline/mayra-0.2.1-green-1795`.
+- Preserved Android CI #1833 failure evidence and repaired two Assistant compile incompatibilities:
+  - removed unavailable optional RecognitionService overrides;
+  - configured repeat behavior on concrete ObjectAnimators.
 
-Validation state: latest Jarvis head requires complete CI and Motorola role-selection/invocation testing.
+Validation state: repaired latest Jarvis head requires complete Android CI, Project Governance and Motorola role-selection/invocation testing before baseline promotion.
 
 ## 0.2.1 — Owner Alpha hardening
 
