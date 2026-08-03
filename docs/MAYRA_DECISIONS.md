@@ -76,9 +76,11 @@ API credentials are encrypted with an Android Keystore-backed key and are never 
 
 ## ADR-009 — Jarvis availability uses official Android Assistant role
 
-**Status:** In progress
+**Status:** Device-proven foundation
 
-Always-available Mayra should be built around `VoiceInteractionService` / Assistant role and lock-screen voice sessions, not an unrestricted permanently running microphone service.
+Always-available Mayra is built around `VoiceInteractionService` / Android Digital Assistant role and `VoiceInteractionSession`, not a general overlay or unrestricted permanently running microphone service.
+
+Motorola evidence now proves Mayra can be selected as the target device’s Digital assistant and invoked through the configured Power-button assistant trigger.
 
 ---
 
@@ -118,31 +120,58 @@ Meaningful code/architecture work must update the roadmap and rolling snapshot; 
 
 **Status:** Implemented foundation; secret setup and upgrade test pending
 
-Personal Alpha APKs intended for repeated installation on the owner device must use one stable signing certificate supplied through protected GitHub/environment secrets. Hosted-runner debug certificates are temporary and must not be presented as update-compatible.
+Personal Alpha and repeated engineering APKs intended for owner-device upgrades should use one stable signing certificate supplied through protected secrets. Hosted-runner debug certificates are temporary and must not be presented as update-compatible.
 
 ---
 
 ## ADR-015 — First launch uses one minimal owner setup
 
-**Status:** Implemented; CI/device validation pending
+**Status:** Implemented; trusted full-app device validation pending
 
-The full Mayra app will present a small two-step first-launch setup: essential runtime permissions, Android Assistant activation, then Start Mayra.
+The final Mayra app will present a small first-launch setup: essential runtime permissions, Android Assistant activation, then Start Mayra. Android may still show its own mandatory system dialogs.
 
 ---
 
 ## ADR-016 — J1 Assistant proof uses a zero-permission isolated APK
 
-**Status:** Implemented; CI/device validation pending
+**Status:** Device-proven for selection/unlocked invocation; lifecycle completion pending
 
-Assistant-role compatibility must be tested separately from the full sensitive-capability app after Play Protect blocked the sideloaded Personal Alpha.
+Assistant-role compatibility is tested separately from the full sensitive-capability app.
 
-**Decision:** Create `ai.mayra.app.j1`, an engineering-only package containing only Assistant activation/status and the VoiceInteraction service/session/orb foundation. It requests zero Android permissions.
+**Decision:** `ai.mayra.app.j1` contains only Assistant activation/status and VoiceInteraction service/session/orb foundations and requests zero Android permissions.
 
-**Reason:** J1 needs to answer one question—whether the Motorola exposes, selects and invokes Mayra as Android Assistant. Contacts, internet, reminders, notification access and owner data are unrelated to that proof and increase sideload trust friction.
+**Consequences:** dedicated CI rejects every permission, extra launcher and unrelated feature/background component; Play Protect/signature checks are never bypassed.
 
-**Consequences:**
+---
 
-- dedicated CI rejects every requested Android permission and forbidden feature/background component;
-- the J1 APK is not the final Mayra product and is removed after role testing;
-- full Mayra remains on stable private signing and trusted distribution;
-- Play Protect is not bypassed.
+## ADR-017 — J2 voice proof is isolated from J1
+
+**Status:** Implemented foundation; CI/device validation pending
+
+J1 must remain the permanent zero-permission proof baseline. Real invocation-time voice therefore moves to a separate engineering package, `ai.mayra.app.j2`.
+
+J2 may request exactly `RECORD_AUDIO` and must remove internet, contacts, notifications, reminders, WorkManager/Room/background listeners and the full Mayra runtime. A dedicated J2 CI gate enforces this one-permission boundary.
+
+Reason: if microphone/speech work breaks, J1 remains a clean known-good proof that Android Assistant selection/invocation itself works.
+
+---
+
+## ADR-018 — Android SpeechRecognizer is invocation-time STT, not the wake-word engine
+
+**Status:** Accepted and implemented in J2 foundation
+
+`SpeechRecognizer.createOnDeviceSpeechRecognizer()` is used only for a short visible/invoked assistant session when Android reports on-device recognition available.
+
+It must stop on result/error/cancel/hide/destroy and must not be looped continuously in the always-running `VoiceInteractionService`.
+
+A true always-awake `Mayra` hotword needs a separate dedicated wake-word detector and Issue #14 battery/background/privacy preflight.
+
+---
+
+## ADR-019 — Assistant UI must always have a bounded exit
+
+**Status:** Repair implemented; device retest pending
+
+Every visible Mayra assistant session must be dismissible through reliable Android navigation and direct surface interaction. Back, orb tap, label tap and outside/root tap call `hide()`. Session hide/destroy stops recognition, keep-awake state and animations.
+
+Reason: the first J1 device invocation exposed that an orb with no click listener felt stuck even though Back and phone lock could dismiss it.
