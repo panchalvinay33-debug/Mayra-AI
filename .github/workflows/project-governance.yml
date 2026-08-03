@@ -1,0 +1,51 @@
+name: Project Governance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "agent/**", phase-5-testing-foundation]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mayra-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-project-records:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve comparison base
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$(git rev-list --max-parents=0 HEAD | tail -n 1)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify canonical project records
+        shell: bash
+        run: bash scripts/verify_project_governance.sh "${{ steps.refs.outputs.base }}" HEAD
+
+      - name: Upload governance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayra-governance-${{ github.run_number }}
+          path: build-governance-changed-files.txt
+          if-no-files-found: warn
+          retention-days: 7
