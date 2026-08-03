@@ -1,6 +1,6 @@
 # Mayra AI — Motorola J2 Voice Acceptance
 
-Status: UNLOCKED ON-DEVICE HINDI TRANSCRIPT PASS — LIFECYCLE ACCEPTANCE NEXT
+Status: UNLOCKED ON-DEVICE TRANSCRIPT + DIRECT DISMISS PASS — STABILITY ACCEPTANCE NEXT
 Date updated: 2026-08-04
 Target device: Motorola Edge 70 Fusion / Android 16
 
@@ -23,7 +23,7 @@ Target device: Motorola Edge 70 Fusion / Android 16
 
 J2 requests exactly `android.permission.RECORD_AUDIO` and excludes internet/provider, contacts, notifications, reminders, boot recovery, notification listener, WorkManager, Room, documents, personal memory, full chat runtime and call control.
 
-## Physical evidence through 00:04 IST
+## Physical evidence through 00:08 IST
 
 PASS on Motorola:
 
@@ -35,8 +35,14 @@ PASS on Motorola:
 - Mayra orb/label renders.
 - Android correctly surfaced `On-device speech language pack needed` before model availability was confirmed.
 - On-device settings showed downloaded `Hindi (India)` and `English (India)` packs.
-- After model availability, J2 produced an unlocked on-device Hindi transcript for the first short phrase.
+- After model availability, J2 produced unlocked on-device Hindi/Hinglish/English transcripts.
 - Spoken `kal subah saat baje` was visibly transcribed as `कल सुबह 7:00`.
+- Spoken `open WhatsApp` was visibly transcribed as `ओपन व्हाट्सएप`; J2 did not execute the command.
+- Spoken `hello Mayra how are you` produced a visible Hindi-script phonetic transcript.
+- Orb tap dismisses the session.
+- `Mayra` label tap dismisses the session.
+- outside/root tap dismisses the session.
+- Back and phone-lock dismissal were already physically proven in the common Assistant session.
 - No cloud STT fallback was used.
 - No false transcript or crash was observed.
 
@@ -46,7 +52,7 @@ Historical bounded failures:
 - CI #90: `Speech recognizer unavailable`.
 - CI #106 before usable model registration: `On-device speech language pack needed`.
 
-The support-probe/single-recognizer repair therefore passes the core physical objective: invocation-time on-device Hindi speech recognition works on the Motorola.
+The support-probe/single-recognizer repair therefore passes the core physical objective: invocation-time on-device speech recognition and direct touch dismissal work on the Motorola.
 
 ## A. Installation/update
 
@@ -67,23 +73,23 @@ The support-probe/single-recognizer repair therefore passes the core physical ob
 - [x] microphone/on-device speech path activates.
 - [x] at least one short Hindi phrase produces a transcript.
 - [x] `kal subah saat baje` produces visible `कल सुबह 7:00`.
-- [ ] `open WhatsApp` transcript-only test.
-- [ ] short English phrase test.
-- [ ] record whether mixed Hindi/English selects Hindi or English model consistently.
+- [x] `open WhatsApp` produces transcript only and does not execute the command.
+- [x] short English phrase produces a visible transcript.
+- [x] mixed English/Hindi input currently follows the Hindi model and can render English words phonetically in Devanagari.
 
-J2 is transcript-only and must not execute `open WhatsApp`.
+J2 is intentionally transcript-only.
 
-## D. Direct dismissal/lifecycle — CURRENT GATE
+## D. Direct dismissal/lifecycle — PASS
 
-- [ ] orb tap closes session.
-- [ ] outside/root tap closes session.
-- [ ] `Mayra` label tap closes session.
+- [x] orb tap closes session.
+- [x] outside/root tap closes session.
+- [x] `Mayra` label tap closes session.
 - [x] Back closes session in prior common-session physical test.
 - [x] phone lock closes session in prior common-session physical test.
 - [ ] microphone privacy indicator disappears after every dismissal.
-- [ ] no stuck/duplicate orb.
+- [x] no stuck/duplicate orb observed in the direct-dismiss tests.
 
-## E. Repeated stability
+## E. Repeated stability — CURRENT GATE
 
 Run 20 invoke → speak/no-speech → dismiss cycles.
 
@@ -122,6 +128,6 @@ Run 20 invoke → speak/no-speech → dismiss cycles.
 
 ## Promotion rule
 
-J2 core on-device unlocked Hindi recognition is physically proven. Full `DEVICE_VERIFIED` status still requires direct dismissal, repeated lifecycle, already-locked behavior and reboot recovery.
+J2 core on-device unlocked speech recognition and direct touch dismissal are physically proven. Full `DEVICE_VERIFIED` status still requires 20-cycle stability, microphone-indicator cleanup, already-locked behavior and reboot recovery.
 
 J2 success does not prove production wake phrase, local LLM, full Mayra conversation or call control.
