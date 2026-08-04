@@ -267,3 +267,19 @@ The current speaking engine is offline-first Android TTS with preferred voice or
 J2 may understand app/reminder intent and speak confirmation-oriented wording, but it does not execute those actions or claim they succeeded. Execution will be connected only through the existing typed Mayra action/confirmation runtime after the voice bridge is device-proven.
 
 Small physical checks should be consolidated into meaningful regression rounds when safe so owner testing overhead does not stall feature progress.
+
+---
+
+## ADR-029 — Mayra natural voice is free/offline, pluggable and license-gated
+
+**Status:** Accepted; benchmark foundation implemented
+
+The desired primary Mayra voice must not depend on a paid TTS API, subscription or per-character billing. After a voice pack is installed, normal synthesis should work locally/offline.
+
+The Assistant depends on the `MayraSpeechOutput` contract rather than directly on Android `TextToSpeech`. `MayraOfflineTtsSpeaker` remains the zero-cost reliability fallback while neural engines are evaluated.
+
+Sherpa-ONNX is the preferred first Android neural inference runtime because it supports offline Android TTS and is Apache-2.0. A Hindi VITS/Piper `Priyamvada Medium` pack is useful as the first phone-sized quality benchmark (~63.5 MB), but it is explicitly `BENCHMARK_ONLY`: its enclosing voice repository is labeled MIT while the model card cites a CC BY-NC-SA 4.0 dataset. Free download is not treated as production redistribution approval.
+
+Indic Parler-TTS and IndicF5 remain quality/research candidates, not immediate Mayra dependencies, because their current mobile cost/workflow is materially heavier.
+
+No neural pack is promoted until exact model hash/version/license, Hindi/Hinglish quality, latency, RAM, storage, battery, thermal, dismissal and lock-screen privacy all pass on the Motorola. J2 does not gain Internet merely to fetch a model; the first model experiment must stay isolated and explicit.
