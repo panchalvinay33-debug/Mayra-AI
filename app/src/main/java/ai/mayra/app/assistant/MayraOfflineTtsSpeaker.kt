@@ -5,7 +5,13 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import java.util.Locale
 
-class MayraOfflineTtsSpeaker(context: Context) : TextToSpeech.OnInitListener {
+/**
+ * Zero-cost Android system TTS fallback.
+ *
+ * This remains the safe default until a neural voice pack passes license, latency, thermal,
+ * battery and quality checks on the target Motorola device.
+ */
+class MayraOfflineTtsSpeaker(context: Context) : TextToSpeech.OnInitListener, MayraSpeechOutput {
     private val appContext = context.applicationContext
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     private var ready = false
@@ -25,7 +31,7 @@ class MayraOfflineTtsSpeaker(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
-    fun speak(text: String) {
+    override fun speak(text: String) {
         val clean = text.trim()
         if (clean.isBlank()) return
         val engine = tts
@@ -36,12 +42,12 @@ class MayraOfflineTtsSpeaker(context: Context) : TextToSpeech.OnInitListener {
         engine.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "mayra-${System.nanoTime()}")
     }
 
-    fun stop() {
+    override fun stop() {
         pending = null
         tts?.stop()
     }
 
-    fun shutdown() {
+    override fun shutdown() {
         pending = null
         tts?.stop()
         tts?.shutdown()
