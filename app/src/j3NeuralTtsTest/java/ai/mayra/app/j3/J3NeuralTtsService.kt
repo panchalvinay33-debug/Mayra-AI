@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.os.Build
 import android.os.IBinder
 import android.os.ResultReceiver
 import android.os.SystemClock
@@ -20,9 +21,9 @@ import kotlin.math.roundToInt
  * J3 deliberately hosts sherpa-onnx in a secondary process.
  *
  * A JNI/native abort cannot be caught by Kotlin. Keeping the neural runtime outside the launcher
- * process means an OEM/ABI/model native crash does not make the benchmark UI disappear. The UI can
- * then report a timeout and we can collect device evidence instead of mistaking a process death for
- * an ordinary exception.
+ * process means an OEM/ABI/model native crash does not make the benchmark UI disappear. Progress
+ * markers are sent before every risky native/model boundary so a process death still tells us the
+ * last stage reached on the physical device.
  */
 class J3NeuralTtsService : Service() {
     private val worker = Executors.newSingleThreadExecutor()
@@ -57,23 +58,54 @@ class J3NeuralTtsService : Service() {
         }
 
         val started = SystemClock.elapsedRealtimeNanos()
+        val modelDir = "vits-piper-hi_IN-priyamvada-medium"
+        val model = "$modelDir/hi_IN-priyamvada-medium.onnx"
+        val tokens = "$modelDir/tokens.txt"
+        val dataDir = "$modelDir/espeak-ng-data"
+
+        send(
+            receiver,
+            RESULT_PROGRESS,
+            "Stage 1/4 • process alive • ABI ${Build.SUPPORTED_ABIS.joinToString(",")}"
+        )
+
         runCatching {
-            val modelDir = "vits-piper-hi_IN-priyamvada-medium"
-            val config = OfflineTtsConfig(
+            requireAssetReadable(model)
+            requireAssetReadable(tokens)
+            val espeakEntries = assets.list(dataDir).orEmpty()
+            check(espeakEntries.isNotEmpty()) { "espeak-ng-data is missing or empty" }
+        }.onFailure { error ->
+            send(receiver, RESULT_ERROR, "Asset check ${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+            return
+        }
+
+        send(receiver, RESULT_PROGRESS, "Stage 2/4 • model, tokens and espeak assets readable")
+
+        val config = runCatching {
+            OfflineTtsConfig(
                 model = OfflineTtsModelConfig(
                     vits = OfflineTtsVitsModelConfig(
-                        model = "$modelDir/hi_IN-priyamvada-medium.onnx",
-                        tokens = "$modelDir/tokens.txt",
-                        dataDir = "$modelDir/espeak-ng-data"
+                        model = model,
+                        tokens = tokens,
+                        dataDir = dataDir
                     ),
                     numThreads = 2,
-                    debug = false
+                    debug = true
                 ),
                 maxNumSentences = 1,
                 silenceScale = 0.2f
             )
+        }.getOrElse { error ->
+            send(receiver, RESULT_ERROR, "Config ${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+            return
+        }
+
+        send(receiver, RESULT_PROGRESS, "Stage 3/4 • config built • entering sherpa native constructor")
+
+        runCatching {
             OfflineTts(assetManager = assets, config = config)
         }.onSuccess { engine ->
+            send(receiver, RESULT_PROGRESS, "Stage 4/4 • native constructor returned")
             tts = engine
             val loadMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0
             send(
@@ -83,6 +115,12 @@ class J3NeuralTtsService : Service() {
             )
         }.onFailure { error ->
             send(receiver, RESULT_ERROR, "${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+        }
+    }
+
+    private fun requireAssetReadable(path: String) {
+        assets.open(path).use { stream ->
+            check(stream.read() >= 0) { "Asset is empty: $path" }
         }
     }
 
@@ -186,5 +224,6 @@ class J3NeuralTtsService : Service() {
         const val RESULT_PLAYING = 2
         const val RESULT_ERROR = 3
         const val RESULT_STOPPED = 4
+        const val RESULT_PROGRESS = 5
     }
 }
