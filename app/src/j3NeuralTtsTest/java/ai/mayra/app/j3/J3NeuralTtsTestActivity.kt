@@ -50,6 +50,7 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
     private var busy by mutableStateOf(false)
     private var status by mutableStateOf("App ready. Tap Load Neural Voice to start the offline model.")
     private var lastMetrics by mutableStateOf("Neural engine not loaded yet")
+    private var lastLoadStage by mutableStateOf("No neural load stage reached yet")
     private var speed by mutableStateOf(1.0f)
 
     private val phrases = listOf(
@@ -71,6 +72,7 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
                     ready = true
                     status = "Ready ✓ Hindi neural model loaded locally"
                     lastMetrics = message.ifBlank { "Native model ready" }
+                    lastLoadStage = "Stage 4/4 • native constructor returned"
                 }
                 J3NeuralTtsService.RESULT_PLAYING -> {
                     speakGeneration++
@@ -90,6 +92,12 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
                     busy = false
                     status = "Neural runtime error"
                     lastMetrics = message.ifBlank { "Unknown neural runtime error" }
+                }
+                J3NeuralTtsService.RESULT_PROGRESS -> {
+                    if (message.isNotBlank()) {
+                        lastLoadStage = message
+                        lastMetrics = message
+                    }
                 }
             }
         }
@@ -132,7 +140,7 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "Native neural runtime is crash-isolated. On Android 11+ process-exit diagnostics are shown here instead of closing the app.",
+                            "Native neural runtime is crash-isolated. On Android 11+ process-exit diagnostics and the last completed load stage are shown here instead of closing the app.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -146,6 +154,7 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
         loading = true
         status = "Loading free offline Hindi neural voice…"
         lastMetrics = "Starting crash-isolated sherpa-onnx process"
+        lastLoadStage = "Service start requested"
         loadAttemptWallMs = System.currentTimeMillis()
         val generation = ++loadGeneration
 
@@ -173,14 +182,15 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
                     lastMetrics = buildString {
                         append("Launcher stayed alive ✓")
                         append(" • status ${exit.status}")
+                        append(" • last stage: ${lastLoadStage.take(120)}")
                         if (exit.description.isNotBlank()) append(" • ${exit.description.take(120)}")
                     }
                 } else {
                     status = "Neural process timed out"
                     lastMetrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        "Launcher stayed alive ✓ No recorded process exit; model did not return within 45 s"
+                        "Launcher stayed alive ✓ • last stage: ${lastLoadStage.take(140)} • no recorded process exit within 45 s"
                     } else {
-                        "Launcher stayed alive ✓ Process-exit detail requires Android 11+"
+                        "Launcher stayed alive ✓ • last stage: ${lastLoadStage.take(140)} • process-exit detail requires Android 11+"
                     }
                 }
             }
@@ -206,13 +216,18 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     private fun reasonName(reason: Int): String = when (reason) {
-        ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CRASH"
-        ApplicationExitInfo.REASON_CRASH -> "JAVA_CRASH"
-        ApplicationExitInfo.REASON_ANR -> "ANR"
-        ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
-        ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "RESOURCE_LIMIT"
+        ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"
         ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+        ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+        ApplicationExitInfo.REASON_CRASH -> "JAVA_CRASH"
+        ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CRASH"
+        ApplicationExitInfo.REASON_ANR -> "ANR"
+        ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
+        ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+        ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "RESOURCE_LIMIT"
         ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+        ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
+        ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
         ApplicationExitInfo.REASON_OTHER -> "OTHER"
         else -> "REASON_$reason"
     }
