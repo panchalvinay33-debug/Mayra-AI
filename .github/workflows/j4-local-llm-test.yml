@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +31,45 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+
+      - name: Probe current LiteRT-LM Android SDK provenance without linking it
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/j4-runtime-probe
+          META="https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml"
+          curl --fail --location --retry 3 "$META" -o build/j4-runtime-probe/maven-metadata.xml
+          VERSION="$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root=ET.parse('build/j4-runtime-probe/maven-metadata.xml').getroot()
+          value=(root.findtext('./versioning/release') or root.findtext('./versioning/latest') or '').strip()
+          if not value:
+              versions=[x.text.strip() for x in root.findall('./versioning/versions/version') if x.text]
+              value=versions[-1] if versions else ''
+          print(value)
+          PY
+          )"
+          test -n "$VERSION"
+          BASE="https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android/$VERSION"
+          curl --fail --location --retry 3 "$BASE/litertlm-android-$VERSION.pom" -o build/j4-runtime-probe/litertlm-android.pom
+          curl --fail --location --retry 3 "$BASE/litertlm-android-$VERSION.aar" -o build/j4-runtime-probe/litertlm-android.aar
+          sha256sum build/j4-runtime-probe/litertlm-android.aar | tee build/j4-runtime-probe/aar-sha256.txt
+          echo "LiteRT-LM Android Maven release: $VERSION" | tee build/j4-runtime-probe/version.txt
+          python3 - <<'PY' | tee build/j4-runtime-probe/classfile-probe.txt
+          import io, struct, zipfile
+          aar=zipfile.ZipFile('build/j4-runtime-probe/litertlm-android.aar')
+          classes=zipfile.ZipFile(io.BytesIO(aar.read('classes.jar')))
+          preferred=['com/google/ai/edge/litertlm/Engine.class','com/google/ai/edge/litertlm/EngineConfig.class']
+          name=next((n for n in preferred if n in classes.namelist()), next(n for n in classes.namelist() if n.endswith('.class')))
+          data=classes.read(name)
+          magic, minor, major=struct.unpack('>IHH', data[:8])
+          assert magic == 0xCAFEBABE
+          java={61:'17', 62:'18', 63:'19', 64:'20', 65:'21', 66:'22', 67:'23', 68:'24', 69:'25'}.get(major, f'unknown({major})')
+          print(f'class={name}')
+          print(f'classfile_major={major}')
+          print(f'approx_java={java}')
+          PY
+          unzip -l build/j4-runtime-probe/litertlm-android.aar | tee build/j4-runtime-probe/aar-contents.txt
 
       - name: Compile and lint J4 model-storage harness
         run: gradle --no-daemon :app:compileJ4LocalLlmTestKotlin :app:lintJ4LocalLlmTest --stacktrace --console=plain
@@ -99,13 +138,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload J4 audit
+      - name: Upload J4 audit and runtime compatibility probe
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mayra-j4-local-model-import-audit-${{ github.run_number }}
           path: |
             build/j4-ci/
+            build/j4-runtime-probe/
             app/build/reports/lint-results-j4LocalLlmTest.html
           if-no-files-found: warn
           retention-days: 7
