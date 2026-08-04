@@ -4,7 +4,7 @@ Snapshot date: 2026-08-04
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: J2 core device acceptance achieved; consolidated lock-screen privacy + offline spoken-reply batch in CI
+Current phase: J2 core device acceptance achieved; lock-screen privacy + offline spoken-reply candidate CI #136 fully green and ready for one consolidated Motorola retest
 
 ## Canonical truth
 
@@ -13,31 +13,35 @@ Current phase: J2 core device acceptance achieved; consolidated lock-screen priv
 - Protected baselines are immutable.
 - Device claims require Motorola evidence.
 
-## Last protected application baseline
+## Latest protected CI-green application baseline
 
-`baseline/mayra-0.2.1-j2-speech-support-green-106`
+`baseline/mayra-0.2.1-j2-privacy-tts-green-136`
 
-- source `a63ef1e7c3ddca06ce444502e5afd3a410d8fb18`
-- J2 #106 / J1 #210 / Android CI #2101 / Governance #282: success
-- artifact ID `8866441207`
-- APK SHA-256 `d0917d17b50429a843f3a5e688580df66f3eea678be4806b44ef9f1535adeb6e`
-- exactly `RECORD_AUDIO`
+- source `ef179cf4cb2395af2647be21dbacea6fb3c7cb62`
+- J2 #136 / J1 #239 / Android CI #2131 / Governance #312: success
+- artifact `mayra-j2-voice-apk-136`, ID `8868518898`
+- APK size `19,209,329` bytes
+- APK SHA-256 `b2d129b2b40d8c2aef7eef21f1acf087daf0600224fd5ce4366b38f4aefad1d0`
+- ZIP SHA-256 `405406128d1f44a7bd9c90b71cc173d4bb352ba5d9e8c2863c1100c9a4d13b36`
 
-## Motorola acceptance achieved
+The previous `baseline/mayra-0.2.1-j2-speech-support-green-106` remains the last physically device-proven application source until CI #136 is retested on Motorola.
+
+## Motorola acceptance already achieved
 
 - Assistant selection and Power-button invocation;
 - offline Hindi/Hinglish/English transcription;
 - all dismissal paths;
 - 20-cycle stability;
 - already-locked invocation;
-- owner-reported remaining reboot/no-speech/rapid interaction checks OK;
+- owner-reported reboot/no-speech/rapid interaction checks OK;
 - no reported crash, duplicate orb, stuck mic or permanent busy recognizer.
 
-## Open device defect
+## Device defect found in #106
 
-CI #106 exposes transcript/private content and overlapping text before unlock.
+- private transcript visible before unlock;
+- status/name overlap on lock screen.
 
-## New source batch — awaiting fresh CI
+## CI #136 repair and forward progress
 
 - keyguard-safe generic locked text;
 - no private transcript-derived TTS before unlock;
@@ -45,13 +49,13 @@ CI #106 exposes transcript/private content and overlapping text before unlock.
 - offline-first Android TTS voice selection: Hindi India → English India → English US → offline fallback;
 - 0.95 speech rate and neutral pitch;
 - deterministic spoken replies for greetings, time, capability, reminder and app intent;
-- app/reminder requests are understood but not executed in J2;
+- app/reminder requests understood but not executed in J2;
 - TTS/recognizer cleanup on hide/destroy;
 - tests prevent fake action-success claims and classify unknown transcript as private.
 
 ## Next gate
 
-Fresh J2/J1/Android/Governance green → exact-head baseline/artifact → one consolidated Motorola round covering voice quality, privacy, lifecycle regression, locked state and reboot → then connect the proven bridge to full Mayra typed local brain and confirmation-safe actions.
+Install CI #136 and do one consolidated Motorola round covering voice quality, privacy, action-confirmation wording, lifecycle regression, already-locked state, lock-while-listening, no-speech, rapid open/close and reboot. If green, mark the J2 Assistant/on-device speech/offline TTS foundation `DEVICE_VERIFIED`, then connect it to the full Mayra typed local brain and confirmation-safe actions.
 
 ## Distribution truth
 
