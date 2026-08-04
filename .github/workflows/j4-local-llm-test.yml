@@ -71,8 +71,13 @@ jobs:
           PY
           unzip -l build/j4-runtime-probe/litertlm-android.aar | tee build/j4-runtime-probe/aar-contents.txt
 
-      - name: Compile and lint J4 model-storage harness
-        run: gradle --no-daemon :app:compileJ4LocalLlmTestKotlin :app:lintJ4LocalLlmTest --stacktrace --console=plain
+      - name: Compile, test and lint J4 model-storage harness
+        run: |
+          gradle --no-daemon \
+            :app:compileJ4LocalLlmTestKotlin \
+            :app:testDebugUnitTest --tests 'ai.mayra.app.localmodel.MayraLocalModelIntegrityTest' \
+            :app:lintJ4LocalLlmTest \
+            --stacktrace --console=plain
 
       - name: Assemble J4 APK
         run: gradle --no-daemon :app:assembleJ4LocalLlmTest --stacktrace --console=plain
@@ -147,5 +152,6 @@ jobs:
             build/j4-ci/
             build/j4-runtime-probe/
             app/build/reports/lint-results-j4LocalLlmTest.html
+            app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: warn
           retention-days: 7
