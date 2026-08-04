@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21 for J4-only LiteRT-LM classes
+      - name: Set up JDK 21 for J4-only LiteRT-LM packaging
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -58,7 +58,7 @@ jobs:
           PY
           unzip -l build/j4-runtime-probe/litertlm-android.aar | tee build/j4-runtime-probe/aar-contents.txt
 
-      - name: Compile, test and lint J4 with pinned LiteRT runtime
+      - name: Compile, test and lint J4 with runtime-only LiteRT isolation
         run: |
           gradle --no-daemon \
             :app:compileJ4LocalLlmTestJavaWithJavac \
@@ -70,7 +70,7 @@ jobs:
       - name: Assemble J4 APK with LiteRT-LM runtime
         run: gradle --no-daemon :app:assembleJ4LocalLlmTest --stacktrace --console=plain
 
-      - name: Audit zero-permission local-model boundary
+      - name: Audit zero-permission and isolated LiteRT runtime boundary
         shell: bash
         run: |
           set -euo pipefail
@@ -83,6 +83,7 @@ jobs:
           "$AAPT" dump permissions "$APK" | tee build/j4-ci/permissions.log
           "$AAPT" dump badging "$APK" | tee build/j4-ci/badging.log
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/j4-ci/manifest.log
+          unzip -l "$APK" | tee build/j4-ci/apk-contents.log
 
           permission_count="$(grep -c '^uses-permission:' build/j4-ci/permissions.log || true)"
           test "$permission_count" -eq 0
@@ -95,10 +96,12 @@ jobs:
           required_components=(
             ai.mayra.app.j4.J4TestApplication
             ai.mayra.app.j4.J4LocalLlmTestActivity
+            ai.mayra.app.j4.J4LocalBrainRuntimeService
           )
           for component in "${required_components[@]}"; do
             grep -Fq "$component" build/j4-ci/manifest.log
           done
+          grep -Fq ':localbrain' build/j4-ci/manifest.log
 
           forbidden_components=(
             ai.mayra.app.MainActivity
@@ -115,6 +118,10 @@ jobs:
               exit 1
             fi
           done
+
+          # Runtime-only means Kotlin/KSP never parses LiteRT's newer metadata, but the arm64 JNI
+          # engine must still be physically packaged for the Motorola runtime probe.
+          grep -Fq 'lib/arm64-v8a/liblitertlm_jni.so' build/j4-ci/apk-contents.log
 
           sha256sum "$APK" | tee build/j4-ci/apk-sha256.txt
           stat --printf='APK bytes: %s\n' "$APK" | tee build/j4-ci/apk-size.txt
