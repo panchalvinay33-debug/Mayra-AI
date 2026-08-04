@@ -165,11 +165,12 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
                 ready = false
                 val exit = latestNeuralExit(loadAttemptWallMs)
                 if (exit != null) {
+                    val description = exit.description.orEmpty()
                     status = "Neural process exited: ${reasonName(exit.reason)}"
                     lastMetrics = buildString {
                         append("Launcher stayed alive ✓")
                         append(" • status ${exit.status}")
-                        if (exit.description.isNotBlank()) append(" • ${exit.description.take(120)}")
+                        if (description.isNotBlank()) append(" • ${description.take(120)}")
                     }
                 } else {
                     status = "Neural process timed out"
