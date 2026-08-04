@@ -14,26 +14,27 @@ Repository hygiene registry: #15
 |---|---|---|---|
 | Governance/backups | DONE / CONTINUOUS | Canonical records, governance CI and protected baselines exist | Sync every meaningful batch |
 | J1 Assistant role | DEVICE VERIFIED FOUNDATION | Motorola accepts/selects Mayra; Power trigger invokes orb | Preserve regression baseline |
-| J2 on-device recognition | CORE DEVICE ACCEPTED | Hindi/Hinglish/English transcript, direct dismissal, 20 cycles, locked invocation and owner-reported reboot/no-speech/rapid tests pass | Consolidated privacy + spoken-reply regression |
-| Lock-screen privacy | REPAIR IN CI | CI #106 exposes transcript/overlap before unlock | Generic locked state, no private transcript/TTS |
-| Spoken Mayra reply | IN PROGRESS | Offline-first Android TTS + deterministic local response policy implemented in source | Fresh CI, then voice-quality device round |
-| Voice actions | SAFE FOUNDATION | J2 understands app/reminder intent but does not execute or falsely claim success | Integrate full typed action/confirmation runtime after spoken-reply proof |
+| J2 on-device recognition | CORE DEVICE ACCEPTED | Hindi/Hinglish/English transcript, direct dismissal, 20 cycles, locked invocation and owner-reported reboot/no-speech/rapid tests pass | CI #136 consolidated regression |
+| Lock-screen privacy | CI GREEN / DEVICE VERIFY | Keyguard-aware transcript suppression and layout repair green in CI #136 | Verify no private transcript/TTS while locked |
+| Spoken Mayra reply | CI GREEN / DEVICE VERIFY | Offline-first Android TTS + deterministic local response policy green in CI #136 | Verify audible quality and lifecycle on Motorola |
+| Voice actions | SAFE FOUNDATION | J2 understands app/reminder intent but does not execute or falsely claim success | Connect proven voice bridge to typed action confirmation runtime |
 | Wake phrase | BENCHMARK | Continuous SpeechRecognizer loop rejected; dedicated KWS required | After consolidated voice acceptance |
 | Local LLM | BENCHMARK | LiteRT-LM/Qwen-class direction preflighted, no model selected | Motorola benchmark after voice bridge |
 | Calls | ACCEPTED / GATED | Default Phone/InCallService preflight complete | No role takeover before full UI/runtime |
-| Trusted install | IN PROGRESS | Stable owner signing/trusted distribution required | Private certificate + upgrade proof |
+| Trusted install | IN_PROGRESS | Stable owner signing/trusted distribution required | Private certificate + upgrade proof |
 
 ## Latest protected application baseline
 
-`baseline/mayra-0.2.1-j2-speech-support-green-106`
+`baseline/mayra-0.2.1-j2-privacy-tts-green-136`
 
-- source `a63ef1e7c3ddca06ce444502e5afd3a410d8fb18`
-- J2 #106, J1 #210, Android CI #2101, Governance #282: success
-- artifact ID `8866441207`
-- APK SHA-256 `d0917d17b50429a843f3a5e688580df66f3eea678be4806b44ef9f1535adeb6e`
-- exactly `RECORD_AUDIO`
+- source `ef179cf4cb2395af2647be21dbacea6fb3c7cb62`
+- J2 #136, J1 #239, Android CI #2131, Governance #312: success
+- artifact `mayra-j2-voice-apk-136`, ID `8868518898`
+- APK size `19,209,329` bytes
+- APK SHA-256 `b2d129b2b40d8c2aef7eef21f1acf087daf0600224fd5ce4366b38f4aefad1d0`
+- ZIP SHA-256 `405406128d1f44a7bd9c90b71cc173d4bb352ba5d9e8c2863c1100c9a4d13b36`
 
-Do not move/promote the new privacy/TTS source until fresh exact-head J2/J1/Android/Governance CI is green.
+Previous device-proven baseline remains `baseline/mayra-0.2.1-j2-speech-support-green-106` until the new privacy/TTS behavior is physically retested.
 
 ## Device evidence
 
@@ -46,13 +47,13 @@ PASS:
 - all direct dismissal paths;
 - 20-cycle stability without reported crash, duplicate orb, stuck mic or permanent busy recognizer;
 - already-locked invocation;
-- owner-reported consolidated reboot/no-speech/rapid-open-close behavior OK.
+- owner-reported reboot/no-speech/rapid-open-close behavior OK.
 
-OPEN DEFECT:
+Previously observed defect in #106:
 
-- CI #106 shows transcript/private text and overlapping layout before unlock.
+- private transcript and overlapping text visible before unlock.
 
-## Current implementation batch
+## CI #136 implementation
 
 - keyguard-aware locked rendering;
 - no transcript-derived/private spoken response while locked;
@@ -62,13 +63,12 @@ OPEN DEFECT:
 - deterministic local replies for greeting, time, capability, reminder and app-open intent;
 - no action execution in J2; confirmation wording only;
 - TTS/recognizer lifecycle cleanup;
-- unit tests for no fake action claim and private unknown transcript handling.
+- tests for no fake action claim and private unknown transcript handling.
 
 ## Immediate next actions
 
-1. Settle fresh J2/J1/Android/Governance workflows.
-2. Repair compile/lint/test/audit failures without weakening checks.
-3. Promote exact-head baseline and artifact only after all gates pass.
-4. Run one consolidated Motorola round: voice quality, privacy, action-confirmation wording, all lifecycle regressions, locked state and reboot.
-5. Then connect the proven voice bridge to the existing full Mayra typed local brain and confirmation-safe action runtime.
-6. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Install CI #136 and run one consolidated Motorola round: speech quality, privacy, action-confirmation wording, all lifecycle regressions, locked state and reboot.
+2. If all pass, promote J2 to full `DEVICE_VERIFIED` for Assistant/on-device speech/offline TTS foundation.
+3. Then connect the proven voice bridge to the existing full Mayra typed local brain and confirmation-safe action runtime.
+4. After that, start the local wake-word benchmark and local-LLM device benchmark as separately gated tracks.
+5. Keep PR #12 Draft/open/unmerged until explicit owner approval.
