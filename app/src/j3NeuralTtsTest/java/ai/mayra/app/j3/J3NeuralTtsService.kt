@@ -14,6 +14,7 @@ import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
+import java.io.File
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
@@ -58,69 +59,108 @@ class J3NeuralTtsService : Service() {
         }
 
         val started = SystemClock.elapsedRealtimeNanos()
-        val modelDir = "vits-piper-hi_IN-priyamvada-medium"
-        val model = "$modelDir/hi_IN-priyamvada-medium.onnx"
-        val tokens = "$modelDir/tokens.txt"
-        val dataDir = "$modelDir/espeak-ng-data"
+        val assetDir = "vits-piper-hi_IN-priyamvada-medium"
+        val assetModel = "$assetDir/hi_IN-priyamvada-medium.onnx"
+        val assetTokens = "$assetDir/tokens.txt"
+        val assetDataDir = "$assetDir/espeak-ng-data"
 
         send(
             receiver,
             RESULT_PROGRESS,
-            "Stage 1/4 • process alive • ABI ${Build.SUPPORTED_ABIS.joinToString(",")}"
+            "Stage 1/5 • process alive • ABI ${Build.SUPPORTED_ABIS.joinToString(",")}"
         )
 
         runCatching {
-            requireAssetReadable(model)
-            requireAssetReadable(tokens)
-            val espeakEntries = assets.list(dataDir).orEmpty()
+            requireAssetReadable(assetModel)
+            requireAssetReadable(assetTokens)
+            val espeakEntries = assets.list(assetDataDir).orEmpty()
             check(espeakEntries.isNotEmpty()) { "espeak-ng-data is missing or empty" }
         }.onFailure { error ->
             send(receiver, RESULT_ERROR, "Asset check ${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
             return
         }
 
-        send(receiver, RESULT_PROGRESS, "Stage 2/4 • model, tokens and espeak assets readable")
+        send(receiver, RESULT_PROGRESS, "Stage 2/5 • packaged model assets readable")
 
-        val config = runCatching {
-            OfflineTtsConfig(
-                model = OfflineTtsModelConfig(
-                    vits = OfflineTtsVitsModelConfig(
-                        model = model,
-                        tokens = tokens,
-                        dataDir = dataDir
-                    ),
-                    numThreads = 2,
-                    debug = true
-                ),
-                maxNumSentences = 1,
-                silenceScale = 0.2f
-            )
-        }.getOrElse { error ->
-            send(receiver, RESULT_ERROR, "Config ${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
-            return
-        }
-
-        send(receiver, RESULT_PROGRESS, "Stage 3/4 • config built • entering sherpa native constructor")
-
+        val localDir = File(filesDir, "j3-neural/$assetDir")
         runCatching {
-            OfflineTts(assetManager = assets, config = config)
-        }.onSuccess { engine ->
-            send(receiver, RESULT_PROGRESS, "Stage 4/4 • native constructor returned")
-            tts = engine
-            val loadMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0
+            materializeAssetTree(assetDir, localDir)
+            val modelFile = File(localDir, "hi_IN-priyamvada-medium.onnx")
+            val tokensFile = File(localDir, "tokens.txt")
+            val dataDir = File(localDir, "espeak-ng-data")
+            check(modelFile.isFile && modelFile.length() > 0L) { "Copied model missing" }
+            check(tokensFile.isFile && tokensFile.length() > 0L) { "Copied tokens missing" }
+            check(dataDir.isDirectory && dataDir.listFiles()?.isNotEmpty() == true) { "Copied espeak data missing" }
+            Triple(modelFile, tokensFile, dataDir)
+        }.onFailure { error ->
+            send(receiver, RESULT_ERROR, "Local copy ${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+            return
+        }.onSuccess { (modelFile, tokensFile, dataDir) ->
             send(
                 receiver,
-                RESULT_READY,
-                "Load ${loadMs.roundToInt()} ms • ${engine.sampleRate()} Hz • speakers ${engine.numSpeakers()}"
+                RESULT_PROGRESS,
+                "Stage 3/5 • copied to app-private files • model ${modelFile.length() / (1024 * 1024)} MB"
             )
-        }.onFailure { error ->
-            send(receiver, RESULT_ERROR, "${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+
+            val config = runCatching {
+                OfflineTtsConfig(
+                    model = OfflineTtsModelConfig(
+                        vits = OfflineTtsVitsModelConfig(
+                            model = modelFile.absolutePath,
+                            tokens = tokensFile.absolutePath,
+                            dataDir = dataDir.absolutePath
+                        ),
+                        numThreads = 1,
+                        debug = true
+                    ),
+                    maxNumSentences = 1,
+                    silenceScale = 0.2f
+                )
+            }.getOrElse { error ->
+                send(receiver, RESULT_ERROR, "Config ${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+                return
+            }
+
+            send(receiver, RESULT_PROGRESS, "Stage 4/5 • filesystem config built • entering sherpa native constructor")
+
+            runCatching {
+                OfflineTts(config = config)
+            }.onSuccess { engine ->
+                send(receiver, RESULT_PROGRESS, "Stage 5/5 • native constructor returned")
+                tts = engine
+                val loadMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0
+                send(
+                    receiver,
+                    RESULT_READY,
+                    "Load ${loadMs.roundToInt()} ms • ${engine.sampleRate()} Hz • speakers ${engine.numSpeakers()}"
+                )
+            }.onFailure { error ->
+                send(receiver, RESULT_ERROR, "${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}")
+            }
         }
     }
 
     private fun requireAssetReadable(path: String) {
         assets.open(path).use { stream ->
             check(stream.read() >= 0) { "Asset is empty: $path" }
+        }
+    }
+
+    private fun materializeAssetTree(assetPath: String, output: File) {
+        val children = assets.list(assetPath).orEmpty()
+        if (children.isEmpty()) {
+            output.parentFile?.mkdirs()
+            if (!output.exists() || output.length() == 0L) {
+                assets.open(assetPath).use { input ->
+                    output.outputStream().buffered().use { out -> input.copyTo(out) }
+                }
+            }
+            return
+        }
+
+        output.mkdirs()
+        children.forEach { child ->
+            materializeAssetTree("$assetPath/$child", File(output, child))
         }
     }
 
