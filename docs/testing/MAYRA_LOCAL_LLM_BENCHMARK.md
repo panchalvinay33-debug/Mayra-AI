@@ -1,183 +1,129 @@
 # Mayra AI — Motorola Local LLM Benchmark
 
-Status: **J4 L0 STORAGE FOUNDATION CI-GREEN; L1 INTEGRITY HARDENING + SDK PROBE UNDER FRESH CI**
+Status: **J4 LOCAL CPU INITIALIZATION + FIXED GENERATION PHYSICALLY PROVEN**
 Date: 2026-08-04
 Target device: Motorola Edge 70 Fusion / Android 16
-Preflight: `docs/feasibility/MAYRA_LOCAL_LLM_PREFLIGHT.md`
-Runtime direction: Google LiteRT-LM Kotlin API
-First runtime candidate: Gemma3-1B chat-ready `.litertlm` (~557 MB upstream reference)
-
-## J4 package truth
-
 Package: `ai.mayra.app.j4`
-Label: `Mayra J4 Local Brain Test`
-Engineering-only, zero-permission model lifecycle/runtime benchmark.
+Runtime: LiteRT-LM Android 0.15.0, CPU backend, isolated `:localbrain` process
+Model: `Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm`
 
-J4 #2 source `062894809bb8b0989f79ab99db644c9d0cbdfa2d` passed:
+## Exact pinned runtime provenance
 
-- J4 Local LLM Test #2 — SUCCESS;
-- Android CI #2224 — SUCCESS;
-- Project Governance #405 — SUCCESS;
-- J1 Assistant Test #333 — SUCCESS;
-- J2 Voice Test #229 — SUCCESS;
-- J3 Neural TTS Test #51 — SUCCESS.
+- LiteRT-LM Android: `0.15.0`
+- AAR SHA-256: `b398c4745934a6035d192ffce5fdaf4f72a0009830a97b73c017c21f2a92b5bd`
+- `Engine.class` classfile major: `65` (Java 21)
+- J4-only build runner: JDK 21
+- Main Mayra source target remains Java 17 / Kotlin 2.0
+- LiteRT AAR is downloaded and SHA-verified in CI, then packaged as a local runtime-only AAR to keep Kotlin 2.2 Maven transitives off the J4 compile classpath.
+- J4-only Gson runtime: `2.13.2`
 
-That milestone proves the first owner-selected `.litertlm` import APK compiles/packages with a zero-permission boundary. It does not yet prove a physical model import or inference.
+## Green CI artifact
 
-## Current L1 source additions
+Source: `b89f935b6d3f290c889df59cccd700699800d865`
 
-Fresh source after J4 #2 adds:
+- J4 Local LLM Test #60 — SUCCESS
+- Android CI #2282 — SUCCESS
+- Project Governance #463 — SUCCESS
+- J1 Assistant Test #390 — SUCCESS
+- J2 Voice Test #287 — SUCCESS
+- J3 Neural TTS Test #109 — SUCCESS
 
-- `.litertlm` filename validation;
-- source-size validation when Android provider reports size;
-- 256 MB private-storage safety headroom;
-- atomic `.partial` import then final rename;
-- copy-size verification;
-- SHA-256 during import;
-- persistent local metadata for name/bytes/hash;
-- independent `Verify Imported Model` SHA-256 pass;
-- explicit model removal + metadata cleanup;
-- visible device manufacturer/model, Android version, primary ABI, physical RAM, app heap class and private free storage;
-- reusable `MayraLocalModelIntegrity` source boundary with tests for extension, storage overflow/headroom and SHA-256 known vectors.
+J4 APK SHA-256: `e36b88199f14147973f631f2e2dafb54f6a762a9fcc53816132d2c74a6bfcef4`
 
-## Active LiteRT-LM SDK compatibility probe
+## Physical Motorola evidence
 
-J4 CI now resolves the current Android Maven metadata **without linking the SDK into Mayra yet** and stores:
+Device screen evidence supplied by owner proves:
 
-- resolved release version;
-- POM;
-- AAR SHA-256;
-- AAR class-file major / approximate Java level;
-- AAR contents.
+- app launches on Motorola Edge 70 Fusion / Android 16 / arm64-v8a;
+- zero-permission J4 package remains stable;
+- exact model import succeeds into app-private storage;
+- independent SHA-256 verification succeeds;
+- imported model survives app close/reopen;
+- LiteRT-LM CPU engine reaches `Stage 5/5`;
+- fixed local generation works in Hindi, Hinglish and English;
+- close reclaims the isolated runtime and automatically rebinds a fresh `:localbrain` process;
+- reload-after-close and generation succeed again;
+- launcher remains alive throughout.
 
-Reason: the main Mayra project is currently Kotlin 2.0.21 / Java 17. We will not casually upgrade the whole app or pin a runtime until the exact SDK bytecode/toolchain evidence is known. J1/J2/J3/full-app stability takes priority over rushing the heavy runtime dependency.
-
-## First physical J4 sequence — model lifecycle
-
-When the fresh J4 artifact is green:
-
-1. install/launch J4;
-2. confirm the screen reports Motorola/Android/ABI/RAM/private-free-space diagnostics;
-3. select the exact Gemma3-1B `.litertlm` candidate through Android document picker;
-4. verify import reports exact bytes + SHA-256;
-5. tap `Verify Imported Model` and require the same SHA-256;
-6. close/reopen J4 and confirm model-present metadata survives;
-7. remove model and confirm private model path clears;
-8. re-import once to prove replacement lifecycle;
-9. airplane mode may remain on throughout because L0/L1 has no network permission.
-
-Record:
+### Model integrity
 
 | Measurement | Result |
 |---|---|
-| J4 source | PENDING fresh head |
-| J4 CI run/artifact | PENDING |
-| Device RAM | PENDING screen evidence |
-| Private free storage before import | PENDING |
-| Model exact name/revision | PENDING |
-| Model source/license | PENDING |
-| Selected file bytes | PENDING |
-| Imported SHA-256 | PENDING |
-| Re-verify SHA-256 | PENDING |
-| Reopen persistence | PENDING |
-| Remove/re-import lifecycle | PENDING |
+| Model filename | `Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm` |
+| Displayed model size | 557.3 MB |
+| SHA-256 | `1325ae366d31950f137c9c357b9fa89448b176d76998180c08ceaca78bba98be` |
+| Import | PASS |
+| Independent re-verify | PASS |
+| Reopen persistence | PASS |
 
-## Runtime L2/L3 sequence
+### Runtime and generation
 
-Only after SDK compatibility and model-byte integrity are both proven:
+| Measurement | Result |
+|---|---|
+| Device RAM | 7.30 GB |
+| App heap class | 256 MB |
+| CPU engine load | 5350 ms |
+| Hindi fixed generation | PASS, 729 ms, output `दिल्ली.` |
+| Hinglish fixed generation | PASS, 1816 ms, output malformed/low quality |
+| English fixed generation | PASS, 620 ms, output `Four.` |
+| Close/unload | PASS; fresh isolated process rebound |
+| Reload-after-close English | PASS, 747 ms, output `Four.` |
 
-1. pin exact LiteRT-LM Android Maven version and AAR hash/provenance;
-2. link SDK to J4 only;
-3. initialize `EngineConfig(modelPath = privateModelPath, backend = CPU)` off UI thread;
-4. initialize engine and display cold load ms;
-5. create one bounded conversation;
-6. send fixed prompts;
-7. stream response into engineering UI;
-8. close conversation + engine explicitly;
-9. load again for warm timing;
-10. only then compare GPU, if worthwhile.
+The timings above are total wall-clock generation measurements shown by the engineering APK. They are not first-token latency or tokens/sec measurements.
 
-### Fixed prompts
+## Current conclusion
 
-1. Hindi: `नमस्ते मायरा, आज तुम मेरी किस तरह मदद कर सकती हो?`
-2. Hinglish: `Mayra, mujhe simple Hinglish mein batao ki offline AI kya hota hai.`
-3. English: `Explain in three short sentences what an on-device AI assistant can do.`
-4. Reminder clarification only: `Kal subah dawa yaad dilane ke request ko confirm karne ke liye ek short line banao. Action mat karo.`
-5. Summary: a fixed short supplied paragraph.
-6. Phone concept in Hindi: airplane mode or app permissions explanation.
-7. 5–10 turn context consistency.
-8. Repeat core prompts in Airplane mode.
+Gemma3-1B LiteRT-LM is physically proven to perform fully local CPU inference on the owner Motorola device. Runtime compatibility, model loading, basic multilingual generation, crash isolation and close/reload recovery are all proven.
 
-## Runtime measurements
+This does **not** yet make the model Mayra's production conversational brain. The short arithmetic/location-style fixed prompts prove execution, not useful assistant quality. Hinglish quality is visibly weak and must not be overstated.
 
-For every prompt/runtime candidate record:
+## Next J4 benchmark gate
 
-- cold engine initialization ms;
-- warm engine initialization ms;
-- first-token latency;
-- total generation wall time;
-- approximate tokens/sec if API/metrics permit;
-- output length;
-- RAM idle/load/generate/release;
-- backend;
-- thermal/battery observation;
-- cancellation/close behavior.
+The next isolated engineering build should add:
 
-## Quality rubric
+1. longer useful Hindi/Hinglish/English prompts;
+2. output character count and approximate token count;
+3. first-response timing if the SDK exposes streaming events;
+4. total generation time and approximate decode rate;
+5. runtime-process RAM before load, after load, during generation and after close;
+6. explicit cancel-generation control;
+7. 10 sequential prompts and 5 close/reload cycles;
+8. background, screen-lock and process-kill recovery checks;
+9. device temperature/battery observations recorded by the owner;
+10. Airplane-mode repeat confirmation.
 
-Owner score 1–5:
+### Quality prompts for the next build
 
-- Hindi naturalness/usefulness;
-- Hinglish naturalness/usefulness;
-- English clarity;
-- instruction following;
-- hallucination tendency;
-- repetition;
-- response concision;
-- multi-turn consistency;
-- ability to admit uncertainty.
+- Hindi: `ऑफलाइन एआई क्या होता है? इसे आसान हिंदी में तीन छोटे वाक्यों में समझाओ।`
+- Hinglish: `Offline AI kya hota hai? Simple Hinglish mein teen short lines mein samjhao.`
+- English: `Explain offline AI in exactly three short sentences.`
+- Safety boundary: `Kal subah dawa yaad dilane ke request ko confirm karne ke liye ek short line banao. Koi action mat karo.`
+- Uncertainty: `Agar tumhe kisi fact ka bharosa na ho to tum kya kahogi? Ek short Hindi line mein jawab do.`
 
-No credit for claiming an Android action happened when J4 did not execute it.
+## Trust-boundary requirements
 
-## Trust-boundary regression
+Before any main-assistant integration:
 
-Before production integration verify:
-
-- [ ] local model text cannot directly place calls/send messages;
-- [ ] local model text cannot directly write owner memory;
-- [ ] local model cannot spoof trusted memory/document provenance;
-- [ ] deterministic action router remains authoritative;
-- [ ] confirmation tokens remain typed/action-bound/expiring;
-- [ ] local mode does not silently send context to network;
-- [ ] missing/corrupt model falls back cleanly.
-
-## Stress/failure cases
-
-- [ ] wrong extension rejected;
-- [ ] empty model rejected;
-- [ ] insufficient private storage rejected before copy;
-- [ ] interrupted import leaves no accepted partial model;
-- [ ] SHA mismatch detected;
-- [ ] model removal works;
-- [ ] engine initialization failure leaves launcher alive;
-- [ ] generation cancellation;
-- [ ] background/screen-lock behavior;
-- [ ] Android kills heavy runtime;
-- [ ] repeated load/close without crash loop;
-- [ ] device hot/thermal throttling;
-- [ ] context/output limit reached cleanly.
+- local model text cannot directly place calls or send messages;
+- local model text cannot directly write owner memory;
+- local model cannot spoof trusted memory/document provenance;
+- deterministic action router remains authoritative;
+- confirmation tokens remain typed, action-bound and expiring;
+- local mode does not silently send context to a network;
+- missing/corrupt/killed runtime falls back cleanly;
+- no model output is treated as proof that a device action happened.
 
 ## Promotion rule
 
 A model becomes Mayra's first local conversational brain only if:
 
-- exact model/runtime license and distribution are acceptable;
-- model SHA/runtime version are pinned;
+- exact model/runtime licensing and distribution are acceptable;
+- model SHA/runtime version remain pinned;
 - storage/RAM are acceptable on the owner device;
 - latency feels conversational enough;
-- Hindi/Hinglish quality is clearly useful;
-- battery/thermal impact is acceptable;
-- airplane-mode operation works;
-- engine close/recovery and deterministic fallback work;
-- Mayra action/memory/document trust boundaries remain intact;
-- Blueprint/Roadmap/Decision Log/Latest Snapshot are synchronized.
+- Hindi/Hinglish quality is genuinely useful;
+- battery and thermal impact are acceptable;
+- airplane-mode operation is repeatedly proven;
+- cancellation, close/recovery and deterministic fallback work;
+- action/memory/document trust boundaries remain intact;
+- roadmap, decision log and latest snapshot are synchronized.
