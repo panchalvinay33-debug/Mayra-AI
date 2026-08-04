@@ -2,6 +2,19 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
+## Unreleased — Free offline neural voice benchmark foundation
+
+- Motorola CI #136 physically speaks Mayra replies through Android offline TTS; owner reports the voice is understandable but too robotic for the desired final Mayra experience.
+- Added `MayraSpeechOutput` so the Assistant can swap speech engines without rewriting the voice-session logic.
+- `MayraOfflineTtsSpeaker` now implements that contract and remains the zero-cost fallback.
+- Added `MayraVoicePackPolicy` with explicit `APPROVED`, `BENCHMARK_ONLY` and `BLOCKED` license gates; a freely downloadable model is not automatically production-eligible.
+- Added unit tests preventing the first Hindi Piper/VITS benchmark model from being treated as production-approved while its model card cites a non-commercial dataset.
+- Added `docs/feasibility/MAYRA_NEURAL_TTS_PREFLIGHT.md` covering free/offline requirements, sherpa-onnx runtime choice, model/license cautions and Motorola performance gates.
+- Added `docs/testing/MAYRA_NEURAL_TTS_BENCHMARK.md` with fixed Hindi/Hinglish phrases and latency/RAM/storage/thermal/privacy/stability measurements.
+- Sherpa-ONNX is the preferred first Android neural runtime candidate; no neural binary/dependency has yet been promoted into the normal J2 path.
+- Hindi Priyamvada Medium (~63.5 MB) is benchmark-only; Indic Parler-TTS and IndicF5 remain later quality/research candidates.
+- No paid TTS API, subscription or per-character billing is accepted as the primary Mayra voice architecture.
+
 ## Unreleased — J2 lock-screen privacy + offline spoken reply
 
 - Accepted the device-proven J2 core voice foundation: Digital assistant role, Motorola Power-button invocation, on-device Hindi/Hinglish/English recognition, direct dismissal, 20-cycle stability, already-locked invocation and owner-reported reboot/no-speech/rapid interaction checks.
