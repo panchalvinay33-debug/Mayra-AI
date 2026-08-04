@@ -37,6 +37,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Native neural runtime is deliberately isolated. A JNI abort must not kill the UI. -->
+        <service
+            android:name=".j3.J3NeuralTtsService"
+            android:exported="false"
+            android:process=":neuraltts"
+            android:stopWithTask="true" />
+
         <service android:name=".assistant.MayraVoiceInteractionService" tools:node="remove" />
         <service android:name=".assistant.MayraVoiceInteractionSessionService" tools:node="remove" />
         <service android:name=".assistant.MayraRecognitionService" tools:node="remove" />
