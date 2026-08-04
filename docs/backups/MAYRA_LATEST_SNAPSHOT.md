@@ -4,16 +4,16 @@ Snapshot date: 2026-08-04
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: J2 voice foundation is device-proven; J3 neural TTS is device-stable as a benchmark candidate but its exact voice pack remains production-license blocked; local LLM benchmark is now the next active offline-intelligence phase.
+Current phase: J2 voice is device-proven; J3 neural TTS is device-stable but the tested voice pack is production-license blocked; J4 local-brain model lifecycle/integrity is now the active offline-intelligence gate.
 
 ## Canonical truth
 
-- Final product remains one Mayra app; J1/J2/J3 and future local-LLM harnesses are engineering packages only.
+- Final product remains one Mayra app; J1/J2/J3/J4 are engineering packages only.
 - PR #12 is not authorized for merge/ready.
 - Protected baselines are immutable.
 - Device capability claims require Motorola evidence.
 - Android offline TTS remains the production-safe speech fallback until a license-clear neural voice is selected.
-- Heavy local LLM integration remains blocked until an isolated Motorola benchmark passes.
+- Heavy local LLM integration remains isolated from final Mayra until Motorola benchmark evidence exists.
 
 ## Latest protected application baseline
 
@@ -26,85 +26,98 @@ Current phase: J2 voice foundation is device-proven; J3 neural TTS is device-sta
 
 ## Motorola voice evidence
 
-Physically proven foundation:
+Physically proven:
 
 - Android Digital assistant selection and Power-button invocation;
 - offline Hindi/Hinglish/English recognition;
 - direct dismissal paths and 20-cycle stability;
 - already-locked invocation;
-- owner-reported reboot/no-speech/rapid-interaction checks OK;
-- Android offline TTS speaks but owner finds it robotic.
+- reboot/no-speech/rapid-interaction checks reported OK;
+- Android offline TTS speaks but sounds robotic to owner.
 
 ## J3 neural voice milestone
 
 Passing source: `1ed0cd3e8d9ebe7671f3027fe0ab85b41da0294a`
 
-Exact CI:
-
-- J3 Neural TTS Test #29 — success;
-- Android CI #2202 — success;
-- J2 Voice Test #207 — success;
-- J1 Assistant Test #311 — success;
-- Project Governance #383 — success.
-
-Physical result on Motorola:
-
+- J3 #29 / Android CI #2202 / J2 #207 / J1 #311 / Governance #383: success;
 - app-private model materialization: PASS;
-- sherpa native `OfflineTts` construction: PASS;
-- model load: PASS;
-- synthesis/playback: PASS;
-- observed sample: 3091 ms generation for 4297 ms audio, RTF 0.72;
-- all six phrases reported fine;
-- phrase #1 preferred by owner;
-- Airplane-mode synthesis reported done/pass;
-- Stop cleanup reported done/pass;
-- 20 sequential replies reported done/pass;
-- no numeric quality scores or detailed RAM/battery telemetry were supplied, so none is inferred.
+- sherpa native constructor/model load/synthesis/playback: PASS;
+- sample RTF: 0.72;
+- all six phrases reported fine, phrase #1 preferred;
+- Airplane mode / Stop cleanup / 20-reply stability reported pass.
 
-## Neural voice decision
+The Priyamvada voice remains benchmark-only because its model-card dataset terms are not production-cleared. Keep system TTS fallback and reuse J3 architecture only with a license-clear voice pack.
 
-Sherpa-ONNX + filesystem-materialized VITS/Piper assets is technically proven on the Motorola. However, the tested Hindi Priyamvada Medium pack remains **BENCHMARK_ONLY** because its model card cites a CC BY-NC-SA dataset. It must not be silently promoted into production Mayra.
+## J4 local brain foundation
 
-Production direction:
+### Green L0 milestone
 
-- preserve `MayraSpeechOutput` engine abstraction;
-- keep `MayraOfflineTtsSpeaker` fallback;
-- reuse J3 runtime architecture with a production-license-clear Hindi/Hinglish voice pack;
-- neural voice selection proceeds independently of local-brain development.
+Source `062894809bb8b0989f79ab99db644c9d0cbdfa2d`:
 
-## Local conversational brain — next active phase
+- J4 Local LLM Test #2 — success;
+- Android CI #2224 — success;
+- Governance #405 — success;
+- J1 #333 / J2 #229 / J3 #51 — success.
 
-Preflight refreshed on 2026-08-04 against current LiteRT-LM upstream direction.
+L0 proves a dedicated zero-permission `ai.mayra.app.j4` package can import an owner-selected `.litertlm` file into app-private storage without bundling a huge model or requesting broad storage/network permissions.
 
-Runtime direction: Google LiteRT-LM.
+### Hardened L1 now in source
 
-First benchmark candidate: **Gemma3-1B LiteRT-LM** as the smaller runtime-proof model (upstream currently lists ~557 MB, 4-bit, chat-ready).
+- reusable `MayraLocalModelIntegrity` boundary;
+- unit tests for filename policy, storage headroom/overflow and SHA-256 known vector;
+- `.litertlm` filename gate;
+- provider-size validation;
+- 256 MB private-storage safety headroom;
+- atomic `.partial` → final import;
+- copy-byte verification;
+- SHA-256 during import;
+- saved model name/bytes/hash;
+- independent SHA-256 re-verification;
+- remove/re-import lifecycle;
+- visible Motorola/Android/ABI/RAM/app-heap/private-free-space diagnostics.
 
-Second comparison candidate: **qwen2.5-1.5b LiteRT-LM** if the first runtime proof is stable (upstream currently lists ~1524 MB, chat-ready).
+Fresh CI for this hardened source is pending.
 
-Earlier Qwen3-1.7B interest is retained as research context but is no longer forced as the first integration target.
+### LiteRT-LM SDK provenance probe
 
-Required benchmark boundaries:
+J4 CI now downloads the current Android Maven AAR **without linking it into the app** and records:
 
-- dedicated engineering package;
-- model outside ordinary APK;
-- owner-managed local model file/checksum;
-- UI-thread-safe load/cancel/unload;
-- crash/failure containment where practical;
-- Airplane mode;
-- Hindi/Hinglish/English prompt set;
-- cold/warm load, first-token, decode speed, RAM and thermal evidence;
-- deterministic Mayra fallback;
-- no direct authority for calls/messages/actions/memory writes/doc trust.
+- resolved Maven release;
+- AAR SHA-256;
+- POM;
+- class-file major / approximate Java level;
+- AAR contents.
 
-## Next gate
+This is required because Mayra currently builds with Kotlin 2.0.21 / Java 17. Toolchain changes will be made only from evidence and must preserve J1/J2/J3/full-app regressions.
 
-1. Keep J3 #29 as benchmark evidence; do not production-ship Priyamvada.
-2. Build the isolated local-LLM engineering harness around a currently supported LiteRT-LM model/runtime combination.
-3. Prove Gemma3-1B load/generation/cancel/unload on Motorola before stronger model comparison.
-4. If stable, compare qwen2.5-1.5b for Hindi/Hinglish quality versus storage/RAM cost.
-5. Only after a device pass, connect a local conversational provider behind Mayra's deterministic routing/trust boundaries.
-6. Preserve voice recognition, privacy, actions and system-TTS fallback regressions throughout.
+## First local-model candidate
+
+**Gemma3-1B chat-ready LiteRT-LM model** — upstream reference around 557 MB, 4-bit, 4096 context.
+
+It is chosen for first runtime compatibility proof because it is a current LiteRT-LM reference model and is smaller than the multi-GB alternatives. It is not yet declared Mayra's final Hindi/Hinglish brain.
+
+## J4 ordered next gate
+
+1. settle fresh J4/J1/J2/J3/Android/Governance CI on hardened L1;
+2. record J4 APK + audit provenance;
+3. install J4 on Motorola and capture RAM/private-storage diagnostics;
+4. import exact Gemma3-1B `.litertlm` model;
+5. require import SHA-256 + re-verify + reopen persistence + remove/re-import lifecycle pass;
+6. inspect SDK probe, pin exact LiteRT-LM Android version;
+7. link runtime to J4 only;
+8. initialize CPU engine off UI thread with exact load/error diagnostics and explicit close;
+9. run fixed Hindi/Hinglish/English prompt set in Airplane mode;
+10. record cold/warm load, first-token latency, tokens/sec, RAM and thermal behavior;
+11. only then compare GPU or a stronger multilingual model.
+
+## Trust boundary
+
+- local LLM never directly executes calls/messages/device actions;
+- local LLM never directly writes owner memory;
+- document provenance remains structured;
+- confirmation tokens remain typed/action-bound/expiring;
+- local mode never silently sends owner context to network;
+- missing/corrupt/killed local model falls back to deterministic Mayra.
 
 ## Distribution truth
 
