@@ -1,9 +1,9 @@
 # Mayra AI — Canonical Test Matrix
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 Entry point: `START_HERE.md`
 
-This document defines the mandatory evidence required before any Mayra capability can move from `IN_PROGRESS` to `DEVICE_VERIFY` or `DONE`.
+This document defines mandatory evidence before any capability may move from `IN_PROGRESS` to `DEVICE_VERIFY`, `DONE` or a protected baseline.
 
 ## Evidence levels
 
@@ -11,30 +11,30 @@ This document defines the mandatory evidence required before any Mayra capabilit
 |---|---|---|
 | L0 — Designed | Requirement/architecture only | Blueprint + roadmap + idea/decision record |
 | L1 — Compiles | Source is syntactically valid | Governed variant compilation |
-| L2 — Automated | Important behavior and failure paths tested | Unit/Robolectric tests + lint |
+| L2 — Automated | Important behavior/failure paths tested | unit/Robolectric tests + lint |
 | L3 — Packaged | Real artifact contains intended package/components/permissions | APK/R8/manifest/component/launcher audits |
-| L4 — Device verified | Behavior works on owner Motorola | Dated physical checklist evidence, screenshots/logs where useful |
-| L5 — Release verified | Signed production artifact and upgrade path verified | Signing/provenance/install/upgrade/rollback evidence |
+| L4 — Device verified | Behavior works on owner Motorola | dated physical checklist evidence/screens/logs where useful |
+| L5 — Release verified | Signed production artifact and upgrade path verified | signing/provenance/install/upgrade/rollback evidence |
 
 No capability may be described above its proven level.
 
 ## Global gates for every meaningful batch
 
-- [ ] START_HERE and latest snapshot read before coding.
-- [ ] PR #12 remains Draft/open/unmerged unless owner explicitly changes that.
+- [ ] START_HERE and Latest Snapshot read before coding.
+- [ ] PR #12 remains Draft/open/unmerged unless owner explicitly changes it.
 - [ ] Exact changed modules identified.
-- [ ] Focused regression tests added or an explicit reason recorded.
-- [ ] Debug, Personal Alpha and Full Test compile.
+- [ ] Focused regression tests added or explicit reason recorded.
+- [ ] Debug, Personal Alpha and Full Test compile where applicable.
 - [ ] Complete debug unit-test suite passes.
 - [ ] Governed lint variants pass.
 - [ ] Personal Alpha APK audit passes.
 - [ ] Minified final `ai.mayra.app` release/R8 audit passes.
 - [ ] Safe Full Test audit passes.
-- [ ] Isolated Document Test audit passes.
+- [ ] Isolated engineering package audits pass for active J1/J2/J3/J4 work.
 - [ ] Project Governance workflow passes.
-- [ ] Roadmap and rolling snapshot updated.
-- [ ] Blueprint/ideas/decisions/changelog updated when applicable.
-- [ ] New authoritative green baseline recorded before riskier next phase.
+- [ ] Roadmap + Latest Snapshot + Pinpoint Audit synchronized.
+- [ ] Blueprint/ideas/decisions/changelog updated when architecture/product truth changes.
+- [ ] New protected baseline only after exact-head required gates are green.
 
 ## Module matrix
 
@@ -45,7 +45,7 @@ Automated:
 - typed routing precedence;
 - action vs document vs conversation collisions;
 - multi-turn reminder clarification;
-- provider fallback and cancellation;
+- provider fallback/cancellation;
 - no trusted metadata spoofing through visible text.
 
 Device:
@@ -54,22 +54,83 @@ Device:
 - offline/online transitions;
 - rotation/process recreation where applicable.
 
-### Local brain
+### Local brain / J4
 
-Automated:
-- model integrity/checksum;
-- bounded prompt/context/output;
-- deterministic fallback when model unavailable;
-- memory/document/action boundaries remain outside free-form model control.
+#### Model lifecycle + integrity automated gates
 
-Device:
-- cold-start latency;
-- tokens/second and perceived response time;
-- idle and active battery drain;
-- thermal throttling;
-- RAM pressure/background survival;
-- Hindi/Hinglish quality;
-- airplane-mode operation.
+- `.litertlm` filename validation;
+- invalid/empty model rejected;
+- storage headroom and integer-overflow protection;
+- model stored outside base APK;
+- app-private target path only;
+- interrupted import never promotes `.partial` bytes as final model;
+- provider-reported source size equals copied size when available;
+- SHA-256 known-vector tests;
+- imported SHA-256 persisted and independently re-verifiable;
+- corrupt/mismatched model blocked before runtime;
+- remove/replace lifecycle does not require app reinstall;
+- no Internet/storage/audio/contact/notification permission added to J4 L0/L1;
+- deterministic fallback remains independent from heavy runtime.
+
+#### SDK/runtime provenance automated gates
+
+Before runtime link:
+- exact LiteRT-LM Maven release resolved and recorded;
+- AAR SHA-256 recorded;
+- POM/dependency provenance recorded;
+- class-file/toolchain level recorded;
+- Java/Kotlin/toolchain change reviewed rather than assumed.
+
+After runtime link:
+- SDK pinned to exact version, not floating latest;
+- J4 compile/lint/package audit green;
+- runtime dependency limited to J4 until promoted;
+- engine initialization off UI thread;
+- explicit close/release path;
+- missing/corrupt model fails before engine init;
+- initialization failure does not create restart loop;
+- bounded input/output/context policy;
+- local model output cannot bypass action/memory/document trust boundaries.
+
+#### J4 model-lifecycle device gates
+
+- Motorola model/Android/ABI/RAM/private-storage diagnostics visible;
+- exact Gemma3-1B candidate source/version/license/bytes recorded;
+- import completes with SHA-256;
+- Verify recomputes same SHA-256;
+- app reopen preserves accepted model metadata/path;
+- remove clears model and metadata;
+- re-import works;
+- Airplane mode remains compatible with model lifecycle package.
+
+#### J4 runtime device gates
+
+- CPU engine cold initialization time;
+- warm initialization/cache behavior;
+- launcher survives load/generation failure;
+- Hindi/Hinglish/English fixed prompts;
+- first-token latency;
+- total response time;
+- approximate decode tokens/sec where measurable;
+- RAM before load / after load / during generation / after release;
+- conversation cancellation;
+- explicit conversation + engine close;
+- repeated load/close stability;
+- app background/screen-lock behavior;
+- Android process-kill recovery;
+- airplane-mode generation;
+- battery/thermal observation;
+- only after CPU pass, GPU comparison if useful.
+
+#### Local-brain trust regression
+
+- model text cannot directly place a call/send message/open app;
+- model text cannot directly write owner memory;
+- model cannot spoof trusted memory/document provenance;
+- deterministic action router remains authoritative;
+- confirmations remain typed/action-bound/expiring;
+- local mode never silently leaks owner context to network;
+- missing/corrupt/killed model falls back cleanly.
 
 ### Provider
 
@@ -80,12 +141,12 @@ Automated:
 - timeout/retry/cancellation;
 - Responses schema parsing;
 - live enable/disable/remove;
-- no secret logging or UI read-back.
+- no secret logging/UI read-back.
 
 Device:
 - real key connection;
 - invalid/expired key UX;
-- network loss and recovery;
+- network loss/recovery;
 - Hindi/Hinglish quality;
 - provider disabled while conversation continues locally.
 
@@ -134,56 +195,75 @@ Automated:
 - remaining follow-up delay.
 
 Device:
-- 3-minute reminder;
+- short reminder;
 - tomorrow/local-time reminder;
 - notification permission denied/granted;
-- Complete and Snooze actions;
-- Doze/battery saver timing;
-- reboot and app update;
+- Complete/Snooze;
+- Doze/battery saver;
+- reboot/update;
 - duplicate-notification check.
 
 ### Apps, contacts, calls and messages
 
 Automated:
 - installed-app resolution;
-- `open` routing collision tests;
-- contact resolution ambiguity;
+- `open` routing collisions;
+- contact ambiguity;
 - dialer/composer intent correctness;
 - one-time expiring confirmations;
 - no false delivery/connection claims.
 
 Device:
-- WhatsApp/YouTube/Chrome opening;
-- known and ambiguous contacts;
-- dialer handoff;
-- message composer handoff;
-- cancellation/expiry behavior.
+- common app opening;
+- known/ambiguous contacts;
+- dialer/message-composer handoff;
+- cancellation/expiry.
 
-### Jarvis Assistant role
+### Android Assistant role / J1-J2
 
 Automated:
 - VoiceInteractionService/session/metadata compilation;
 - manifest service permission/export audit;
-- one-launcher remains unchanged;
+- one launcher remains unchanged;
 - assistant components absent from safe Full Test;
-- session animation lifecycle does not leak/carry stale animator state.
+- session animation/mic/TTS lifecycle cleanup.
 
 Device:
 - Mayra appears in Android Assistant selection;
 - owner can select/remove role;
-- invocation while unlocked;
-- invocation while locked;
-- animation appears only during active visual session;
-- screen-off path remains voice/background only;
-- process restart and reboot behavior;
-- battery/thermal observation.
+- unlocked + locked invocation;
+- animation/session lifecycle;
+- direct dismissal;
+- repeated invocation stability;
+- reboot behavior;
+- lock-screen privacy.
+
+### Speech output / J3
+
+Automated:
+- speech-output abstraction preserved;
+- J3 zero-permission package audit;
+- neural runtime isolated from launcher;
+- exact runtime/model hashes recorded;
+- Android system TTS fallback preserved.
+
+Device:
+- neural model load;
+- synthesis/playback;
+- RTF/latency;
+- Hindi/Hinglish phrase quality;
+- Airplane mode;
+- Stop cleanup;
+- repeated replies;
+- thermal/RAM where available;
+- production voice license separately cleared before promotion.
 
 ### Wake phrase
 
 Automated:
 - explicit enable/disable;
 - model checksum/version;
-- false-trigger test corpus;
+- false-trigger corpus;
 - restart/recovery;
 - microphone-state visibility;
 - no wake engine in safe Full Test.
@@ -193,8 +273,8 @@ Device:
 - near/far voice;
 - Hindi/accent/noisy-room cases;
 - false accepts/rejects;
-- 8-hour idle battery test;
-- thermal and RAM behavior.
+- long idle battery test;
+- thermal/RAM behavior.
 
 ### Phone role and incoming calls
 
@@ -202,27 +282,27 @@ Automated:
 - role request/status;
 - InCallService lifecycle state machine;
 - answer/reject/silence/mute/speaker commands;
-- emergency-call and lost-role fallback;
+- emergency-call/lost-role fallback;
 - no call recording/injection claim without proven supported route.
 
 Device:
-- default Phone role selection and removal;
+- default Phone role selection/removal;
 - incoming known/unknown caller announce;
 - answer/reject/silence;
 - mute/speaker/Bluetooth endpoint;
-- outgoing and emergency fallback;
-- reboot and lost-role behavior;
-- Motorola-specific call UI stability.
+- outgoing/emergency fallback;
+- reboot/lost-role behavior;
+- Motorola call UI stability.
 
 ### Packaging and release
 
 Automated:
 - package/label/version;
 - one launcher;
-- required and forbidden permissions;
+- required/forbidden permissions;
 - required/forbidden components;
 - non-debuggable minified release;
-- R8 mapping output;
+- R8 mapping;
 - no secret material in repository.
 
 Device/release:
@@ -230,17 +310,18 @@ Device/release:
 - upgrade over previous signed build;
 - uninstall/reinstall data expectations;
 - Play Protect/installer behavior without bypass;
-- signed APK/AAB provenance and digest;
-- rollback instructions verified.
+- signed APK/AAB provenance/digest;
+- rollback verified.
 
 ## Physical test recording format
 
-Every device test entry must record:
+Every device test entry records:
 
-- date/time and timezone;
-- phone model and Android/build version;
-- Mayra version, package and APK SHA-256;
-- source commit and CI run;
+- date/time/timezone;
+- phone model + Android/build version;
+- Mayra version/package/APK SHA-256;
+- source commit + CI run;
+- model/runtime exact version/hash where applicable;
 - preconditions/permissions/system roles;
 - exact steps;
 - expected result;
@@ -251,4 +332,4 @@ Every device test entry must record:
 
 ## Promotion rule
 
-A test failure blocks promotion of that capability only, but any crash, data-loss, secret-exposure, launcher/package, signing, manifest or destructive-action failure blocks the entire candidate.
+A feature failure blocks promotion of that capability. Any crash loop, data loss, secret exposure, launcher/package/signing/manifest failure, corrupt trust boundary or unsafe destructive-action path blocks the entire candidate.
