@@ -82,7 +82,7 @@ jobs:
           gradle --no-daemon \
             :app:compileJ4LocalLlmTestJavaWithJavac \
             :app:compileJ4LocalLlmTestKotlin \
-            :app:testDebugUnitTest --tests 'ai.mayra.app.localmodel.MayraLocalModelIntegrityTest' \
+            :app:testDebugUnitTest --tests 'ai.mayra.app.localmodel.MayraLocalModelIntegrityTest' --tests 'ai.mayra.app.learning.MayraSelfLearningPolicyTest' \
             :app:lintJ4LocalLlmTest \
             --stacktrace --console=plain
 
