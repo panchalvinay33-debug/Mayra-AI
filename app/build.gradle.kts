@@ -211,9 +211,10 @@ dependencies {
     // CI places the pinned official sherpa-onnx AAR here only for the isolated J3 neural-TTS test.
     add("j3NeuralTtsTestImplementation", files("libs/sherpa-onnx-1.13.2.aar"))
 
-    // J4 only: package LiteRT-LM at runtime but keep its Kotlin 2.3 metadata off the Kotlin 2.0/KSP
-    // compile classpath. J4 accesses it exclusively through reflection inside the isolated process.
-    add("j4LocalLlmTestRuntimeOnly", "com.google.ai.edge.litertlm:litertlm-android:0.15.0")
+    // J4 only: CI downloads the exact verified LiteRT-LM AAR into app/libs. Using the local AAR
+    // avoids Maven POM/transitive Kotlin 2.2 dependencies entering Kotlin 2.0/KSP resolution.
+    // J4 accesses LiteRT exclusively through reflection in the isolated :localbrain process.
+    add("j4LocalLlmTestRuntimeOnly", files("libs/litertlm-android-0.15.0.aar"))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
