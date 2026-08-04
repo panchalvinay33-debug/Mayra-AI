@@ -26,22 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ai.mayra.app.localmodel.MayraLocalModelIntegrity
 import ai.mayra.app.ui.theme.MayraAITheme
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 
-/**
- * J4 phase L0/L1: owner-managed local-model import/integrity harness.
- *
- * The large .litertlm model is never bundled into the APK. Android's document picker grants access
- * only to the file the owner selects; the model is copied atomically into app-private storage and
- * pinned by SHA-256. This keeps model lifecycle independent from Mayra install/update lifecycle.
- *
- * LiteRT-LM inference is deliberately a separate gate. This class establishes trustworthy local
- * model bytes, device/storage diagnostics and cleanup first so a runtime failure cannot corrupt the
- * imported model or expand Mayra's permission boundary.
- */
 class J4LocalLlmTestActivity : ComponentActivity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences(PREFS, MODE_PRIVATE) }
@@ -79,25 +69,19 @@ class J4LocalLlmTestActivity : ComponentActivity() {
                             enabled = !busy,
                             onClick = { picker.launch(arrayOf("application/octet-stream", "*/*")) },
                             modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(if (busy) "Working…" else "Select Local Model")
-                        }
+                        ) { Text(if (busy) "Working…" else "Select Local Model") }
                         Spacer(Modifier.height(10.dp))
                         Button(
                             enabled = !busy && importedModelFile().exists(),
                             onClick = ::verifyImportedModel,
                             modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Verify Imported Model")
-                        }
+                        ) { Text("Verify Imported Model") }
                         Spacer(Modifier.height(10.dp))
                         Button(
                             enabled = !busy && importedModelFile().exists(),
                             onClick = ::removeImportedModel,
                             modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Remove Imported Model")
-                        }
+                        ) { Text("Remove Imported Model") }
                         Spacer(Modifier.height(18.dp))
                         Text(
                             "Next gate: initialize LiteRT-LM from this verified private path in a crash-isolated runtime, then run fixed Hindi/Hinglish/English prompts and measure load time, RAM and tokens/sec.",
@@ -114,7 +98,7 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         if (busy) return
         val selected = selectedMetadata(uri)
         val name = selected.name
-        if (!name.endsWith(".litertlm", ignoreCase = true)) {
+        if (!MayraLocalModelIntegrity.isLiteRtLmName(name)) {
             status = "Model import rejected"
             details = "Expected a .litertlm file, selected: $name"
             return
@@ -126,9 +110,9 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         }
 
         val available = availablePrivateBytes()
-        if (selected.size != null && available < selected.size + STORAGE_HEADROOM_BYTES) {
+        if (selected.size != null && !MayraLocalModelIntegrity.hasEnoughStorage(available, selected.size)) {
             status = "Not enough private storage"
-            details = "Need ${formatBytes(selected.size + STORAGE_HEADROOM_BYTES)} including safety headroom • available ${formatBytes(available)}"
+            details = "Need model size plus ${formatBytes(MayraLocalModelIntegrity.DEFAULT_STORAGE_HEADROOM_BYTES)} safety headroom • available ${formatBytes(available)}"
             return
         }
 
@@ -151,7 +135,7 @@ class J4LocalLlmTestActivity : ComponentActivity() {
                 contentResolver.openInputStream(uri).use { input ->
                     requireNotNull(input) { "Unable to open selected model" }
                     temp.outputStream().buffered().use { output ->
-                        val buffer = ByteArray(COPY_BUFFER_BYTES)
+                        val buffer = ByteArray(MayraLocalModelIntegrity.COPY_BUFFER_BYTES)
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
@@ -163,13 +147,9 @@ class J4LocalLlmTestActivity : ComponentActivity() {
                         output.flush()
                     }
                 }
-
                 check(bytes > 0L) { "Selected file is empty" }
-                selected.size?.let { expected ->
-                    check(bytes == expected) { "Copy size mismatch: expected $expected, copied $bytes" }
-                }
+                selected.size?.let { expected -> check(bytes == expected) { "Copy size mismatch: expected $expected, copied $bytes" } }
                 check(temp.length() == bytes) { "Private copy size mismatch" }
-
                 if (target.exists()) check(target.delete()) { "Could not replace previous model" }
                 check(temp.renameTo(target)) { "Could not finalize private model atomically" }
 
@@ -206,7 +186,7 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         details = "Reading ${formatBytes(file.length())}; this can take a little while for a large model"
         worker.execute {
             val result = runCatching {
-                val digest = sha256(file)
+                val digest = MayraLocalModelIntegrity.sha256(file)
                 val expected = prefs.getString(KEY_SHA, null)
                 check(expected == null || expected == digest) {
                     "Integrity mismatch • expected ${expected.orEmpty().take(20)}… • got ${digest.take(20)}…"
@@ -256,13 +236,7 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         var name: String? = null
         var size: Long? = null
         runCatching {
-            contentResolver.query(
-                uri,
-                arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-                null,
-                null,
-                null
-            )?.use { cursor ->
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
@@ -271,36 +245,15 @@ class J4LocalLlmTestActivity : ComponentActivity() {
                 }
             }
         }
-        return SelectedFile(
-            name = name ?: uri.lastPathSegment.orEmpty().ifBlank { "selected-model.litertlm" },
-            size = size
-        )
+        return SelectedFile(name ?: uri.lastPathSegment.orEmpty().ifBlank { "selected-model.litertlm" }, size)
     }
 
     private fun saveMetadata(name: String, bytes: Long, sha: String) {
-        prefs.edit()
-            .putString(KEY_NAME, name)
-            .putLong(KEY_BYTES, bytes)
-            .putString(KEY_SHA, sha)
-            .putLong(KEY_IMPORTED_AT, System.currentTimeMillis())
-            .apply()
-    }
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(COPY_BUFFER_BYTES)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                if (read > 0) digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        prefs.edit().putString(KEY_NAME, name).putLong(KEY_BYTES, bytes).putString(KEY_SHA, sha)
+            .putLong(KEY_IMPORTED_AT, System.currentTimeMillis()).apply()
     }
 
     private fun importedModelFile(): File = File(filesDir, "models/j4-model.litertlm")
-
     private fun availablePrivateBytes(): Long = StatFs(filesDir.absolutePath).availableBytes
 
     private fun deviceDiagnostics(): String {
@@ -336,7 +289,5 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         private const val KEY_BYTES = "bytes"
         private const val KEY_SHA = "sha256"
         private const val KEY_IMPORTED_AT = "imported_at"
-        private const val COPY_BUFFER_BYTES = 1024 * 1024
-        private const val STORAGE_HEADROOM_BYTES = 256L * 1024L * 1024L
     }
 }
