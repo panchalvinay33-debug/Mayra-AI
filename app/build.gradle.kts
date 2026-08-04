@@ -118,6 +118,16 @@ android {
             buildConfigField("boolean", "VOICE_SESSION_RECOGNITION_ENABLED", "true")
             matchingFallbacks += listOf("debug")
         }
+        create("j3NeuralTtsTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j3"
+            versionNameSuffix = "-j3"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
         create("fullTest") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".fulltest"
@@ -187,6 +197,9 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.2")
 
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // CI places the pinned official sherpa-onnx AAR here only for the isolated J3 neural-TTS test.
+    add("j3NeuralTtsTestImplementation", files("libs/sherpa-onnx-1.13.2.aar"))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
