@@ -2,6 +2,21 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
+## Unreleased — J2 lock-screen privacy + offline spoken reply
+
+- Accepted the device-proven J2 core voice foundation: Digital assistant role, Motorola Power-button invocation, on-device Hindi/Hinglish/English recognition, direct dismissal, 20-cycle stability, already-locked invocation and owner-reported reboot/no-speech/rapid interaction checks.
+- Implemented keyguard-aware privacy rendering so recognized/private transcript is not shown while the device is locked.
+- Reworked lock-screen layout spacing to remove the observed Mayra-label/transcript overlap from CI #106.
+- Added offline-first Android TTS with preferred voice order Hindi India → English India → English US → another offline voice.
+- Added deterministic local spoken responses for greeting, time, capability, reminder and app-open intent.
+- Preserved J2 safety boundary: app/reminder requests are understood but not executed and Mayra does not falsely claim success.
+- Added recognizer/TTS lifecycle cleanup on hide/destroy.
+- Added tests for greeting, deterministic time reply, no fake action success and private unknown-transcript classification.
+- Exact application source `ef179cf4cb2395af2647be21dbacea6fb3c7cb62` passed J2 #136, J1 #239, Android CI #2131 and Governance #312.
+- Promoted protected CI baseline `baseline/mayra-0.2.1-j2-privacy-tts-green-136`.
+- Artifact `mayra-j2-voice-apk-136`, ID `8868518898`, APK SHA-256 `b2d129b2b40d8c2aef7eef21f1acf087daf0600224fd5ce4366b38f4aefad1d0`.
+- Device verification remains required for the repaired lock-screen privacy behavior and audible voice quality before full J2 `DEVICE_VERIFIED` promotion.
+
 ## Unreleased — J2 Motorola speech-locale repair
 
 - Motorola device testing proved J2 can install, obtain microphone permission, report on-device recognition available, become the selected Digital assistant and launch a mic-active Mayra Assistant session.
