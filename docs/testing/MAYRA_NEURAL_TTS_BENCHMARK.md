@@ -1,6 +1,6 @@
 # Mayra AI — Neural TTS Motorola Benchmark
 
-Status: HARNESS/PLAN READY — DEVICE MODEL TEST NOT STARTED
+Status: FIRST DEVICE STARTUP FAIL RECORDED — EXPLICIT-LOAD REPAIR IN CI
 Date: 2026-08-04
 Target: Motorola Edge 70 Fusion / Android 16
 
@@ -23,6 +23,32 @@ Role: first neural benchmark candidate only.
 
 Expected model size: ~63.5 MB.
 Do not promote to production because the voice model's model card cites a CC BY-NC-SA 4.0 dataset. The test exists to measure whether this model class solves the quality/latency problem on the Motorola.
+
+## Device result — first J3 package
+
+CI-green J3 #4 installed on Motorola but the app closed immediately on launch before the owner could touch any control.
+
+Interpretation:
+
+- packaging/build/lint/zero-permission audit PASS did not prove native model initialization on the Motorola;
+- the first J3 Activity automatically started sherpa-onnx + neural-model initialization immediately after Compose content creation;
+- exact crash cause is not yet proven because no device logcat was captured;
+- likely fault domain is startup-time native/model initialization rather than UI interaction;
+- J3 #4 is therefore a DEVICE FAIL candidate and must not be promoted.
+
+## Repair under test
+
+The replacement J3 source changes startup semantics:
+
+- Activity opens without loading sherpa-onnx/model;
+- visible UI must remain usable first;
+- owner explicitly taps `Load Neural Voice` to begin native/model initialization;
+- model-loading Java/Kotlin exceptions are rendered in the UI;
+- playback construction is also guarded;
+- model release is guarded during destroy;
+- this separates `app startup` proof from `native model load` proof.
+
+If the native runtime itself aborts the process on explicit load, that becomes a much narrower reproducible failure and the next repair will isolate neural inference into a separate process/runtime candidate.
 
 ## Measurements to capture
 
@@ -58,20 +84,16 @@ Use the same phrases for every engine:
 6. `आज 4 अगस्त है और समय नौ बजकर बत्तीस मिनट है।`
 7. a 20–30 second paragraph.
 
-## Test procedure
+## Replacement test procedure
 
-1. Reboot device and wait for normal idle state.
-2. Put device in airplane mode after any required local pack is already present.
-3. Synthesize phrase 1 cold; record time until audible speech begins.
-4. Repeat phrase 1 warm three times.
-5. Run phrases 2–6 and score pronunciation/naturalness.
-6. Run the long paragraph and note stutter/underrun.
-7. Run 20 consecutive Mayra replies.
-8. Dismiss Mayra during speech 5 times; audio must stop promptly.
-9. Invoke while already locked; private reply must not be spoken.
-10. Lock while speech is active; private audio must stop.
-11. Observe battery/thermal behavior for a sustained 10-minute session.
-12. Compare directly with Android system TTS using the same phrases.
+1. Install replacement J3.
+2. Open app and wait 10 seconds without touching anything. App must remain open.
+3. Capture screenshot of the visible `Load Neural Voice` control/status.
+4. Tap `Load Neural Voice` once.
+5. If app remains open and reports Ready, play phrases 1–6 and score voice quality.
+6. If model load reports an error, capture the exact visible error.
+7. If app process closes only after tapping Load, record `native explicit-load crash`; do not repeatedly retry.
+8. Only after successful load continue airplane mode, warm latency, 20 replies, stop/playback, thermal and quality comparisons.
 
 ## Acceptance rule
 
@@ -97,4 +119,5 @@ Android system TTS:
 
 Neural candidate:
 
-- not yet physically tested.
+- J3 #4 startup on Motorola: FAIL — app closed immediately before interaction;
+- replacement explicit-load build: CI pending.
