@@ -32,16 +32,20 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Probe pinned LiteRT-LM Android SDK provenance
+      - name: Fetch and verify pinned LiteRT-LM Android AAR without Maven transitives
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/j4-runtime-probe
+          mkdir -p build/j4-runtime-probe app/libs
           VERSION="0.15.0"
+          EXPECTED_SHA="b398c4745934a6035d192ffce5fdaf4f72a0009830a97b73c017c21f2a92b5bd"
           BASE="https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android/$VERSION"
           curl --fail --location --retry 3 "$BASE/litertlm-android-$VERSION.pom" -o build/j4-runtime-probe/litertlm-android.pom
           curl --fail --location --retry 3 "$BASE/litertlm-android-$VERSION.aar" -o build/j4-runtime-probe/litertlm-android.aar
-          sha256sum build/j4-runtime-probe/litertlm-android.aar | tee build/j4-runtime-probe/aar-sha256.txt
+          ACTUAL_SHA="$(sha256sum build/j4-runtime-probe/litertlm-android.aar | awk '{print $1}')"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          echo "$ACTUAL_SHA  build/j4-runtime-probe/litertlm-android.aar" | tee build/j4-runtime-probe/aar-sha256.txt
+          cp build/j4-runtime-probe/litertlm-android.aar app/libs/litertlm-android-0.15.0.aar
           echo "LiteRT-LM Android pinned release: $VERSION" | tee build/j4-runtime-probe/version.txt
           python3 - <<'PY' | tee build/j4-runtime-probe/classfile-probe.txt
           import io, struct, zipfile
@@ -58,7 +62,22 @@ jobs:
           PY
           unzip -l build/j4-runtime-probe/litertlm-android.aar | tee build/j4-runtime-probe/aar-contents.txt
 
-      - name: Compile, test and lint J4 with runtime-only LiteRT isolation
+      - name: Prove Maven Kotlin transitives are absent from J4 compile classpath
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/j4-ci
+          gradle --no-daemon :app:dependencies --configuration j4LocalLlmTestCompileClasspath --console=plain | tee build/j4-ci/compile-classpath.txt
+          if grep -Fq 'com.google.ai.edge.litertlm:litertlm-android' build/j4-ci/compile-classpath.txt; then
+            echo 'LiteRT Maven module leaked onto J4 compile classpath' >&2
+            exit 1
+          fi
+          if grep -Fq 'org.jetbrains.kotlin:kotlin-stdlib:2.2.21' build/j4-ci/compile-classpath.txt; then
+            echo 'Kotlin 2.2.21 leaked onto J4 compile classpath' >&2
+            exit 1
+          fi
+
+      - name: Compile, test and lint J4 with local-AAR runtime isolation
         run: |
           gradle --no-daemon \
             :app:compileJ4LocalLlmTestJavaWithJavac \
@@ -67,14 +86,13 @@ jobs:
             :app:lintJ4LocalLlmTest \
             --stacktrace --console=plain
 
-      - name: Assemble J4 APK with LiteRT-LM runtime
+      - name: Assemble J4 APK with local LiteRT-LM runtime
         run: gradle --no-daemon :app:assembleJ4LocalLlmTest --stacktrace --console=plain
 
       - name: Audit zero-permission and isolated LiteRT runtime boundary
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/j4-ci
           APK="$(find app/build/outputs/apk/j4LocalLlmTest -name '*.apk' -type f | head -n 1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
@@ -119,10 +137,7 @@ jobs:
             fi
           done
 
-          # Runtime-only means Kotlin/KSP never parses LiteRT's newer metadata, but the arm64 JNI
-          # engine must still be physically packaged for the Motorola runtime probe.
           grep -Fq 'lib/arm64-v8a/liblitertlm_jni.so' build/j4-ci/apk-contents.log
-
           sha256sum "$APK" | tee build/j4-ci/apk-sha256.txt
           stat --printf='APK bytes: %s\n' "$APK" | tee build/j4-ci/apk-size.txt
 
