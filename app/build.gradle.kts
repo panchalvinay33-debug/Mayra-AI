@@ -128,6 +128,16 @@ android {
             buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
             matchingFallbacks += listOf("debug")
         }
+        create("j4LocalLlmTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j4"
+            versionNameSuffix = "-j4"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
         create("fullTest") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".fulltest"
