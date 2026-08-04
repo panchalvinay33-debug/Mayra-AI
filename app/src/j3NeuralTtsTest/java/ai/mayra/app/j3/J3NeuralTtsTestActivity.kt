@@ -1,10 +1,10 @@
 package ai.mayra.app.j3
 
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioTrack
+import android.content.Intent
 import android.os.Bundle
-import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
+import android.os.ResultReceiver
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -26,25 +26,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ai.mayra.app.ui.theme.MayraAITheme
-import com.k2fsa.sherpa.onnx.GenerationConfig
-import com.k2fsa.sherpa.onnx.OfflineTts
-import com.k2fsa.sherpa.onnx.OfflineTtsConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
-import java.util.concurrent.Executors
-import kotlin.math.roundToInt
 
 /**
  * Zero-permission, zero-network neural Hindi TTS benchmark.
  *
- * The app must remain usable before the native neural runtime is loaded. CI can prove packaging,
- * permissions and Kotlin/JNI linkage, but only a real phone can prove native model initialization.
- * Therefore model loading is explicit and user-triggered rather than automatic at Activity startup.
+ * sherpa-onnx runs in J3NeuralTtsService's secondary process. This launcher process intentionally
+ * contains no JNI TTS initialization, so a native model/runtime abort cannot make the UI vanish.
  */
 class J3NeuralTtsTestActivity : ComponentActivity() {
-    private val worker = Executors.newSingleThreadExecutor()
-    private var tts: OfflineTts? = null
-    private var audioTrack: AudioTrack? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var loadGeneration = 0
+    private var speakGeneration = 0
 
     private var ready by mutableStateOf(false)
     private var loading by mutableStateOf(false)
@@ -61,6 +53,40 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
         "Hello, main Mayra hoon. Aap bataiye main kya help kar sakti hoon?",
         "आज चार अगस्त है और समय नौ बजकर बत्तीस मिनट है।"
     )
+
+    private val resultReceiver = object : ResultReceiver(handler) {
+        override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
+            val message = resultData?.getString(J3NeuralTtsService.EXTRA_MESSAGE).orEmpty()
+            when (resultCode) {
+                J3NeuralTtsService.RESULT_READY -> {
+                    loadGeneration++
+                    loading = false
+                    ready = true
+                    status = "Ready ✓ Hindi neural model loaded locally"
+                    lastMetrics = message.ifBlank { "Native model ready" }
+                }
+                J3NeuralTtsService.RESULT_PLAYING -> {
+                    speakGeneration++
+                    busy = false
+                    status = "Playing neural Mayra voice…"
+                    lastMetrics = message.ifBlank { "Playback started" }
+                }
+                J3NeuralTtsService.RESULT_STOPPED -> {
+                    busy = false
+                    status = "Playback stopped"
+                    if (message.isNotBlank()) lastMetrics = message
+                }
+                J3NeuralTtsService.RESULT_ERROR -> {
+                    loadGeneration++
+                    speakGeneration++
+                    loading = false
+                    busy = false
+                    status = "Neural runtime error"
+                    lastMetrics = message.ifBlank { "Unknown neural runtime error" }
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,18 +146,92 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
                             ) { Text("1.00×") }
                             Button(
                                 onClick = ::stopPlayback,
-                                enabled = ready
+                                enabled = ready || busy
                             ) { Text("Stop") }
                         }
 
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "First proof is app startup. Second proof is native model load. If loading fails, the app should remain open and show the error instead of disappearing.",
+                            "Native neural runtime is crash-isolated. If model loading aborts, this screen should stay open and report a timeout instead of disappearing.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
             }
+        }
+    }
+
+    private fun loadModel() {
+        if (loading || ready || busy) return
+        loading = true
+        status = "Loading free offline Hindi neural voice…"
+        lastMetrics = "Starting crash-isolated sherpa-onnx process"
+        val generation = ++loadGeneration
+
+        runCatching {
+            startService(
+                Intent(this, J3NeuralTtsService::class.java)
+                    .setAction(J3NeuralTtsService.ACTION_LOAD)
+                    .putExtra(J3NeuralTtsService.EXTRA_RECEIVER, resultReceiver)
+            )
+        }.onFailure { error ->
+            loading = false
+            ready = false
+            status = "Could not start neural runtime"
+            lastMetrics = "${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}"
+            return
+        }
+
+        handler.postDelayed({
+            if (loading && generation == loadGeneration) {
+                loading = false
+                ready = false
+                status = "Neural process crashed or timed out"
+                lastMetrics = "Launcher stayed alive ✓ Native model did not return within 45 s"
+            }
+        }, LOAD_TIMEOUT_MS)
+    }
+
+    private fun synthesize(text: String) {
+        if (!ready || busy) return
+        busy = true
+        status = "Generating locally in isolated neural process…"
+        val generation = ++speakGeneration
+
+        runCatching {
+            startService(
+                Intent(this, J3NeuralTtsService::class.java)
+                    .setAction(J3NeuralTtsService.ACTION_SPEAK)
+                    .putExtra(J3NeuralTtsService.EXTRA_RECEIVER, resultReceiver)
+                    .putExtra(J3NeuralTtsService.EXTRA_TEXT, text)
+                    .putExtra(J3NeuralTtsService.EXTRA_SPEED, speed)
+            )
+        }.onFailure { error ->
+            busy = false
+            status = "Could not reach neural runtime"
+            lastMetrics = "${error.javaClass.simpleName}: ${error.message.orEmpty().take(180)}"
+            return
+        }
+
+        handler.postDelayed({
+            if (busy && generation == speakGeneration) {
+                busy = false
+                ready = false
+                status = "Neural process crashed or synthesis timed out"
+                lastMetrics = "Launcher stayed alive ✓ Reload Neural Voice before retrying"
+            }
+        }, SPEAK_TIMEOUT_MS)
+    }
+
+    private fun stopPlayback() {
+        speakGeneration++
+        busy = false
+        runCatching {
+            startService(
+                Intent(this, J3NeuralTtsService::class.java)
+                    .setAction(J3NeuralTtsService.ACTION_STOP)
+                    .putExtra(J3NeuralTtsService.EXTRA_RECEIVER, resultReceiver)
+            )
         }
     }
 
@@ -141,140 +241,13 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        stopPlayback()
-        worker.shutdownNow()
-        runCatching { tts?.release() }
-        tts = null
+        handler.removeCallbacksAndMessages(null)
+        runCatching { stopService(Intent(this, J3NeuralTtsService::class.java)) }
         super.onDestroy()
     }
 
-    private fun loadModel() {
-        if (loading || ready || busy) return
-        loading = true
-        status = "Loading free offline Hindi neural voice…"
-        lastMetrics = "Initializing sherpa-onnx + local model"
-
-        worker.execute {
-            val started = SystemClock.elapsedRealtimeNanos()
-            runCatching {
-                val modelDir = "vits-piper-hi_IN-priyamvada-medium"
-                val config = OfflineTtsConfig(
-                    model = OfflineTtsModelConfig(
-                        vits = OfflineTtsVitsModelConfig(
-                            model = "$modelDir/hi_IN-priyamvada-medium.onnx",
-                            tokens = "$modelDir/tokens.txt",
-                            dataDir = "$modelDir/espeak-ng-data"
-                        ),
-                        numThreads = 2,
-                        debug = false
-                    ),
-                    maxNumSentences = 1,
-                    silenceScale = 0.2f
-                )
-                OfflineTts(assetManager = assets, config = config)
-            }.onSuccess { engine ->
-                val loadMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0
-                tts = engine
-                runOnUiThread {
-                    loading = false
-                    ready = true
-                    status = "Ready ✓ Hindi neural model loaded locally"
-                    lastMetrics = "Load ${loadMs.roundToInt()} ms • ${engine.sampleRate()} Hz • speakers ${engine.numSpeakers()}"
-                }
-            }.onFailure { error ->
-                runOnUiThread {
-                    loading = false
-                    ready = false
-                    status = "Model load failed: ${error.javaClass.simpleName}"
-                    lastMetrics = error.message?.take(180) ?: "No error message"
-                }
-            }
-        }
-    }
-
-    private fun synthesize(text: String) {
-        val engine = tts ?: return
-        if (busy) return
-        stopPlayback()
-        busy = true
-        status = "Generating locally…"
-
-        worker.execute {
-            val started = SystemClock.elapsedRealtimeNanos()
-            runCatching {
-                engine.generateWithConfig(
-                    text = text,
-                    config = GenerationConfig(
-                        sid = 0,
-                        speed = speed,
-                        silenceScale = 0.2f
-                    )
-                )
-            }.onSuccess { audio ->
-                val generationMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0
-                val audioMs = if (audio.sampleRate > 0) {
-                    audio.samples.size * 1000.0 / audio.sampleRate
-                } else {
-                    0.0
-                }
-                val rtf = if (audioMs > 0.0) generationMs / audioMs else Double.NaN
-                runOnUiThread {
-                    busy = false
-                    status = "Playing neural Mayra voice…"
-                    lastMetrics = "Generate ${generationMs.roundToInt()} ms • audio ${audioMs.roundToInt()} ms • RTF ${"%.2f".format(rtf)}"
-                    play(audio.samples, audio.sampleRate)
-                }
-            }.onFailure { error ->
-                runOnUiThread {
-                    busy = false
-                    status = "Synthesis failed: ${error.javaClass.simpleName}"
-                    lastMetrics = error.message?.take(180) ?: "No error message"
-                }
-            }
-        }
-    }
-
-    private fun play(samples: FloatArray, sampleRate: Int) {
-        if (samples.isEmpty() || sampleRate <= 0) return
-        stopPlayback()
-
-        runCatching {
-            val pcm = ShortArray(samples.size) { index ->
-                (samples[index].coerceIn(-1f, 1f) * Short.MAX_VALUE).roundToInt().toShort()
-            }
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build()
-                )
-                .setBufferSizeInBytes((pcm.size * 2).coerceAtLeast(4096))
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-
-            audioTrack = track
-            track.write(pcm, 0, pcm.size)
-            track.play()
-        }.onFailure { error ->
-            status = "Playback failed: ${error.javaClass.simpleName}"
-            lastMetrics = error.message?.take(180) ?: "No error message"
-        }
-    }
-
-    private fun stopPlayback() {
-        audioTrack?.let { track ->
-            runCatching { track.stop() }
-            runCatching { track.flush() }
-            runCatching { track.release() }
-        }
-        audioTrack = null
+    companion object {
+        private const val LOAD_TIMEOUT_MS = 45_000L
+        private const val SPEAK_TIMEOUT_MS = 60_000L
     }
 }
