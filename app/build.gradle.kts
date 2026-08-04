@@ -211,6 +211,9 @@ dependencies {
     // CI places the pinned official sherpa-onnx AAR here only for the isolated J3 neural-TTS test.
     add("j3NeuralTtsTestImplementation", files("libs/sherpa-onnx-1.13.2.aar"))
 
+    // J4 only: exact SDK proven by J4 #34 provenance probe. Normal Mayra/J1/J2/J3 stay Java 17.
+    add("j4LocalLlmTestImplementation", "com.google.ai.edge.litertlm:litertlm-android:0.15.0")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("androidx.room:room-testing:2.7.2")
