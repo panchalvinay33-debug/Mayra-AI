@@ -215,6 +215,8 @@ dependencies {
     // avoids Maven POM/transitive Kotlin 2.2 dependencies entering Kotlin 2.0/KSP resolution.
     // J4 accesses LiteRT exclusively through reflection in the isolated :localbrain process.
     add("j4LocalLlmTestRuntimeOnly", files("libs/litertlm-android-0.15.0.aar"))
+    // LiteRT-LM 0.15.0 requires Gson at runtime; keep it J4-only and off normal Mayra variants.
+    add("j4LocalLlmTestRuntimeOnly", "com.google.code.gson:gson:2.13.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
