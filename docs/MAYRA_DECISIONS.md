@@ -1,6 +1,6 @@
 # Mayra AI — Decision Log
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 
 This log preserves important product and architecture decisions. Newer entries may supersede older ones, but history is not deleted.
 
@@ -146,11 +146,11 @@ Assistant-role compatibility is tested separately from the full sensitive-capabi
 
 ## ADR-017 — J2 voice proof is isolated from J1
 
-**Status:** Exact-head CI green; Motorola voice acceptance pending
+**Status:** Core device accepted; privacy/TTS candidate CI-green
 
 J1 remains the zero-permission proof baseline. Real invocation-time voice uses the separate engineering package `ai.mayra.app.j2`.
 
-J2 requests exactly `RECORD_AUDIO` and excludes internet, contacts, notifications, reminders, WorkManager/Room/background listeners and the full Mayra runtime. J2 Voice Test #18, J1 #122, Android CI #2013 and Governance #194 passed on source `ef809bbdaca80f3b953483499dc03de8e091339f`.
+J2 requests exactly `RECORD_AUDIO` and excludes internet, contacts, notifications, reminders, WorkManager/Room/background listeners and the full Mayra runtime. The core voice path is physically proven on Motorola; CI #136 adds privacy/TTS progress without broadening the action boundary.
 
 ---
 
@@ -166,7 +166,7 @@ It stops on result/error/cancel/hide/destroy and is never looped continuously in
 
 ## ADR-019 — Assistant UI must always have a bounded exit
 
-**Status:** Repair implemented and CI-green; device retest pending
+**Status:** Device-proven
 
 Every visible Mayra assistant session must be dismissible through reliable Android navigation and direct surface interaction. Back, orb tap, label tap and outside/root tap call `hide()`. Session hide/destroy stops recognition, keep-awake state and animations.
 
@@ -248,10 +248,22 @@ A→B install-over-install data-retention proof is mandatory. Play Protect is ne
 
 ## ADR-027 — On-device speech support and language support are separate capabilities
 
-**Status:** Repair implemented; fresh CI and Motorola retest pending
+**Status:** Device-proven and implemented
 
-Android reporting `SpeechRecognizer.isOnDeviceRecognitionAvailable()` does not prove that the implicit/default speech language is installed or supported. Motorola J2 device testing proved this distinction: J2 showed on-device speech available and active microphone access, but the first recognition attempt returned `ERROR_LANGUAGE_UNAVAILABLE`.
+Android reporting `SpeechRecognizer.isOnDeviceRecognitionAvailable()` does not prove that the implicit/default speech language is installed or supported. Motorola J2 device testing proved this distinction.
 
-Mayra therefore uses an explicit bounded locale negotiation policy for invocation-time on-device recognition: device locale → `hi-IN` → `en-IN` → `en-US`, with duplicates removed. `ERROR_LANGUAGE_NOT_SUPPORTED` and `ERROR_LANGUAGE_UNAVAILABLE` advance to the next candidate; the chain is finite and never loops continuously.
+Mayra uses explicit bounded locale negotiation and Android 13+ support probing; there is no silent cloud STT fallback or continuous retry loop.
 
-Reason: Hindi/Hinglish usage must remain resilient to device locale/model-pack differences without silently switching to cloud STT or pretending recognition succeeded.
+---
+
+## ADR-028 — Locked speech is private and J2 voice actions remain confirmation-only
+
+**Status:** CI #136 green; Motorola privacy/TTS retest pending
+
+When Android reports the device locked, Mayra may show a generic listening state but must not display or speak transcript-derived/private content before unlock. This uses normal keyguard state detection only.
+
+The current speaking engine is offline-first Android TTS with preferred voice order Hindi India → English India → English US → another offline voice. A custom neural TTS model is a future benchmark rather than a dependency for the Assistant foundation.
+
+J2 may understand app/reminder intent and speak confirmation-oriented wording, but it does not execute those actions or claim they succeeded. Execution will be connected only through the existing typed Mayra action/confirmation runtime after the voice bridge is device-proven.
+
+Small physical checks should be consolidated into meaningful regression rounds when safe so owner testing overhead does not stall feature progress.
