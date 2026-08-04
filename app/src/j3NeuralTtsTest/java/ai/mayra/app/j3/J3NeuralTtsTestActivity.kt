@@ -4,12 +4,14 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,8 +36,8 @@ import ai.mayra.app.ui.theme.MayraAITheme
  * Zero-permission, zero-network neural Hindi TTS benchmark.
  *
  * sherpa-onnx runs in J3NeuralTtsService's secondary process. A native abort cannot kill this
- * launcher process. Android's own ApplicationExitInfo is then used to classify the secondary
- * process death so the next device screenshot can distinguish native crash, ANR, LMK and timeout.
+ * launcher process. Android 11+ process-exit diagnostics classify a secondary-process death while
+ * API 26-29 retain the same crash-isolated generic timeout behavior.
  */
 class J3NeuralTtsTestActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
@@ -130,7 +132,7 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "Native neural runtime is crash-isolated. On failure Android process-exit diagnostics are shown here instead of closing the app.",
+                            "Native neural runtime is crash-isolated. On Android 11+ process-exit diagnostics are shown here instead of closing the app.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -163,33 +165,46 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
             if (loading && generation == loadGeneration) {
                 loading = false
                 ready = false
-                val exit = latestNeuralExit(loadAttemptWallMs)
+                val exit = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    latestNeuralExitDiagnostic(loadAttemptWallMs)
+                } else null
                 if (exit != null) {
-                    val description = exit.description.orEmpty()
-                    status = "Neural process exited: ${reasonName(exit.reason)}"
+                    status = "Neural process exited: ${exit.reason}"
                     lastMetrics = buildString {
                         append("Launcher stayed alive ✓")
                         append(" • status ${exit.status}")
-                        if (description.isNotBlank()) append(" • ${description.take(120)}")
+                        if (exit.description.isNotBlank()) append(" • ${exit.description.take(120)}")
                     }
                 } else {
                     status = "Neural process timed out"
-                    lastMetrics = "Launcher stayed alive ✓ No recorded process exit; model did not return within 45 s"
+                    lastMetrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        "Launcher stayed alive ✓ No recorded process exit; model did not return within 45 s"
+                    } else {
+                        "Launcher stayed alive ✓ Process-exit detail requires Android 11+"
+                    }
                 }
             }
         }, LOAD_TIMEOUT_MS)
     }
 
-    private fun latestNeuralExit(sinceMs: Long): ApplicationExitInfo? {
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun latestNeuralExitDiagnostic(sinceMs: Long): NeuralExitDiagnostic? {
         val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        return runCatching {
+        val exit = runCatching {
             manager.getHistoricalProcessExitReasons(packageName, 0, 12)
                 .filter { it.processName.endsWith(":neuraltts") }
                 .filter { it.timestamp >= sinceMs - 2_000L }
                 .maxByOrNull { it.timestamp }
-        }.getOrNull()
+        }.getOrNull() ?: return null
+
+        return NeuralExitDiagnostic(
+            reason = reasonName(exit.reason),
+            status = exit.status,
+            description = exit.description.orEmpty()
+        )
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun reasonName(reason: Int): String = when (reason) {
         ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CRASH"
         ApplicationExitInfo.REASON_CRASH -> "JAVA_CRASH"
@@ -251,6 +266,12 @@ class J3NeuralTtsTestActivity : ComponentActivity() {
         runCatching { stopService(Intent(this, J3NeuralTtsService::class.java)) }
         super.onDestroy()
     }
+
+    private data class NeuralExitDiagnostic(
+        val reason: String,
+        val status: Int,
+        val description: String
+    )
 
     companion object {
         private const val LOAD_TIMEOUT_MS = 45_000L
