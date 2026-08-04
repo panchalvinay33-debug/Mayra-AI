@@ -1,6 +1,6 @@
 # Mayra AI — Idea Ledger
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 
 This ledger records product ideas from acceptance through delivery, deferral, replacement or removal. Ideas must never disappear silently from the roadmap.
 
@@ -20,17 +20,17 @@ This ledger records product ideas from acceptance through delivery, deferral, re
 | ID | Idea | Status | Current implementation truth | Next gate |
 |---|---|---|---|---|
 | IDEA-001 | One personal Mayra app with one launcher | DEVICE_VERIFY | Final app keeps Chat, Library, Memory, Provider and History internal; J1/J2 are disposable engineering packages | Motorola final-app one-icon acceptance |
-| IDEA-002 | Natural Hindi/Hinglish/English companion | DEVICE_VERIFY | Deterministic local conversation, app voice/TTS and optional provider foundations exist | J2 speech proof, then local-brain benchmark |
+| IDEA-002 | Natural Hindi/Hinglish/English companion | DEVICE_VERIFY | Recognition works physically; Android TTS speaks but owner rates voice robotic; pluggable speech-output + neural benchmark foundation added | Natural Hindi neural voice benchmark + full local-brain bridge |
 | IDEA-003 | Mayra must work without OpenAI/API | BENCHMARK | Deterministic offline engine exists; local LLM preflight recorded; LiteRT-LM runtime direction + Qwen3-1.7B initial candidate | Motorola model/runtime benchmark |
 | IDEA-004 | Optional cloud intelligence, not cloud dependency | DEVICE_VERIFY | Responses-compatible provider, Keystore credentials, live enable/disable and local fallback implemented | Owner API-key/failure-mode test |
 | IDEA-005 | Owner-approved personal memory | DEVICE_VERIFY | Propose/approve/use/edit/delete/expiry and trusted provenance implemented | Motorola recovery/lifecycle checks |
 | IDEA-006 | Private document intelligence | DEVICE_VERIFY | TXT/PDF/DOCX import, indexing, search, summary and grounded answers implemented | Physical PDF/DOCX acceptance |
 | IDEA-007 | Mayra-owned reminders | DEVICE_VERIFY | Persistent parser/scheduler/notification/actions/follow-up/reboot recovery implemented | Timing, Doze, Snooze, Complete and reboot tests |
 | IDEA-008 | Open apps and prepare phone actions | DEVICE_VERIFY | App open, contact resolution, dialer/composer handoffs and expiring confirmations implemented | Motorola action acceptance |
-| IDEA-009 | Animated Mayra presence | DEVICE_VERIFY | Orb physically invoked on Motorola; Back/lock dismiss work; direct tap repair is J2 CI-green | J2 tap/repeat/lock-screen retest |
-| IDEA-010 | Mayra as Android system Assistant | DEVICE_VERIFY | Motorola accepts/selects Mayra and unlocked Power-button invocation launches session | J2 locked-screen/reboot/recovery completion |
-| IDEA-011 | Always-available `Mayra` wake phrase | BENCHMARK | Dedicated KWS architecture preflight recorded; continuous SpeechRecognizer loop rejected; sherpa-onnx first candidate only | J2 physical pass, then KWS false-trigger/battery benchmark |
-| IDEA-012 | Background/lock-screen voice operation | DEVICE_VERIFY | Assistant role/keyguard foundation exists; unlocked invocation proven | Already-locked J2 invocation + reboot test |
+| IDEA-009 | Animated Mayra presence | DEVICE_VERIFY | Orb physically invoked on Motorola; direct dismissal and repeat lifecycle pass | Preserve regression behavior |
+| IDEA-010 | Mayra as Android system Assistant | DEVICE_VERIFY | Motorola accepts/selects Mayra and Power-button invocation launches session | Consolidated privacy/voice regression |
+| IDEA-011 | Always-available `Mayra` wake phrase | BENCHMARK | Dedicated KWS architecture preflight recorded; continuous SpeechRecognizer loop rejected; sherpa-onnx first candidate only | KWS false-trigger/battery benchmark |
+| IDEA-012 | Background/lock-screen voice operation | DEVICE_VERIFY | Already-locked invocation works; privacy-safe rendering/TTS suppression implemented in CI #136 | Physical privacy regression on latest candidate |
 | IDEA-013 | Advanced incoming-call control | ACCEPTED | Phone-role preflight recorded; no Phone takeover implemented | Build complete isolated Dialer/InCallService UI/runtime before role request |
 | IDEA-014 | Caller announce, answer, reject, mute, speaker | ACCEPTED | Public Telecom path documented; deterministic call-command state machine required | Phone UI/runtime tests, then Motorola role acceptance |
 | IDEA-015 | AI takes a message from caller | ACCEPTED | Direct arbitrary SIM audio path rejected; call-forwarding/VoIP/telephony endpoint architecture documented | Select provider/carrier route + privacy/retention design |
@@ -39,9 +39,9 @@ This ledger records product ideas from acceptance through delivery, deferral, re
 | IDEA-018 | Production-signed final Mayra | IN_PROGRESS | Minified release audit and environment-only signing scaffold implemented | Private signing/provenance/trusted distribution |
 | IDEA-019 | Stable owner APK updates without uninstall | IN_PROGRESS | Personal Alpha/J1/J2 can use secret-backed owner signing when configured; trusted-install preflight recorded | Configure secrets + A→B update/data-retention proof |
 | IDEA-020 | Very simple first-start setup | IN_PROGRESS | Two-step permission + Assistant-role onboarding committed | Trusted full-app Motorola first-launch test |
-| IDEA-021 | Zero-permission J1 Assistant test APK | DEVICE_VERIFY | `ai.mayra.app.j1` selection and unlocked invocation physically proven | Touch lifecycle/locked-start/reboot completion through J2 |
-| IDEA-022 | Isolated J2 real voice proof | DEVICE_VERIFY | J2 #18 installed; mic/on-device capability/Assistant invocation physically work; first transcript blocked by language-unavailable result | Fresh CI on locale fallback repair, then Motorola transcript/lifecycle/reboot retest |
-| IDEA-023 | Invocation-time local speech before local LLM | DEVICE_VERIFY | On-device recognizer is physically available and mic-active on Motorola; implicit language failed, so bounded device→hi-IN→en-IN→en-US negotiation is now implemented | Fresh CI + successful Hindi/Hinglish/English transcript proof |
+| IDEA-021 | Zero-permission J1 Assistant test APK | DEVICE_VERIFY | `ai.mayra.app.j1` selection and unlocked invocation physically proven | Preserve as regression baseline |
+| IDEA-022 | Isolated J2 real voice proof | DEVICE_VERIFY | On-device recognition, spoken reply and lifecycle physically work; privacy/TTS CI #136 green | Latest privacy + natural voice regression |
+| IDEA-023 | Invocation-time local speech before local LLM | DEVICE_VERIFY | Device → hi-IN → en-IN → en-US bounded recognition path physically produces transcripts | Connect to full typed Mayra runtime |
 | IDEA-024 | Dedicated local wake-word engine | BENCHMARK | Wake preflight + Motorola benchmark contract recorded; no production dependency integrated | Compare KWS candidate behavior on device |
 | IDEA-025 | LiteRT-LM local brain runtime | BENCHMARK | Runtime/model benchmark contracts recorded; Qwen3-1.7B is candidate only | Reproducible model conversion/load + Motorola RAM/thermal/quality test |
 | IDEA-026 | Complete Mayra default-Phone runtime | ACCEPTED | Safety gate requires full Dialer/InCallService UI before asking for Phone role | Isolated call UI/state/adapters + CI |
@@ -49,6 +49,7 @@ This ledger records product ideas from acceptance through delivery, deferral, re
 | IDEA-028 | Local-first notification summaries | ACCEPTED | Notification Access architecture/sensitive exclusions documented | Policy tests + owner device acceptance |
 | IDEA-029 | Reliable cross-app workflows | ACCEPTED | API/intents/deep-link-first policy recorded; generic LLM Accessibility tapping rejected | Add typed adapters per real workflow |
 | IDEA-030 | Trusted Play/Internal owner distribution | IN_PROGRESS | Stable-signing + Internal Testing architecture documented | Play Console/internal track + signed A→B install test |
+| IDEA-031 | Free natural offline Mayra neural voice | BENCHMARK | `MayraSpeechOutput`, model license gate, sherpa-onnx preflight and Motorola neural-TTS benchmark matrix implemented; no neural binary bundled | Isolated Hindi VITS/Piper class benchmark, then production-clear model selection |
 
 ## Deferred ideas
 
