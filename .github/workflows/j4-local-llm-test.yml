@@ -82,7 +82,7 @@ jobs:
           gradle --no-daemon \
             :app:compileJ4LocalLlmTestJavaWithJavac \
             :app:compileJ4LocalLlmTestKotlin \
-            :app:testDebugUnitTest --tests 'ai.mayra.app.localmodel.MayraLocalModelIntegrityTest' --tests 'ai.mayra.app.learning.MayraSelfLearningPolicyTest' \
+            :app:testDebugUnitTest --tests 'ai.mayra.app.localmodel.MayraLocalModelIntegrityTest' --tests 'ai.mayra.app.learning.*' \
             :app:lintJ4LocalLlmTest \
             --stacktrace --console=plain
 
@@ -97,12 +97,10 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
           test -x "$AAPT"
-
           "$AAPT" dump permissions "$APK" | tee build/j4-ci/permissions.log
           "$AAPT" dump badging "$APK" | tee build/j4-ci/badging.log
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/j4-ci/manifest.log
           unzip -l "$APK" | tee build/j4-ci/apk-contents.log
-
           permission_count="$(grep -c '^uses-permission:' build/j4-ci/permissions.log || true)"
           test "$permission_count" -eq 0
           grep -Fq "package: name='ai.mayra.app.j4'" build/j4-ci/badging.log
@@ -110,33 +108,13 @@ jobs:
           launcher_count="$(grep -c '^launchable-activity:' build/j4-ci/badging.log || true)"
           test "$launcher_count" -eq 1
           grep -Fq "launchable-activity: name='ai.mayra.app.j4.J4LocalLlmTestActivity'" build/j4-ci/badging.log
-
-          required_components=(
-            ai.mayra.app.j4.J4TestApplication
-            ai.mayra.app.j4.J4LocalLlmTestActivity
-            ai.mayra.app.j4.J4LocalBrainRuntimeService
-          )
-          for component in "${required_components[@]}"; do
-            grep -Fq "$component" build/j4-ci/manifest.log
-          done
+          required_components=(ai.mayra.app.j4.J4TestApplication ai.mayra.app.j4.J4LocalLlmTestActivity ai.mayra.app.j4.J4LocalBrainRuntimeService)
+          for component in "${required_components[@]}"; do grep -Fq "$component" build/j4-ci/manifest.log; done
           grep -Fq ':localbrain' build/j4-ci/manifest.log
-
-          forbidden_components=(
-            ai.mayra.app.MainActivity
-            ai.mayra.app.assistant.MayraVoiceInteractionService
-            ai.mayra.app.assistant.MayraVoiceInteractionSessionService
-            ai.mayra.app.assistant.MayraRecognitionService
-            ai.mayra.app.background.MayraNotificationListener
-            ai.mayra.app.background.MayraBootReceiver
-            ai.mayra.app.reminder.MayraReminderActionReceiver
-          )
+          forbidden_components=(ai.mayra.app.MainActivity ai.mayra.app.assistant.MayraVoiceInteractionService ai.mayra.app.assistant.MayraVoiceInteractionSessionService ai.mayra.app.assistant.MayraRecognitionService ai.mayra.app.background.MayraNotificationListener ai.mayra.app.background.MayraBootReceiver ai.mayra.app.reminder.MayraReminderActionReceiver)
           for component in "${forbidden_components[@]}"; do
-            if grep -Fq "$component" build/j4-ci/manifest.log; then
-              echo "Unexpected component in J4 Local LLM Test: $component" >&2
-              exit 1
-            fi
+            if grep -Fq "$component" build/j4-ci/manifest.log; then echo "Unexpected component in J4 Local LLM Test: $component" >&2; exit 1; fi
           done
-
           grep -Fq 'lib/arm64-v8a/liblitertlm_jni.so' build/j4-ci/apk-contents.log
           sha256sum "$APK" | tee build/j4-ci/apk-sha256.txt
           stat --printf='APK bytes: %s\n' "$APK" | tee build/j4-ci/apk-size.txt
