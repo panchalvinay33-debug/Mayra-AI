@@ -1,6 +1,6 @@
 # Mayra AI — Neural TTS Motorola Benchmark
 
-Status: J3 #29 DEVICE LOAD + FIRST SYNTHESIS PASS — QUALITY/STABILITY BENCHMARK CONTINUES
+Status: J3 #29 DEVICE LOAD + FIRST SYNTHESIS PASS — OWNER LISTENING CHECK POSITIVE; STABILITY BENCHMARK CONTINUES
 Date: 2026-08-04
 Target: Motorola Edge 70 Fusion / Android 16
 
@@ -78,7 +78,18 @@ Interpretation:
 - first observed synthesis: PASS;
 - AudioTrack playback start: PASS;
 - observed RTF `0.72` is faster than real time and passes the initial sustained-generation requirement of `<= 1.0` for this sample;
-- this is not yet a complete quality/stability or production pass.
+- this is not yet a complete stability or production pass.
+
+## Owner listening feedback
+
+Physical listening check on J3 #29:
+
+- owner reports the tested voice outputs are all okay;
+- listening phrase **#1** (`नमस्ते, मैं मायरा हूँ। मैं आपकी बात सुन रही हूँ।`) is the preferred/best-sounding sample;
+- no major pronunciation defect was reported during this listening round;
+- exact 1–5 naturalness/intelligibility scores were not collected, so the numeric quality gate remains unscored rather than being inferred.
+
+This is positive owner preference evidence for the Priyamvada benchmark candidate, but it does not override the remaining stability, thermal, privacy and model-license gates.
 
 ## Measurements to capture
 
@@ -98,9 +109,10 @@ Interpretation:
 | Airplane-mode synthesis | PENDING |
 | Stop/playback cleanup | PENDING |
 | Locked private speech suppression | PENDING / final integration gate |
-| Hindi naturalness 1–5 | PENDING owner score |
-| Hinglish intelligibility 1–5 | PENDING owner score |
-| Names/numbers 1–5 | PENDING owner score |
+| Hindi naturalness 1–5 | Owner says listening is okay; numeric score not collected |
+| Hinglish intelligibility 1–5 | Owner says listening is okay; numeric score not collected |
+| Preferred sample | Phrase #1 |
+| Names/numbers 1–5 | No issue reported in this round; numeric score not collected |
 | Heat/battery observation | PENDING |
 
 ## Listening set
@@ -117,15 +129,13 @@ Use the same phrases for every engine:
 
 ## Next physical benchmark sequence
 
-1. Play phrases 1–6 at `1.00×` and judge naturalness/pronunciation.
-2. Repeat the same useful phrases at `0.92×`; choose the better owner listening preference.
-3. Record Hindi naturalness, Hinglish intelligibility and names/numbers scores from 1–5.
-4. Turn Airplane mode ON and synthesize at least phrases 1 and 5; neural playback must still work.
-5. Press Stop during playback; audio must stop cleanly without hanging the neural process.
-6. Run 20 sequential replies, mixing Hindi/Hinglish, without crash, stuck audio or forced reload.
-7. Observe device heat and obvious battery impact during the 20-reply run.
-8. Record warm synthesis timings/RTF from multiple phrases.
-9. Do not integrate this model into production Mayra until the model-license/redistribution gate is separately approved.
+1. Turn Airplane mode ON and synthesize at least phrases 1 and 5; neural playback must still work.
+2. Press Stop during playback; audio must stop cleanly without hanging the neural process.
+3. Run 20 sequential replies, mixing Hindi/Hinglish, without crash, stuck audio or forced reload.
+4. Observe device heat and obvious battery impact during the 20-reply run.
+5. Record warm synthesis timings/RTF from multiple phrases.
+6. If useful before final voice selection, capture explicit 1–5 Hindi/Hinglish quality scores; current qualitative feedback is positive and phrase #1 is preferred.
+7. Do not integrate this model into production Mayra until the model-license/redistribution gate is separately approved.
 
 ## Acceptance rule
 
@@ -156,4 +166,5 @@ Neural candidate:
 - J3 #29 model load: PASS on Motorola;
 - J3 #29 first observed synthesis/playback: PASS;
 - observed RTF: `0.72` PASS;
-- quality score, airplane mode, 20-reply stability, warm latency and thermal checks: PENDING.
+- owner qualitative listening check: PASS / positive, with phrase #1 preferred;
+- airplane mode, Stop cleanup, 20-reply stability, warm latency and thermal checks: PENDING.
