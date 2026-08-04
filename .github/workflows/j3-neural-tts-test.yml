@@ -46,7 +46,9 @@ jobs:
 
           MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-hi_IN-priyamvada-medium.tar.bz2"
           MODEL_ARCHIVE="build/j3-inputs/vits-piper-hi_IN-priyamvada-medium.tar.bz2"
+          MODEL_ARCHIVE_SHA256="399d91cc97eb288725633261f26b715f9a971e3bf7ec4fa1d7910cd0080d37eb"
           curl --fail --location --retry 3 --output "$MODEL_ARCHIVE" "$MODEL_URL"
+          echo "$MODEL_ARCHIVE_SHA256  $MODEL_ARCHIVE" | sha256sum --check
           tar -xjf "$MODEL_ARCHIVE" -C app/src/j3NeuralTtsTest/assets
 
           MODEL="app/src/j3NeuralTtsTest/assets/vits-piper-hi_IN-priyamvada-medium/hi_IN-priyamvada-medium.onnx"
@@ -56,8 +58,9 @@ jobs:
           test -s "$TOKENS"
           test -d "$DATA_DIR"
 
-          # Pin the actual neural model bytes, not merely the transport archive.
-          echo "aa63bcf2cd493b55a450f280e23cf77f03afc9af7015e6e5acd43b652f166c88  $MODEL" | sha256sum --check
+          # Pin the exact sherpa-converted neural model inside the verified archive.
+          MODEL_SHA256="8871f3e07adb6ca490f8dbcd3956a8647c53c35b5d0a1c2a8d097b3bf721a31b"
+          echo "$MODEL_SHA256  $MODEL" | sha256sum --check
 
           sha256sum "$AAR" "$MODEL_ARCHIVE" "$MODEL" | tee build/j3-inputs/hashes.txt
           du -sh app/src/j3NeuralTtsTest/assets/vits-piper-hi_IN-priyamvada-medium | tee build/j3-inputs/model-size.txt
