@@ -1,8 +1,10 @@
 package ai.mayra.app.context
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
@@ -19,6 +21,9 @@ fun collectMayraContext(context: Context, now: LocalDateTime = LocalDateTime.now
 }
 
 private fun readConnectivity(context: Context): ContextValue<ConnectivityState> {
+    if (context.checkSelfPermission(Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
+        return ContextValue.NotGranted
+    }
     return runCatching {
         val manager = context.getSystemService(ConnectivityManager::class.java)
             ?: return ContextValue.Unavailable
@@ -70,7 +75,7 @@ fun MayraContextSnapshot.summaryLines(): List<String> {
             ConnectivityState.ONLINE -> "Online"
             ConnectivityState.OFFLINE -> "Offline"
         }
-        ContextValue.NotGranted -> lines += "Network permission not granted"
+        ContextValue.NotGranted -> lines += "Network state not granted"
         ContextValue.Unavailable -> lines += "Network state unavailable"
     }
     return lines
