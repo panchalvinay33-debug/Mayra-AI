@@ -2,6 +2,30 @@
 
 This changelog records meaningful user-visible and engineering milestones. It does not replace Git history.
 
+## Unreleased — J5 AI-native Home foundation
+
+- Added a separate `MayraLauncherActivity` so Android Home rendering is independent from the normal chat/activity surface.
+- Declared `MAIN + HOME + DEFAULT` qualification for the Mayra Home surface while keeping exactly one normal `CATEGORY_LAUNCHER` app entry.
+- Added user-consent `ROLE_HOME` request where the Android role is available.
+- Added searchable launchable-app discovery and direct app launching.
+- Added an `Ask Mayra` bridge into the existing normal Mayra experience.
+- Added an explicit `Settings.ACTION_HOME_SETTINGS` switch/restore path so the owner can return to another launcher.
+- The J5 Home rendering path intentionally does not initialize the local LLM, cloud provider, memory or privileged action engine.
+- Device success is not yet claimed; fresh CI plus Motorola HOME-selection/reboot/switch-back/model-failure acceptance are required.
+
+## Unreleased — J4 quality/operability harness
+
+- Repaired the Room/KSP multi-variant schema race by isolating transient Room schema generation and serializing governed variant builds.
+- Protected exact recovery source `e72488a6f6dceb24950f9b0f574ae223d52bd8bb` as `baseline/mayra-0.2.1-j4-ci-recovery-green-134` after Android #2356, J1 #465, J2 #361, J3 #183, J4 #134 and Governance #537 all passed.
+- Added longer Hindi/Hinglish/English quality prompts plus explicit safety-boundary and uncertainty prompts.
+- Added 10-prompt sequential local-brain stress benchmarking.
+- Added response character count, approximate-token count, total latency and clearly labelled rough throughput estimates.
+- Added isolated `:localbrain` process PSS, Java heap and native heap telemetry.
+- Added explicit process-bounded generation cancellation: only the isolated localbrain process is killed/rebound so the outer UI survives.
+- Quality engineering source `862450933da3700d4d1559e09ebde910a4185914` passed Android #2364, J1 #473, J2 #369, J3 #191, J4 #142 and Governance #545.
+- J4 #142 runtime APK artifact ID `8918003689`; audit artifact ID `8918004266`.
+- Motorola quality/RAM/thermal/background/lock/Airplane evidence remains required before production conversational-brain promotion.
+
 ## Unreleased — Free offline neural voice benchmark foundation
 
 - Motorola CI #136 physically speaks Mayra replies through Android offline TTS; owner reports the voice is understandable but too robotic for the desired final Mayra experience.
