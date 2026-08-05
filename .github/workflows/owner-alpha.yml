@@ -50,7 +50,7 @@ jobs:
               exit 1
             fi
           done
-          KEYSTORE="$RUNNER_TEMP/mayra-owner.jks"
+          KEYSTORE="$RUNNER_TEMP/mayra-owner.p12"
           printf '%s' "$OWNER_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           chmod 600 "$KEYSTORE"
           {
@@ -63,25 +63,35 @@ jobs:
       - name: Compile, test and lint owner candidate
         shell: bash
         run: |
-          set -o pipefail
-          gradle --no-daemon :app:compilePersonalAlphaKotlin :app:testDebugUnitTest :app:lintPersonalAlpha --stacktrace --console=plain
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
+          gradle --no-daemon :app:compileOwnerAlphaKotlin :app:testDebugUnitTest :app:lintOwnerAlpha --stacktrace --console=plain
 
       - name: Assemble stable owner APK
         shell: bash
-        run: gradle --no-daemon :app:assemblePersonalAlpha --stacktrace --console=plain
+        run: |
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
+          gradle --no-daemon :app:assembleOwnerAlpha --stacktrace --console=plain
 
-      - name: Verify package and signing certificate
+      - name: Verify package and stable signing certificate
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/owner-signing
-          APK="$(find app/build/outputs/apk/personalAlpha -name '*.apk' -type f | head -n 1)"
+          APK="$(find app/build/outputs/apk/ownerAlpha -name '*.apk' -type f | head -n 1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
           test -f "$APK"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
           "$AAPT" dump badging "$APK" | tee build/owner-signing/badging.txt
-          grep -Fq "package: name='ai.mayra.app.alpha'" build/owner-signing/badging.txt
+          grep -Fq "package: name='ai.mayra.app.owner'" build/owner-signing/badging.txt
+          grep -Fq "application-label:'Mayra AI Owner'" build/owner-signing/badging.txt
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee build/owner-signing/signing-certificate.txt
+          grep -Fq "Verified using v2 scheme (APK Signature Scheme v2): true" build/owner-signing/signing-certificate.txt
           grep -Fq "Signer #1 certificate SHA-256 digest:" build/owner-signing/signing-certificate.txt
           cp "$APK" build/owner-signing/Mayra-AI-Owner-Update.apk
           sha256sum build/owner-signing/Mayra-AI-Owner-Update.apk | tee build/owner-signing/apk-sha256.txt
