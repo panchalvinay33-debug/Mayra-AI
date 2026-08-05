@@ -45,10 +45,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ai.mayra.app.MayraEntryContract
+import ai.mayra.app.context.collectMayraContext
+import ai.mayra.app.context.summaryLines
 import ai.mayra.app.ui.theme.MayraAITheme
 
 /**
- * J5 launcher/Home foundation.
+ * J5 launcher/Home foundation with the first J6 Context Fabric surface.
  *
  * This activity deliberately remains independent of local/cloud model startup. Basic Home and app
  * access must continue working if Mayra's heavy AI runtime is unavailable or crashes.
@@ -87,6 +89,8 @@ private fun MayraLauncherHome() {
     var status by remember { mutableStateOf("Mayra Home ready") }
     val apps = remember(refreshKey) { loadLaunchableApps(context) }
     val filtered = remember(apps, query) { filterLaunchableApps(apps, query) }
+    val contextSnapshot = remember(refreshKey) { collectMayraContext(context) }
+    val contextLines = remember(contextSnapshot) { contextSnapshot.summaryLines() }
     val roleManager = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.getSystemService(RoleManager::class.java) else null
     }
@@ -156,9 +160,23 @@ private fun MayraLauncherHome() {
                 }
             }
 
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Now", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(contextLines.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "System context only — no AI inference needed.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AssistChip(onClick = ::openFullMayra, label = { Text("Open Mayra") })
-                AssistChip(onClick = { refreshKey++ }, label = { Text("Refresh apps") })
+                AssistChip(onClick = { refreshKey++ }, label = { Text("Refresh") })
             }
 
             if (!roleHeld) {
@@ -223,7 +241,7 @@ private fun MayraLauncherHome() {
             }
 
             Text(
-                "Mayra Home stays lightweight. Deeper AI, memory and actions open through the same Mayra entry without becoming a Home dependency.",
+                "Mayra Home stays lightweight. Context is permission-bounded; deeper AI, memory and actions remain outside the Home critical path.",
                 style = MaterialTheme.typography.bodySmall
             )
         }
