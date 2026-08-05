@@ -1,7 +1,7 @@
 # Mayra AI — Owner Signing Migration
 
 Date: 2026-08-05
-Status: **ONE-TIME SIGNING MIGRATION REQUIRED**
+Status: **SIDE-BY-SIDE OWNER SIGNING MIGRATION IN PROGRESS**
 
 ## What happened
 
@@ -13,10 +13,10 @@ This is a signing continuity issue, not a launcher/runtime failure.
 
 ## Evidence
 
-- Earlier physically proven J5 APK: Android CI #2384 / artifact `8919388343`.
+- Earlier physically proven J5 APK: Android CI #2384 / artifact `8919388343` / package `ai.mayra.app.alpha`.
 - Unified J5 code checkpoint: `cc89a392a53fcb910166c92badaab3543b5520ff`, Android CI #2416 green.
 - Owner-signed workflow exists at `.github/workflows/owner-alpha.yml`.
-- Stable Owner Alpha run #6 (`30984237319`) reached the required signing-material step and failed because `MAYRA_OWNER_KEYSTORE_BASE64` was not configured. The other owner signing secrets are therefore treated as unconfigured until the complete set is installed.
+- Stable Owner Alpha run #6 (`30984237319`) reached the required signing-material step and failed because `MAYRA_OWNER_KEYSTORE_BASE64` was not configured. The complete owner signing secret set is therefore considered unconfigured.
 
 ## Permanent rule
 
@@ -31,24 +31,36 @@ Required GitHub Secrets:
 3. `MAYRA_OWNER_KEY_ALIAS`
 4. `MAYRA_OWNER_KEY_PASSWORD`
 
-## Migration
+## Safer permanent owner package
 
-Because the currently installed #2384 package was signed by a transient CI debug key whose private key was not preserved, it cannot be upgraded in-place to a new stable signer using ordinary Android package installation.
+A dedicated `ownerAlpha` build type now uses application ID **`ai.mayra.app.owner`** and visible label **`Mayra AI Owner`**. The Stable Owner Alpha workflow builds this package with the persistent owner key.
 
-Safe migration sequence:
+This intentionally avoids trying to replace the transient-signed `.alpha` package. The working `.alpha` Mayra can remain installed while the new permanent owner line is installed and tested side-by-side.
 
-1. Preserve any Mayra owner data that must survive uninstall using available Mayra export/record mechanisms or a manual record where export is not yet implemented.
-2. Keep another launcher installed and selected/available as recovery.
-3. Generate and securely back up one permanent Mayra owner signing key.
+The owner variant is preflighted without private signing material by `.github/workflows/owner-alpha-preflight.yml`; the actual installable owner APK is produced only by the dedicated stable-signing lane after all four encrypted Secrets are configured.
+
+## Migration sequence
+
+1. Keep the currently working `ai.mayra.app.alpha` installed as rollback/reference.
+2. Keep the previous Motorola launcher installed and available.
+3. Securely back up the permanent Mayra owner signing key outside GitHub source/history.
 4. Configure the four GitHub Actions owner-signing Secrets.
-5. Build `personalAlpha` with Stable Owner Alpha and record APK SHA-256 plus signer SHA-256.
-6. One time only: uninstall the transient-signed `ai.mayra.app.alpha`, install the stable-owner-signed APK, restore/recreate preserved owner data as applicable, then reselect Mayra as Home.
-7. Prove the next stable-owner build installs directly over the first stable-owner build without uninstall. That second-install proof closes the migration.
+5. Build `ai.mayra.app.owner` with Stable Owner Alpha and record APK SHA-256 plus signer SHA-256.
+6. Install `Mayra AI Owner` side-by-side with the existing `.alpha` package; do **not** uninstall the working alpha first.
+7. Select/test `Mayra AI Owner` as Home and, where desired, as Digital Assistant. Re-run launcher, lock/reboot, switch-back, Airplane and unified orb/assistant checks.
+8. Keep old `.alpha` until owner-package behavior and any needed owner data transfer/recreation are accepted.
+9. Produce a second stable-owner APK with the same `ai.mayra.app.owner` package and prove direct install-over-install without uninstall. This is the key signing-continuity proof.
+10. Only after the new owner line is accepted may the old transient `.alpha` be removed at the owner's discretion.
 
-After step 7, all owner-device APKs must come from the stable owner signing lane unless an explicit new migration is documented.
+After step 9, owner-device updates must come from the stable `ai.mayra.app.owner` signing lane unless an explicit migration is documented.
+
+## Data note
+
+Android isolates app-private data by package. `ai.mayra.app.owner` cannot silently read the private data of `ai.mayra.app.alpha`. Keeping both packages installed preserves access to the old data while export/import or explicit recreation is handled. Do not claim data migration unless physically proven.
 
 ## Non-goals
 
 - Do not bypass Android package-signature checks.
 - Do not store private keys/passwords in repository files, issues, PR comments, Actions logs or ordinary CI artifacts.
 - Do not call a transient debug-signed CI APK an owner update.
+- Do not uninstall the physically working `.alpha` before the side-by-side owner package is verified.
