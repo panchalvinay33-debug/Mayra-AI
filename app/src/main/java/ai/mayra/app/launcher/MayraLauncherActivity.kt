@@ -45,12 +45,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ai.mayra.app.MayraEntryContract
+import ai.mayra.app.background.MayraNotificationListener
+import ai.mayra.app.context.NotificationContextStore
 import ai.mayra.app.context.collectMayraContext
+import ai.mayra.app.context.summaryLine
 import ai.mayra.app.context.summaryLines
 import ai.mayra.app.ui.theme.MayraAITheme
 
 /**
- * J5 launcher/Home foundation with the first J6 Context Fabric surface.
+ * J5 launcher/Home foundation with J6 Context Fabric surfaces.
  *
  * This activity deliberately remains independent of local/cloud model startup. Basic Home and app
  * access must continue working if Mayra's heavy AI runtime is unavailable or crashes.
@@ -91,6 +94,11 @@ private fun MayraLauncherHome() {
     val filtered = remember(apps, query) { filterLaunchableApps(apps, query) }
     val contextSnapshot = remember(refreshKey) { collectMayraContext(context) }
     val contextLines = remember(contextSnapshot) { contextSnapshot.summaryLines() }
+    val notificationAccessGranted = remember(refreshKey) { isNotificationAccessGranted(context) }
+    val notificationSnapshot = remember(refreshKey, notificationAccessGranted) {
+        NotificationContextStore(context).read(notificationAccessGranted)
+    }
+    val notificationLine = remember(notificationSnapshot) { notificationSnapshot.summaryLine() }
     val roleManager = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.getSystemService(RoleManager::class.java) else null
     }
@@ -131,10 +139,7 @@ private fun MayraLauncherHome() {
                 }
             }
 
-            Card(
-                onClick = ::openFullMayra,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Card(onClick = ::openFullMayra, modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -167,10 +172,35 @@ private fun MayraLauncherHome() {
                 ) {
                     Text("Now", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(contextLines.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+                    Text("System context only — no AI inference needed.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(notificationLine, style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "System context only — no AI inference needed.",
+                        "Aggregate counts only — no sender, message text, OTP or account content.",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    if (!notificationAccessGranted) {
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                }.onFailure {
+                                    status = "Notification access settings are unavailable"
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Enable notification context")
+                        }
+                    }
                 }
             }
 
@@ -246,6 +276,17 @@ private fun MayraLauncherHome() {
             )
         }
     }
+}
+
+private fun isNotificationAccessGranted(context: Context): Boolean {
+    val expected = ComponentName(context, MayraNotificationListener::class.java)
+    val enabled = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_NOTIFICATION_LISTENERS
+    ).orEmpty()
+    return enabled.split(':')
+        .mapNotNull(ComponentName::unflattenFromString)
+        .any { it == expected }
 }
 
 private fun loadLaunchableApps(context: Context): List<LaunchableApp> {
