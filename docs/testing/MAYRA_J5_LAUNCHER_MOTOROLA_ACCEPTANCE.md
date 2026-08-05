@@ -1,7 +1,7 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: **DEVICE VERIFY IN PROGRESS — CORE DAILY LOOP + LOCK/REBOOT + SWITCH-BACK + AIRPLANE-MODE INDEPENDENCE PROVEN**
+Status: **DEVICE VERIFY IN PROGRESS — CORE DAILY LOOP + LOCK/REBOOT + SWITCH-BACK + AIRPLANE + ASK-MAYRA BRIDGE PROVEN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
 ## Exact artifact identity
@@ -36,10 +36,13 @@ Owner-supplied screenshots / explicit owner confirmation prove:
 12. Switching back to `Mayra AI Personal Alpha` works normally and restores Mayra Home.
 13. With Airplane mode enabled, Mayra Home still renders normally, installed-app search still works, Chrome can still be launched as an app, and returning Home restores Mayra Home.
 14. The Airplane-mode proof shows the core launcher shell/search/app-launch path is not dependent on network/cloud availability.
-15. Owner reports the selected launcher is otherwise functioning normally in day-to-day use.
-16. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
+15. Tapping `Ask Mayra` from Mayra Home opens the normal Mayra AI activity successfully.
+16. The normal Mayra activity reports `Offline core ready / Private on-device mode` and remains usable without a connected general AI provider.
+17. A simple owner input (`hello maida`) produces a bounded offline fallback response rather than crashing or creating a launcher loop.
+18. Returning between launcher and normal Mayra activity remains sane in the observed flow.
+19. Owner reports the selected launcher is otherwise functioning normally in day-to-day use.
 
-This proves the core daily launcher loop plus lock/unlock, reboot persistence, safe launcher switching and offline/Airplane-mode launcher independence. Repeated formal 20/20 Home returns, broader search/refresh checks, localbrain-kill/provider/TTS/permission independence, assistant coexistence, force-stop recovery and resource behavior remain pending.
+This proves the core daily launcher loop plus lock/unlock, reboot persistence, safe launcher switching, offline/Airplane-mode launcher independence and the launcher-to-normal-Mayra bridge. Repeated formal 20/20 Home returns, broader search/refresh checks, localbrain-kill/TTS/permission independence, Power-button Digital Assistant coexistence, force-stop recovery and resource behavior remain pending.
 
 ## Installation precheck
 
@@ -73,7 +76,7 @@ Favorites/basic persistent layout is not implemented in the current slice and is
 
 - [ ] Local model unavailable: Home/app list/search/launch still usable.
 - [ ] Local-brain process killed: Home/app list/search/launch still usable.
-- [x] Provider/network unavailable: core Home/search/app-launch path remains usable under Airplane mode.
+- [x] Provider/network unavailable: core Home/search/app-launch path remains usable under Airplane mode; normal Mayra also shows bounded offline fallback behavior.
 - [x] Airplane mode: Home/search/app launch/Home return remain usable.
 - [ ] Neural TTS unavailable: Home remains usable.
 - [ ] Notification Access denied: Home remains usable.
@@ -81,11 +84,11 @@ Favorites/basic persistent layout is not implemented in the current slice and is
 
 ## D. Assistant coexistence
 
-- [ ] `Ask Mayra` opens the normal Mayra activity.
+- [x] `Ask Mayra` opens the normal Mayra activity.
 - [ ] Power-button Digital Assistant invocation still works where configured.
 - [ ] Dismissing Assistant returns to a sane screen/Home.
-- [ ] No Assistant <-> Launcher navigation loop.
-- [ ] Rapid invoke/dismiss/Home cycle remains stable.
+- [x] No Launcher -> normal Mayra navigation loop observed in the tested `Ask Mayra` flow.
+- [ ] Rapid Power-assistant invoke/dismiss/Home cycle remains stable.
 
 Deeper voice/orb integration into Home is intentionally a later J5 slice after base Home reliability proof.
 
