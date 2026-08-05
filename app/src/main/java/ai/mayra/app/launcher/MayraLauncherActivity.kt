@@ -282,12 +282,14 @@ private fun isNotificationAccessGranted(context: Context): Boolean {
     val expected = ComponentName(context, MayraNotificationListener::class.java)
     val enabled = Settings.Secure.getString(
         context.contentResolver,
-        Settings.Secure.ENABLED_NOTIFICATION_LISTENERS
+        ENABLED_NOTIFICATION_LISTENERS_SETTING
     ).orEmpty()
     return enabled.split(':')
         .mapNotNull(ComponentName::unflattenFromString)
         .any { it == expected }
 }
+
+private const val ENABLED_NOTIFICATION_LISTENERS_SETTING = "enabled_notification_listeners"
 
 private fun loadLaunchableApps(context: Context): List<LaunchableApp> {
     val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
