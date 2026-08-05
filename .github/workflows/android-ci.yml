@@ -115,8 +115,10 @@ jobs:
           for permission in "${forbidden_permissions[@]}"; do
             if grep -Fq "$permission" build/ci/personal-alpha-permissions.log; then echo "Personal Alpha unexpectedly requests $permission" >&2; exit 1; fi
           done
-          required_components=(ai.mayra.app.MainActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity ai.mayra.app.background.MayraBootReceiver ai.mayra.app.background.MayraNotificationListener ai.mayra.app.reminder.MayraReminderActionReceiver)
+          required_components=(ai.mayra.app.MainActivity ai.mayra.app.launcher.MayraLauncherActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity ai.mayra.app.background.MayraBootReceiver ai.mayra.app.background.MayraNotificationListener ai.mayra.app.reminder.MayraReminderActionReceiver)
           for component in "${required_components[@]}"; do grep -Fq "$component" build/ci/personal-alpha-manifest-tree.log; done
+          grep -Fq "android.intent.category.HOME" build/ci/personal-alpha-manifest-tree.log
+          grep -Fq "android.intent.category.DEFAULT" build/ci/personal-alpha-manifest-tree.log
 
       - name: Assemble minified final release candidate
         shell: bash
@@ -150,8 +152,10 @@ jobs:
           for permission in "${forbidden_permissions[@]}"; do
             if grep -Fq "$permission" build/ci/release-permissions.log; then echo "Final release candidate unexpectedly requests $permission" >&2; exit 1; fi
           done
-          required_components=(ai.mayra.app.MainActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity ai.mayra.app.background.MayraBootReceiver ai.mayra.app.background.MayraNotificationListener ai.mayra.app.reminder.MayraReminderActionReceiver)
+          required_components=(ai.mayra.app.MainActivity ai.mayra.app.launcher.MayraLauncherActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity ai.mayra.app.background.MayraBootReceiver ai.mayra.app.background.MayraNotificationListener ai.mayra.app.reminder.MayraReminderActionReceiver)
           for component in "${required_components[@]}"; do grep -Fq "$component" build/ci/release-manifest-tree.log; done
+          grep -Fq "android.intent.category.HOME" build/ci/release-manifest-tree.log
+          grep -Fq "android.intent.category.DEFAULT" build/ci/release-manifest-tree.log
 
       - name: Assemble full Mayra test APK
         shell: bash
