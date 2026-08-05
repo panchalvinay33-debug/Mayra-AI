@@ -4,121 +4,119 @@ Snapshot date: 2026-08-05
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: J4 CI recovery is green and protected; complete J4 quality/operability device gate, then start J5 AI-native launcher implementation from a known recovery point.
+Current phase: **J4 quality device verification + J5 launcher/Home foundation validation**.
 
-## Canonical product direction
+## Canonical direction
 
-Mayra is targeting a practical **Jarvis-style personal Android operating layer** combining:
+Mayra targets a practical **Jarvis-style personal Android operating layer**: Digital Assistant voice presence, local-first conversational brain, owner-controlled memory/documents, typed context, AI-native Home, trust-gated actions, proactive assistance, later multimodal support and owner-defined routines.
 
-- Android Digital Assistant / voice presence;
-- local-first conversational brain with deterministic fallback;
-- owner-approved memory and private documents;
-- reminders, notification intelligence and people/context;
-- AI-native default launcher/Home shell;
-- trust-gated typed action engine;
-- proactive My Day/pending-item assistance;
-- later multimodal understanding and owner-defined routines through separate gates.
+The launcher is a resilient Home shell, not privileged authority. Basic Home/app access must survive model/provider/brain failure.
 
-Canonical plan: `docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md`
-Launcher decision: `docs/decisions/ADR_033_AI_NATIVE_LAUNCHER_AND_MAJOR_STEP_BASELINES.md`
-Room/KSP recovery decision: `docs/decisions/ADR_034_ROOM_SCHEMA_ISOLATION_FOR_MULTI_VARIANT_CI.md`
-Jarvis planning snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_JARVIS_LAUNCHER_DIRECTION.md`
-J4 recovery snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_J4_CI_RECOVERY_GREEN.md`
-
-## Current protected recovery point
+## Protected recovery baseline
 
 `baseline/mayra-0.2.1-j4-ci-recovery-green-134`
 
 Exact source: `e72488a6f6dceb24950f9b0f574ae223d52bd8bb`
 Backup ref: `backup/j4-ci-recovery-2026-08-05`
 
-Exact-head automated evidence:
+Exact automated evidence:
+- Android CI #2356 — SUCCESS
+- J1 #465 — SUCCESS
+- J2 #361 — SUCCESS
+- J3 #183 — SUCCESS
+- J4 #134 — SUCCESS
+- Governance #537 — SUCCESS
 
-- Android CI #2356 — SUCCESS;
-- J1 Assistant Test #465 — SUCCESS;
-- J2 Voice Test #361 — SUCCESS;
-- J3 Neural TTS Test #183 — SUCCESS;
-- J4 Local LLM Test #134 — SUCCESS;
-- Project Governance #537 — SUCCESS.
+This remains the immutable rollback point while J4 quality and J5 launcher work advance.
 
-Android CI #2356 passed serial governed variant compilation, complete debug unit tests, all governed lint variants, Personal Alpha package/audit, minified Release/R8 package/audit, FullTest package/audit and isolated DocumentTest package/audit.
+## J4 quality engineering checkpoint
 
-J4 #134 passed pinned LiteRT-LM 0.15.0 provenance/hash/classfile checks, Maven-transitive isolation, isolated compile, generated Room JSON validation, focused local-model/learning tests, lint, J4 APK assembly, zero-permission/component/runtime audit and artifact upload.
+Source: `862450933da3700d4d1559e09ebde910a4185914`
+Backup: `backup/j4-quality-harness-ci-green-2026-08-05`
 
-J4 runtime APK artifact ID: `8917566340`.
-J4 audit artifact ID: `8917567141`.
+Automated evidence:
+- Android CI #2364 — SUCCESS
+- J1 #473 — SUCCESS
+- J2 #369 — SUCCESS
+- J3 #191 — SUCCESS
+- J4 #142 — SUCCESS
+- Governance #545 — SUCCESS
 
-## Why the J4 red head happened and why it is considered repaired
+J4 #142 adds longer Hindi/Hinglish/English prompts, safety/uncertainty prompts, 10-prompt sequential stress, response character/approximate-token metrics, total latency/rough throughput estimates, localbrain PSS + Java/native heap telemetry, manual metrics capture and process-bounded cancellation/rebind.
 
-The earlier failure was not a LiteRT-LM runtime incompatibility. Room/KSP variants shared `app/schemas`, and concurrent variant compilation could expose truncated or empty schema JSON to another Room processor. The same pattern reproduced under FullTest in Android CI.
+J4 runtime APK artifact ID: `8918003689`.
+J4 audit artifact ID: `8918004266`.
 
-Repair:
+Physical Motorola quality evidence is still pending. The model is not yet promoted as Mayra's production conversational brain.
 
-- J4 compile/test/lint/assemble split into isolated Gradle invocations;
-- transient Room schema output reset before isolated variant work;
-- explicit JSON parser validation after J4 compile;
-- shared Android CI governed variants serialized to avoid concurrent Room schema writes.
+## J5 launcher foundation now in source
 
-The exact recovery source above passed all major CI regressions, so this failure class is closed at the automated-build level unless reproduced again.
+The development branch now includes a separate `MayraLauncherActivity` and HOME intent surface.
+
+First slice includes:
+- `MAIN + HOME + DEFAULT` Home qualification;
+- Android `ROLE_HOME` user-consent request where available;
+- searchable launchable-app list;
+- direct app launch;
+- bridge into normal Mayra (`Ask Mayra`);
+- explicit Android Home-settings switch/restore route;
+- launcher rendering kept independent from local model, provider, memory and privileged action startup.
+
+This is implementation evidence only until fresh CI and Motorola device acceptance pass. No J5 device-success claim exists yet.
 
 ## Physical Motorola evidence preserved
 
-Motorola Edge 70 Fusion / Android 16 evidence already proves:
+Already proven on Motorola Edge 70 Fusion / Android 16:
+- Android Digital Assistant selection/invocation;
+- offline Hindi/Hinglish/English recognition and privacy/lifecycle foundations;
+- J3 neural-TTS technical benchmark pass, with tested voice license blocked for production;
+- Gemma3-1B model import/private SHA verification;
+- LiteRT-LM CPU Stage 5/5 initialization;
+- fixed multilingual generation;
+- isolated localbrain close/reload while outer UI survives.
 
-- Mayra selectable/invokable as Android Digital Assistant;
-- offline Hindi/Hinglish/English recognition and lock/privacy foundation;
-- J3 offline neural-TTS technical benchmark pass, with tested Priyamvada pack still production-license blocked;
-- Gemma3-1B `.litertlm` import + private-storage SHA verification;
-- LiteRT-LM 0.15.0 CPU engine initialization to Stage 5/5;
-- fixed Hindi/Hinglish/English local generation;
-- isolated `:localbrain` close/reload and launcher/test-activity survival.
+## Immediate physical gates
 
-The current local model is **not yet promoted as Mayra's production conversational brain**. Fixed prompts prove execution, not sufficient assistant quality. Hinglish quality in the first benchmark was weak.
+### J4 #142
+1. quality prompts;
+2. RAM metrics before/after load and generation;
+3. 10-prompt stress;
+4. cancellation + fresh rebind + reinitialize;
+5. five close/reload cycles;
+6. background/lock/process recovery;
+7. Airplane-mode repeat;
+8. battery/thermal observations.
 
-## Active J4 quality/operability gate
+### J5
+1. install fresh CI/owner APK;
+2. select Mayra as default Home;
+3. Home gesture/button returns to Mayra;
+4. app drawer/search and app launching work;
+5. reboot preserves usable Home behavior;
+6. switch/restore previous Home works;
+7. local-model/provider failure does not break Home/app access.
 
-Before J4 production-brain promotion or J5 dependency on local AI, complete:
+## Jarvis phases
 
-1. longer useful Hindi/Hinglish/English prompts;
-2. output character/approximate token metrics;
-3. total generation timing and defensible decode estimate;
-4. local-brain RAM before load / after load / during or after generation / after close;
-5. explicit cancel-generation control and recovery;
-6. 10 sequential prompts;
-7. 5 close/reload cycles;
-8. background, screen-lock and process-kill recovery;
-9. Airplane-mode repeat;
-10. owner-observed battery/thermal behavior.
+- J5 Launcher/Home
+- J6 Context Fabric
+- J7 Trust/Action Orchestration
+- J8 Proactive Mayra
+- J9 Multimodal Mayra
+- J10 Owner-defined Routines
 
-J5 launcher work may begin only after the chosen J4 gate is recorded without weakening launcher reliability. The launcher must remain fully usable with local AI missing, corrupt, killed or disabled.
+## Trust boundaries
 
-## Jarvis execution phases
-
-- J5 — AI-native launcher/Home shell;
-- J6 — provenance-aware typed context fabric;
-- J7 — GREEN/AMBER/RED trust/action orchestration;
-- J8 — proactive My Day/pending-item intelligence;
-- J9 — multimodal Mayra;
-- J10 — owner-defined routines.
-
-## Non-negotiable trust boundaries
-
-- launcher is the Home shell, not privileged action authority;
-- heavy AI/model/provider failure never makes Home unusable;
-- local LLM text never directly executes calls/messages/device actions;
-- local LLM text never directly writes owner memory;
-- trusted memory/document/context provenance stays structured;
-- confirmations stay typed, action-bound and expiring;
-- local mode never silently sends owner context to a network;
-- previous/default launcher remains restorable;
-- no Play Protect/security/signing bypass;
-- no device-success claim without Motorola evidence;
-- PR #12 remains Draft/open/unmerged until explicit owner approval.
-
-## Baseline discipline
-
-Material direction changes receive immutable planning snapshots. Exact-green major milestones receive immutable milestone snapshots plus protected `baseline/*` recovery branches. A pending/red head is never called stable. New risky work must preserve a known rollback point.
+- no free-form LLM privileged execution;
+- no direct LLM trusted-memory writes;
+- structured provenance for memory/documents/context;
+- typed/action-bound/expiring confirmations;
+- no silent cloud use in local mode;
+- no security/Play Protect/signing bypass;
+- default Home remains restorable;
+- no device claim without Motorola evidence;
+- PR #12 stays Draft/open/unmerged until explicit owner approval.
 
 ## Immediate next action
 
-Instrument and validate the J4 quality/operability benchmark while preserving the exact green recovery baseline. After that, synchronize evidence and begin J5 launcher implementation with HOME selection, app drawer/search, app launch, switch-back and AI-failure survival as the first acceptance slice.
+Run fresh CI for the J5 launcher source. If green, preserve that exact source as an engineering checkpoint, then perform Motorola J4-quality and J5-HOME acceptance before deeper voice/context/action integration.
