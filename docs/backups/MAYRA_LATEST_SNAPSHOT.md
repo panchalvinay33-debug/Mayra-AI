@@ -4,13 +4,11 @@ Snapshot date: 2026-08-05
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: repair current J4 CI red head, then complete J4 green recovery baseline before J5 AI-native launcher implementation.
+Current phase: J4 CI recovery is green and protected; complete J4 quality/operability device gate, then start J5 AI-native launcher implementation from a known recovery point.
 
 ## Canonical product direction
 
-Mayra is now explicitly targeting a practical **Jarvis-style personal Android operating layer**.
-
-The final product combines:
+Mayra is targeting a practical **Jarvis-style personal Android operating layer** combining:
 
 - Android Digital Assistant / voice presence;
 - local-first conversational brain with deterministic fallback;
@@ -22,126 +20,105 @@ The final product combines:
 - later multimodal understanding and owner-defined routines through separate gates.
 
 Canonical plan: `docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md`
-Decision: `docs/decisions/ADR_033_AI_NATIVE_LAUNCHER_AND_MAJOR_STEP_BASELINES.md`
-Immutable planning snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_JARVIS_LAUNCHER_DIRECTION.md`
+Launcher decision: `docs/decisions/ADR_033_AI_NATIVE_LAUNCHER_AND_MAJOR_STEP_BASELINES.md`
+Room/KSP recovery decision: `docs/decisions/ADR_034_ROOM_SCHEMA_ISOLATION_FOR_MULTI_VARIANT_CI.md`
+Jarvis planning snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_JARVIS_LAUNCHER_DIRECTION.md`
+J4 recovery snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_J4_CI_RECOVERY_GREEN.md`
 
-## Canonical truth
+## Current protected recovery point
 
-- Final product remains one Mayra app plus one AI-native launcher/Home shell; J1/J2/J3/J4 and future isolated engineering packages are test/proof packages only.
-- The launcher is Mayra's Home surface, not the privileged action authority.
-- Heavy AI/model/provider failure must not make Home unusable.
-- PR #12 is not authorized for merge/ready.
-- Protected `baseline/*` branches are immutable exact-green recovery markers.
-- Planning/failure snapshots are not green application baselines.
-- Device capability claims require Motorola evidence.
-- Android offline TTS remains the production-safe speech fallback until a license-clear neural voice is selected.
-- Free-form LLM output never directly executes privileged actions or writes trusted owner memory/context.
+`baseline/mayra-0.2.1-j4-ci-recovery-green-134`
 
-## Latest protected application baseline
+Exact source: `e72488a6f6dceb24950f9b0f574ae223d52bd8bb`
+Backup ref: `backup/j4-ci-recovery-2026-08-05`
 
-`baseline/mayra-0.2.1-j2-privacy-tts-green-136`
+Exact-head automated evidence:
 
-- source `ef179cf4cb2395af2647be21dbacea6fb3c7cb62`
-- J2 #136 / J1 #239 / Android CI #2131 / Governance #312: success
-- artifact `mayra-j2-voice-apk-136`, ID `8868518898`
-- APK SHA-256 `b2d129b2b40d8c2aef7eef21f1acf087daf0600224fd5ce4366b38f4aefad1d0`
+- Android CI #2356 — SUCCESS;
+- J1 Assistant Test #465 — SUCCESS;
+- J2 Voice Test #361 — SUCCESS;
+- J3 Neural TTS Test #183 — SUCCESS;
+- J4 Local LLM Test #134 — SUCCESS;
+- Project Governance #537 — SUCCESS.
 
-## Motorola voice evidence
+Android CI #2356 passed serial governed variant compilation, complete debug unit tests, all governed lint variants, Personal Alpha package/audit, minified Release/R8 package/audit, FullTest package/audit and isolated DocumentTest package/audit.
 
-Physically proven:
+J4 #134 passed pinned LiteRT-LM 0.15.0 provenance/hash/classfile checks, Maven-transitive isolation, isolated compile, generated Room JSON validation, focused local-model/learning tests, lint, J4 APK assembly, zero-permission/component/runtime audit and artifact upload.
 
-- Android Digital assistant selection and Power-button invocation;
-- offline Hindi/Hinglish/English recognition;
-- direct dismissal paths and 20-cycle stability;
-- already-locked invocation;
-- reboot/no-speech/rapid-interaction checks reported OK;
-- Android offline TTS speaks but sounds robotic to owner.
+J4 runtime APK artifact ID: `8917566340`.
+J4 audit artifact ID: `8917567141`.
 
-## J3 neural voice milestone
+## Why the J4 red head happened and why it is considered repaired
 
-Passing source: `1ed0cd3e8d9ebe7671f3027fe0ab85b41da0294a`
+The earlier failure was not a LiteRT-LM runtime incompatibility. Room/KSP variants shared `app/schemas`, and concurrent variant compilation could expose truncated or empty schema JSON to another Room processor. The same pattern reproduced under FullTest in Android CI.
 
-- J3 #29 / Android CI #2202 / J2 #207 / J1 #311 / Governance #383: success;
-- app-private model materialization: PASS;
-- sherpa native constructor/model load/synthesis/playback: PASS;
-- sample RTF: 0.72;
-- all six phrases reported fine, phrase #1 preferred;
-- Airplane mode / Stop cleanup / 20-reply stability reported pass.
+Repair:
 
-The Priyamvada voice remains benchmark-only because its model-card dataset terms are not production-cleared. Keep system TTS fallback and reuse J3 architecture only with a license-clear voice pack.
+- J4 compile/test/lint/assemble split into isolated Gradle invocations;
+- transient Room schema output reset before isolated variant work;
+- explicit JSON parser validation after J4 compile;
+- shared Android CI governed variants serialized to avoid concurrent Room schema writes.
 
-## J4 local brain — current exact-head truth
+The exact recovery source above passed all major CI regressions, so this failure class is closed at the automated-build level unless reproduced again.
 
-J4 has accumulated model import/integrity, isolated local-brain and LiteRT-LM provenance work. However the latest inspected PR head before this documentation synchronization had one failing workflow:
+## Physical Motorola evidence preserved
 
-- **J4 Local LLM Test — failure**;
-- Android CI — success;
-- J1 Assistant Test — success;
-- J2 Voice Test — success;
-- J3 Neural TTS Test — success;
-- Project Governance — success.
+Motorola Edge 70 Fusion / Android 16 evidence already proves:
 
-Failure root cause observed in the J4 job:
+- Mayra selectable/invokable as Android Digital Assistant;
+- offline Hindi/Hinglish/English recognition and lock/privacy foundation;
+- J3 offline neural-TTS technical benchmark pass, with tested Priyamvada pack still production-license blocked;
+- Gemma3-1B `.litertlm` import + private-storage SHA verification;
+- LiteRT-LM 0.15.0 CPU engine initialization to Stage 5/5;
+- fixed Hindi/Hinglish/English local generation;
+- isolated `:localbrain` close/reload and launcher/test-activity survival.
 
-- LiteRT-LM Android 0.15.0 AAR download and SHA-256 verification passed;
-- classfile probe passed (`Engine.class`, Java 21 classfile major 65);
-- compile classpath isolation check passed;
-- `kspJ4LocalLlmTestKotlin` failed when Room/KSP deserialized a truncated schema JSON;
-- error: `Expected colon ':', but had 'EOF'` with JSON input ending after `"formatVersion"`.
+The current local model is **not yet promoted as Mayra's production conversational brain**. Fixed prompts prove execution, not sufficient assistant quality. Hinglish quality in the first benchmark was weak.
 
-Conclusion: this is a localized Room/KSP schema-data/build failure in the current head, not evidence that the LiteRT-LM AAR probe itself failed. The head remains red and must not be promoted.
+## Active J4 quality/operability gate
 
-## Major-step baseline discipline
+Before J4 production-brain promotion or J5 dependency on local AI, complete:
 
-Before every major capability:
+1. longer useful Hindi/Hinglish/English prompts;
+2. output character/approximate token metrics;
+3. total generation timing and defensible decode estimate;
+4. local-brain RAM before load / after load / during or after generation / after close;
+5. explicit cancel-generation control and recovery;
+6. 10 sequential prompts;
+7. 5 close/reload cycles;
+8. background, screen-lock and process-kill recovery;
+9. Airplane-mode repeat;
+10. owner-observed battery/thermal behavior.
 
-1. Idea Ledger update;
-2. ADR/decision;
-3. Blueprint update;
-4. Roadmap gate;
-5. preflight/test contract where needed;
-6. rollback point;
-7. immutable planning snapshot for material direction changes.
+J5 launcher work may begin only after the chosen J4 gate is recorded without weakening launcher reliability. The launcher must remain fully usable with local AI missing, corrupt, killed or disabled.
 
-After implementation becomes exact-green:
+## Jarvis execution phases
 
-1. all applicable CI/lint/unit/package/permission/component audits;
-2. Motorola evidence for device claims;
-3. Changelog + Latest Snapshot + test evidence synchronization;
-4. immutable milestone snapshot;
-5. protected `baseline/*` branch on the exact green commit;
-6. next risky phase recorded.
+- J5 — AI-native launcher/Home shell;
+- J6 — provenance-aware typed context fabric;
+- J7 — GREEN/AMBER/RED trust/action orchestration;
+- J8 — proactive My Day/pending-item intelligence;
+- J9 — multimodal Mayra;
+- J10 — owner-defined routines.
 
-## Jarvis phases accepted
+## Non-negotiable trust boundaries
 
-- J5 AI-native launcher shell;
-- J6 provenance-aware context fabric;
-- J7 GREEN/AMBER/RED trust/action orchestration;
-- J8 proactive My Day/pending-item intelligence;
-- J9 multimodal Mayra;
-- J10 owner-defined routines.
+- launcher is the Home shell, not privileged action authority;
+- heavy AI/model/provider failure never makes Home unusable;
+- local LLM text never directly executes calls/messages/device actions;
+- local LLM text never directly writes owner memory;
+- trusted memory/document/context provenance stays structured;
+- confirmations stay typed, action-bound and expiring;
+- local mode never silently sends owner context to a network;
+- previous/default launcher remains restorable;
+- no Play Protect/security/signing bypass;
+- no device-success claim without Motorola evidence;
+- PR #12 remains Draft/open/unmerged until explicit owner approval.
 
-None of these should be stacked on the current red J4 head.
+## Baseline discipline
 
-## Immediate next gate
+Material direction changes receive immutable planning snapshots. Exact-green major milestones receive immutable milestone snapshots plus protected `baseline/*` recovery branches. A pending/red head is never called stable. New risky work must preserve a known rollback point.
 
-1. repair the Room/KSP truncated-schema failure;
-2. restore exact-head J4 + J1/J2/J3/Android/Governance green;
-3. complete J4 longer-output/cancel/RAM/thermal/background/lock/Airplane regressions;
-4. synchronize evidence and create a protected J4 recovery baseline only from exact green;
-5. then begin J5 launcher preflight and isolated implementation;
-6. prove default HOME selection, Home-button return, reboot persistence, app drawer/search, launcher switch-back and model/crash failure survival on Motorola.
+## Immediate next action
 
-## Trust boundary
-
-- local LLM never directly executes calls/messages/device actions;
-- local LLM never directly writes owner memory;
-- context provenance remains structured;
-- confirmation tokens remain typed/action-bound/expiring;
-- local mode never silently sends owner context to network;
-- missing/corrupt/killed local model falls back to deterministic Mayra;
-- launcher remains usable when heavy AI is unavailable.
-
-## Distribution truth
-
-Hosted CI debug signatures may conflict. Stable owner signing/trusted distribution remains required. Never bypass Play Protect or Android security.
+Instrument and validate the J4 quality/operability benchmark while preserving the exact green recovery baseline. After that, synchronize evidence and begin J5 launcher implementation with HOME selection, app drawer/search, app launch, switch-back and AI-failure survival as the first acceptance slice.
