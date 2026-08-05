@@ -1,7 +1,7 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: **DEVICE VERIFY IN PROGRESS — DEFAULT HOME + SEARCH/LAUNCH/HOME RETURN + LOCK/REBOOT PERSISTENCE PROVEN**
+Status: **DEVICE VERIFY IN PROGRESS — CORE DAILY LOOP + LOCK/REBOOT + SWITCH-BACK PROVEN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
 ## Exact artifact identity
@@ -31,9 +31,13 @@ Owner-supplied screenshots / explicit owner confirmation prove:
 7. Pressing Home after Chrome returns to Mayra Home with the search state still visible.
 8. Locking and unlocking the phone returns to a usable Mayra Home state.
 9. Restarting/rebooting the phone preserves Mayra as the Home experience after unlock; owner reports Mayra remains on Home and works normally.
-10. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
+10. `Switch / restore Home app` / Android Home settings allows easy selection of the previous launcher.
+11. Switching away from Mayra works normally and does not trap the owner.
+12. Switching back to `Mayra AI Personal Alpha` works normally and restores Mayra Home.
+13. Owner reports the selected launcher is otherwise functioning normally in day-to-day use.
+14. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
 
-This proves the core daily launcher loop plus lock/unlock and reboot persistence. Repeated formal 20/20 Home returns, switch-back, failure-independence, assistant coexistence, refresh/install-change behavior and resource behavior remain pending.
+This proves the core daily launcher loop plus lock/unlock, reboot persistence and safe launcher switching. Repeated formal 20/20 Home returns, broader search/refresh checks, failure-independence, assistant coexistence, force-stop recovery and resource behavior remain pending.
 
 ## Installation precheck
 
@@ -85,10 +89,10 @@ Deeper voice/orb integration into Home is intentionally a later J5 slice after b
 
 ## E. Recovery / switch-back
 
-- [ ] `Switch / restore Home app` opens Android Home settings.
-- [ ] Previous launcher can be selected again.
-- [ ] Switching away does not delete Mayra data.
-- [ ] Switching back to Mayra works.
+- [x] `Switch / restore Home app` opens Android Home settings / equivalent Home-app selector path.
+- [x] Previous launcher can be selected again.
+- [x] Switching away does not delete Mayra data or trap the owner.
+- [x] Switching back to Mayra works and restores Mayra Home.
 - [ ] Force-stop/restart does not trap the owner.
 - [ ] A launcher activity/process failure recovers to a selectable usable Home path.
 
