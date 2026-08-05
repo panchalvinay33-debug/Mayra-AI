@@ -8,11 +8,17 @@ required_files=(
   "START_HERE.md"
   "README.md"
   "docs/MAYRA_BLUEPRINT.md"
+  "docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md"
+  "docs/MAYRA_BLUEPRINT_JARVIS_LAUNCHER_ADDENDUM.md"
   "docs/MAYRA_ROADMAP.md"
   "docs/backups/MAYRA_LATEST_SNAPSHOT.md"
   "docs/MAYRA_IDEA_LEDGER.md"
   "docs/MAYRA_DECISIONS.md"
   "docs/MAYRA_CHANGELOG.md"
+  "docs/MAYRA_TEST_MATRIX.md"
+  "docs/MAYRA_BASELINE_AND_ROLLBACK.md"
+  "docs/feasibility/MAYRA_J5_LAUNCHER_PREFLIGHT.md"
+  "docs/testing/MAYRA_J5_LAUNCHER_MOTOROLA_ACCEPTANCE.md"
   "docs/MAYRA_FULL_APP_ACCEPTANCE.md"
   "docs/BLUEPRINT_UPDATE_POLICY.md"
 )
@@ -28,15 +34,21 @@ done
 
 # START_HERE is deliberately validated as the stable project entry point.
 grep -Fq "# Mayra AI — START HERE" START_HERE.md || fail "START_HERE.md has no canonical title"
-grep -Fq "## 5. Mandatory resume procedure" START_HERE.md || fail "START_HERE.md has no resume procedure"
+# Section numbers may move as the entry record grows; the semantic heading must remain.
+grep -Eq '^## [0-9]+\. Mandatory resume procedure$' START_HERE.md || fail "START_HERE.md has no resume procedure"
+grep -Eq '^## [0-9]+\. Mandatory completion procedure$' START_HERE.md || fail "START_HERE.md has no completion procedure"
+grep -Fq "docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md" START_HERE.md || fail "START_HERE.md does not link the Jarvis/Launcher master plan"
 grep -Fq "docs/MAYRA_BLUEPRINT.md" START_HERE.md || fail "START_HERE.md does not link the blueprint"
 grep -Fq "docs/MAYRA_ROADMAP.md" START_HERE.md || fail "START_HERE.md does not link the roadmap"
 grep -Fq "docs/backups/MAYRA_LATEST_SNAPSHOT.md" START_HERE.md || fail "START_HERE.md does not link the rolling snapshot"
 
 grep -Fq "## Product vision" docs/MAYRA_BLUEPRINT.md || fail "blueprint has no product vision"
+grep -Fq "## North star" docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md || fail "Jarvis/Launcher master plan has no north star"
 grep -Fq "## Overall program view" docs/MAYRA_ROADMAP.md || fail "roadmap has no overall program view"
 grep -Fq "## Active ideas" docs/MAYRA_IDEA_LEDGER.md || fail "idea ledger has no active ideas section"
 grep -Fq "## ADR-" docs/MAYRA_DECISIONS.md || fail "decision log has no ADR entries"
+grep -Fq "J5" docs/feasibility/MAYRA_J5_LAUNCHER_PREFLIGHT.md || fail "J5 launcher preflight is malformed"
+grep -Fq "J5" docs/testing/MAYRA_J5_LAUNCHER_MOTOROLA_ACCEPTANCE.md || fail "J5 Motorola acceptance record is malformed"
 
 # Ensure no secrets or private signing materials were accidentally placed in governance records.
 if grep -Eir --include='*.md' \
@@ -82,12 +94,12 @@ for file in "${changed_files[@]}"; do
       ;;
   esac
   case "$file" in
-    app/src/main/AndroidManifest.xml|app/build.gradle.kts|app/src/main/java/ai/mayra/app/MayraApplication.kt|app/src/main/java/ai/mayra/app/core/*|app/src/main/java/ai/mayra/app/assistant/*|app/src/main/java/ai/mayra/app/call/*|app/src/main/java/ai/mayra/app/background/*)
+    app/src/main/AndroidManifest.xml|app/build.gradle.kts|app/src/main/java/ai/mayra/app/MayraApplication.kt|app/src/main/java/ai/mayra/app/core/*|app/src/main/java/ai/mayra/app/assistant/*|app/src/main/java/ai/mayra/app/call/*|app/src/main/java/ai/mayra/app/background/*|app/src/main/java/ai/mayra/app/launcher/*)
       architecture_change=true
       ;;
   esac
   case "$file" in
-    app/src/main/java/ai/mayra/app/assistant/*|app/src/main/java/ai/mayra/app/call/*|app/src/main/java/ai/mayra/app/reminder/*|app/src/main/java/ai/mayra/app/memory/*|app/src/main/java/ai/mayra/app/document/*)
+    app/src/main/java/ai/mayra/app/assistant/*|app/src/main/java/ai/mayra/app/call/*|app/src/main/java/ai/mayra/app/reminder/*|app/src/main/java/ai/mayra/app/memory/*|app/src/main/java/ai/mayra/app/document/*|app/src/main/java/ai/mayra/app/launcher/*)
       idea_sensitive_change=true
       ;;
   esac
