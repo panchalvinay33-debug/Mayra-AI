@@ -16,7 +16,7 @@ concurrency:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
 
     steps:
       - name: Checkout
@@ -36,28 +36,61 @@ jobs:
       - name: Prepare CI diagnostics
         run: mkdir -p build/ci
 
-      - name: Compile debug, personal-alpha and full-test sources
+      - name: Compile governed variants with isolated Room schema output
         shell: bash
         run: |
-          set -o pipefail
-          gradle --no-daemon :app:compileDebugKotlin :app:compilePersonalAlphaKotlin :app:compileFullTestKotlin --stacktrace --console=plain 2>&1 | tee build/ci/compile.log
+          set -euo pipefail
+          variants=(Debug PersonalAlpha FullTest)
+          for variant in "${variants[@]}"; do
+            rm -rf app/schemas
+            mkdir -p app/schemas
+            echo "=== compile${variant}Kotlin ===" | tee -a build/ci/compile.log
+            gradle --no-daemon ":app:compile${variant}Kotlin" --stacktrace --console=plain 2>&1 | tee -a build/ci/compile.log
+            python3 - <<'PY' | tee -a build/ci/room-schema-validation.log
+          import json
+          from pathlib import Path
+          root = Path('app/schemas')
+          files = sorted(root.rglob('*.json')) if root.exists() else []
+          for path in files:
+              raw = path.read_text(encoding='utf-8')
+              if not raw.strip():
+                  raise SystemExit(f'Empty Room schema file: {path}')
+              try:
+                  data = json.loads(raw)
+              except Exception as exc:
+                  raise SystemExit(f'Invalid Room schema JSON {path}: {exc}')
+              if not isinstance(data, dict):
+                  raise SystemExit(f'Room schema root must be an object: {path}')
+              print(f'VALID {path} bytes={len(raw.encode("utf-8"))}')
+          PY
+          done
 
       - name: Run complete unit-test suite
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
           gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee build/ci/unit-tests.log
 
-      - name: Run Android lint
+      - name: Run Android lint with isolated Room schema output
         shell: bash
         run: |
-          set -o pipefail
-          gradle --no-daemon :app:lintDebug :app:lintPersonalAlpha :app:lintFullTest :app:lintRelease :app:lintDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/lint.log
+          set -euo pipefail
+          variants=(Debug PersonalAlpha FullTest Release DocumentTest)
+          for variant in "${variants[@]}"; do
+            rm -rf app/schemas
+            mkdir -p app/schemas
+            echo "=== lint${variant} ===" | tee -a build/ci/lint.log
+            gradle --no-daemon ":app:lint${variant}" --stacktrace --console=plain 2>&1 | tee -a build/ci/lint.log
+          done
 
       - name: Assemble Personal Alpha APK
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
           gradle --no-daemon :app:assemblePersonalAlpha --stacktrace --console=plain 2>&1 | tee build/ci/assemble-personal-alpha.log
 
       - name: Verify Personal Alpha APK manifest and permissions
@@ -68,71 +101,29 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
           test -x "$AAPT"
-
           "$AAPT" dump permissions "$APK" | tee build/ci/personal-alpha-permissions.log
           "$AAPT" dump badging "$APK" | tee build/ci/personal-alpha-badging.log
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/personal-alpha-manifest-tree.log
-
           grep -Fq "package: name='ai.mayra.app.alpha'" build/ci/personal-alpha-badging.log
           grep -Fq "application-label:'Mayra AI Personal Alpha'" build/ci/personal-alpha-badging.log
-
           launcher_count="$(grep -c '^launchable-activity:' build/ci/personal-alpha-badging.log || true)"
-          if [ "$launcher_count" -ne 1 ]; then
-            echo "Personal Alpha APK must expose exactly one launchable activity; found $launcher_count" >&2
-            exit 1
-          fi
+          test "$launcher_count" -eq 1
           grep -Fq "launchable-activity: name='ai.mayra.app.MainActivity'" build/ci/personal-alpha-badging.log
-
-          required_permissions=(
-            android.permission.INTERNET
-            android.permission.RECORD_AUDIO
-            android.permission.READ_CONTACTS
-            android.permission.POST_NOTIFICATIONS
-            android.permission.RECEIVE_BOOT_COMPLETED
-          )
-          for permission in "${required_permissions[@]}"; do
-            if ! grep -Fq "$permission" build/ci/personal-alpha-permissions.log; then
-              echo "Personal Alpha APK is missing required capability permission: $permission" >&2
-              exit 1
-            fi
-          done
-
-          forbidden_permissions=(
-            android.permission.CALL_PHONE
-            android.permission.SEND_SMS
-            android.permission.READ_SMS
-            android.permission.RECEIVE_SMS
-            android.permission.WRITE_CONTACTS
-            android.permission.SCHEDULE_EXACT_ALARM
-            android.permission.REQUEST_INSTALL_PACKAGES
-            android.permission.SYSTEM_ALERT_WINDOW
-          )
+          required_permissions=(android.permission.INTERNET android.permission.RECORD_AUDIO android.permission.READ_CONTACTS android.permission.POST_NOTIFICATIONS android.permission.RECEIVE_BOOT_COMPLETED)
+          for permission in "${required_permissions[@]}"; do grep -Fq "$permission" build/ci/personal-alpha-permissions.log; done
+          forbidden_permissions=(android.permission.CALL_PHONE android.permission.SEND_SMS android.permission.READ_SMS android.permission.RECEIVE_SMS android.permission.WRITE_CONTACTS android.permission.SCHEDULE_EXACT_ALARM android.permission.REQUEST_INSTALL_PACKAGES android.permission.SYSTEM_ALERT_WINDOW)
           for permission in "${forbidden_permissions[@]}"; do
-            if grep -Fq "$permission" build/ci/personal-alpha-permissions.log; then
-              echo "Personal Alpha APK unexpectedly requests high-risk permission: $permission" >&2
-              exit 1
-            fi
+            if grep -Fq "$permission" build/ci/personal-alpha-permissions.log; then echo "Personal Alpha unexpectedly requests $permission" >&2; exit 1; fi
           done
-
-          required_components=(
-            ai.mayra.app.MainActivity
-            ai.mayra.app.MayraApplication
-            ai.mayra.app.document.MayraDocumentActivity
-            ai.mayra.app.memory.MayraMemoryCenterActivity
-            ai.mayra.app.core.MayraProviderSettingsActivity
-            ai.mayra.app.core.MayraActivityHistoryActivity
-            ai.mayra.app.background.MayraBootReceiver
-            ai.mayra.app.background.MayraNotificationListener
-            ai.mayra.app.reminder.MayraReminderActionReceiver
-          )
-          for component in "${required_components[@]}"; do
-            grep -Fq "$component" build/ci/personal-alpha-manifest-tree.log
-          done
+          required_components=(ai.mayra.app.MainActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity ai.mayra.app.background.MayraBootReceiver ai.mayra.app.background.MayraNotificationListener ai.mayra.app.reminder.MayraReminderActionReceiver)
+          for component in "${required_components[@]}"; do grep -Fq "$component" build/ci/personal-alpha-manifest-tree.log; done
 
       - name: Assemble minified final release candidate
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
           gradle --no-daemon :app:assembleRelease --stacktrace --console=plain 2>&1 | tee build/ci/assemble-release.log
 
       - name: Verify final release candidate manifest and permissions
@@ -144,75 +135,30 @@ jobs:
           test -n "$APK"
           test -x "$AAPT"
           test -f app/build/outputs/mapping/release/mapping.txt
-
           "$AAPT" dump permissions "$APK" | tee build/ci/release-permissions.log
           "$AAPT" dump badging "$APK" | tee build/ci/release-badging.log
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/release-manifest-tree.log
-
           grep -Fq "package: name='ai.mayra.app'" build/ci/release-badging.log
           grep -Fq "application-label:'Mayra AI'" build/ci/release-badging.log
-          if grep -Fq "application-debuggable" build/ci/release-badging.log; then
-            echo "Final release candidate must not be debuggable" >&2
-            exit 1
-          fi
-
+          if grep -Fq "application-debuggable" build/ci/release-badging.log; then echo "Final release candidate must not be debuggable" >&2; exit 1; fi
           launcher_count="$(grep -c '^launchable-activity:' build/ci/release-badging.log || true)"
-          if [ "$launcher_count" -ne 1 ]; then
-            echo "Final release candidate must expose exactly one launchable activity; found $launcher_count" >&2
-            exit 1
-          fi
+          test "$launcher_count" -eq 1
           grep -Fq "launchable-activity: name='ai.mayra.app.MainActivity'" build/ci/release-badging.log
-
-          required_permissions=(
-            android.permission.INTERNET
-            android.permission.RECORD_AUDIO
-            android.permission.READ_CONTACTS
-            android.permission.POST_NOTIFICATIONS
-            android.permission.RECEIVE_BOOT_COMPLETED
-          )
-          for permission in "${required_permissions[@]}"; do
-            if ! grep -Fq "$permission" build/ci/release-permissions.log; then
-              echo "Final release candidate is missing required capability permission: $permission" >&2
-              exit 1
-            fi
-          done
-
-          forbidden_permissions=(
-            android.permission.CALL_PHONE
-            android.permission.SEND_SMS
-            android.permission.READ_SMS
-            android.permission.RECEIVE_SMS
-            android.permission.WRITE_CONTACTS
-            android.permission.SCHEDULE_EXACT_ALARM
-            android.permission.REQUEST_INSTALL_PACKAGES
-            android.permission.SYSTEM_ALERT_WINDOW
-          )
+          required_permissions=(android.permission.INTERNET android.permission.RECORD_AUDIO android.permission.READ_CONTACTS android.permission.POST_NOTIFICATIONS android.permission.RECEIVE_BOOT_COMPLETED)
+          for permission in "${required_permissions[@]}"; do grep -Fq "$permission" build/ci/release-permissions.log; done
+          forbidden_permissions=(android.permission.CALL_PHONE android.permission.SEND_SMS android.permission.READ_SMS android.permission.RECEIVE_SMS android.permission.WRITE_CONTACTS android.permission.SCHEDULE_EXACT_ALARM android.permission.REQUEST_INSTALL_PACKAGES android.permission.SYSTEM_ALERT_WINDOW)
           for permission in "${forbidden_permissions[@]}"; do
-            if grep -Fq "$permission" build/ci/release-permissions.log; then
-              echo "Final release candidate unexpectedly requests high-risk permission: $permission" >&2
-              exit 1
-            fi
+            if grep -Fq "$permission" build/ci/release-permissions.log; then echo "Final release candidate unexpectedly requests $permission" >&2; exit 1; fi
           done
-
-          required_components=(
-            ai.mayra.app.MainActivity
-            ai.mayra.app.MayraApplication
-            ai.mayra.app.document.MayraDocumentActivity
-            ai.mayra.app.memory.MayraMemoryCenterActivity
-            ai.mayra.app.core.MayraProviderSettingsActivity
-            ai.mayra.app.core.MayraActivityHistoryActivity
-            ai.mayra.app.background.MayraBootReceiver
-            ai.mayra.app.background.MayraNotificationListener
-            ai.mayra.app.reminder.MayraReminderActionReceiver
-          )
-          for component in "${required_components[@]}"; do
-            grep -Fq "$component" build/ci/release-manifest-tree.log
-          done
+          required_components=(ai.mayra.app.MainActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity ai.mayra.app.background.MayraBootReceiver ai.mayra.app.background.MayraNotificationListener ai.mayra.app.reminder.MayraReminderActionReceiver)
+          for component in "${required_components[@]}"; do grep -Fq "$component" build/ci/release-manifest-tree.log; done
 
       - name: Assemble full Mayra test APK
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
           gradle --no-daemon :app:assembleFullTest --stacktrace --console=plain 2>&1 | tee build/ci/assemble-full-test.log
 
       - name: Verify full Mayra test APK manifest and permissions
@@ -223,65 +169,32 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
           test -x "$AAPT"
-
           "$AAPT" dump permissions "$APK" | tee build/ci/full-test-permissions.log
           "$AAPT" dump badging "$APK" | tee build/ci/full-test-badging.log
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/full-test-manifest-tree.log
-
           grep -Fq "package: name='ai.mayra.app.fulltest'" build/ci/full-test-badging.log
           grep -Fq "application-label:'Mayra AI Full Test'" build/ci/full-test-badging.log
           grep -Fq "android.permission.RECORD_AUDIO" build/ci/full-test-permissions.log
-
           launcher_count="$(grep -c '^launchable-activity:' build/ci/full-test-badging.log || true)"
-          if [ "$launcher_count" -ne 1 ]; then
-            echo "Full-test APK must expose exactly one launchable activity; found $launcher_count" >&2
-            exit 1
-          fi
+          test "$launcher_count" -eq 1
           grep -Fq "launchable-activity: name='ai.mayra.app.MainActivity'" build/ci/full-test-badging.log
-
-          forbidden_permissions=(
-            android.permission.READ_CONTACTS
-            android.permission.CALL_PHONE
-            android.permission.SEND_SMS
-            android.permission.POST_NOTIFICATIONS
-            android.permission.SCHEDULE_EXACT_ALARM
-            android.permission.RECEIVE_BOOT_COMPLETED
-            android.permission.INTERNET
-          )
+          forbidden_permissions=(android.permission.READ_CONTACTS android.permission.CALL_PHONE android.permission.SEND_SMS android.permission.POST_NOTIFICATIONS android.permission.SCHEDULE_EXACT_ALARM android.permission.RECEIVE_BOOT_COMPLETED android.permission.INTERNET)
           for permission in "${forbidden_permissions[@]}"; do
-            if grep -Fq "$permission" build/ci/full-test-permissions.log; then
-              echo "Full-test APK unexpectedly requests: $permission" >&2
-              exit 1
-            fi
+            if grep -Fq "$permission" build/ci/full-test-permissions.log; then echo "Full-test APK unexpectedly requests $permission" >&2; exit 1; fi
           done
-
-          required_components=(
-            ai.mayra.app.MainActivity
-            ai.mayra.app.MayraApplication
-            ai.mayra.app.document.MayraDocumentActivity
-            ai.mayra.app.memory.MayraMemoryCenterActivity
-            ai.mayra.app.core.MayraProviderSettingsActivity
-            ai.mayra.app.core.MayraActivityHistoryActivity
-          )
-          for component in "${required_components[@]}"; do
-            grep -Fq "$component" build/ci/full-test-manifest-tree.log
-          done
-
-          forbidden_components=(
-            ai.mayra.app.background.MayraNotificationListener
-            ai.mayra.app.background.MayraBootReceiver
-          )
+          required_components=(ai.mayra.app.MainActivity ai.mayra.app.MayraApplication ai.mayra.app.document.MayraDocumentActivity ai.mayra.app.memory.MayraMemoryCenterActivity ai.mayra.app.core.MayraProviderSettingsActivity ai.mayra.app.core.MayraActivityHistoryActivity)
+          for component in "${required_components[@]}"; do grep -Fq "$component" build/ci/full-test-manifest-tree.log; done
+          forbidden_components=(ai.mayra.app.background.MayraNotificationListener ai.mayra.app.background.MayraBootReceiver)
           for component in "${forbidden_components[@]}"; do
-            if grep -Fq "$component" build/ci/full-test-manifest-tree.log; then
-              echo "High-risk background component found in full-test APK: $component" >&2
-              exit 1
-            fi
+            if grep -Fq "$component" build/ci/full-test-manifest-tree.log; then echo "High-risk background component found in full-test APK: $component" >&2; exit 1; fi
           done
 
       - name: Assemble isolated document-test APK
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
           gradle --no-daemon :app:assembleDocumentTest --stacktrace --console=plain 2>&1 | tee build/ci/assemble-document-test.log
 
       - name: Verify isolated APK manifest and permissions
@@ -292,35 +205,16 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
           test -n "$APK"
           test -x "$AAPT"
-
           "$AAPT" dump permissions "$APK" | tee build/ci/document-test-permissions.log
           "$AAPT" dump badging "$APK" | tee build/ci/document-test-badging.log
           "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/ci/document-test-manifest-tree.log
-
-          if grep -q '^uses-permission:' build/ci/document-test-permissions.log; then
-            echo "Document-test APK unexpectedly requests Android permissions" >&2
-            exit 1
-          fi
-
+          if grep -q '^uses-permission:' build/ci/document-test-permissions.log; then echo "Document-test APK unexpectedly requests Android permissions" >&2; exit 1; fi
           grep -Fq "package: name='ai.mayra.app.documenttest'" build/ci/document-test-badging.log
           grep -Fq "application-label:'Mayra Document Test'" build/ci/document-test-badging.log
-
-          forbidden_components=(
-            ai.mayra.app.MainActivity
-            ai.mayra.app.MayraApplication
-            ai.mayra.app.background.MayraNotificationListener
-            ai.mayra.app.background.MayraBootReceiver
-            androidx.startup.InitializationProvider
-            androidx.work.impl.background.systemjob.SystemJobService
-            androidx.work.impl.foreground.SystemForegroundService
-          )
+          forbidden_components=(ai.mayra.app.MainActivity ai.mayra.app.MayraApplication ai.mayra.app.background.MayraNotificationListener ai.mayra.app.background.MayraBootReceiver androidx.startup.InitializationProvider androidx.work.impl.background.systemjob.SystemJobService androidx.work.impl.foreground.SystemForegroundService)
           for component in "${forbidden_components[@]}"; do
-            if grep -Fq "$component" build/ci/document-test-manifest-tree.log; then
-              echo "Forbidden component found in isolated APK: $component" >&2
-              exit 1
-            fi
+            if grep -Fq "$component" build/ci/document-test-manifest-tree.log; then echo "Forbidden component found in isolated APK: $component" >&2; exit 1; fi
           done
-
           grep -Fq "ai.mayra.app.document.MayraDocumentActivity" build/ci/document-test-manifest-tree.log
           grep -Fq "ai.mayra.app.core.MayraActivityHistoryActivity" build/ci/document-test-manifest-tree.log
           grep -Fq "ai.mayra.app.documenttest.DocumentTestApplication" build/ci/document-test-manifest-tree.log
