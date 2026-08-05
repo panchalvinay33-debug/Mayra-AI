@@ -1,42 +1,39 @@
 # Mayra AI — J5 AI-Native Launcher Preflight
 
 Date: 2026-08-05
-Status: ACCEPTED / IMPLEMENTATION BLOCKED UNTIL J4 EXACT-HEAD GREEN
+Status: **AUTOMATED PREFLIGHT PASS / DEVICE_VERIFY READY**
 
 ## Goal
 
-Prove that Mayra can become the owner's stable default Android Home/launcher while keeping all ordinary apps reachable and keeping Home usable when AI components fail.
+Prove that Mayra can become the owner's stable default Android Home/launcher while keeping ordinary apps reachable and Home usable when AI components fail.
 
-## Preconditions
+## Preconditions — satisfied for device testing
 
-J5 implementation does not start until:
+- J4 Room/KSP failure repaired and protected at `baseline/mayra-0.2.1-j4-ci-recovery-green-134`;
+- J5 exact source `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a` is fully green;
+- Android #2384, J1 #493, J2 #389, J3 #211, J4 #162 and Governance #565 all passed;
+- exact green engineering backup: `backup/j5-home-contract-ci-green-2026-08-05`.
 
-- current J4 Room/KSP CI failure is repaired;
-- relevant J4/J1/J2/J3/Android/Governance workflows are exact-head green;
-- J4 recovery point is recorded;
-- no unresolved package/signing issue would invalidate device testing.
+## Android integration implemented
 
-## Android integration target
+The candidate uses a separate `MayraLauncherActivity` with the standard `MAIN + HOME + DEFAULT` Home boundary and supported user-consent `ROLE_HOME` request where available.
 
-The J5 engineering candidate will declare the standard Android HOME launcher intent/category boundary and use supported package-manager APIs to enumerate launchable applications.
+Launcher status grants no access to private app data and no security bypass is assumed.
 
-No security bypass is required or assumed. Launcher status does not grant access to private app data.
+## First implementation boundary — current truth
 
-## First implementation boundary
-
-Include only:
-
+Implemented:
 - launcher HOME activity/surface;
 - installed launchable-app inventory;
-- app search;
-- launch app action;
+- deterministic case-insensitive app search by label/package;
+- direct launchable-activity opening;
+- bridge to normal Mayra;
+- Android Home settings switch/restore path;
+- basic fallback Home UI independent from local model/cloud/memory/action-engine startup.
+
+Still intentionally deferred within J5 or later gates:
 - favorites/basic persistent layout;
-- Mayra voice/orb entry;
-- settings/switch-back help;
-- deterministic fallback UI when AI runtime is unavailable.
-
-Exclude from J5 MVP:
-
+- deeper Mayra voice/orb entry integration;
 - unrestricted Accessibility automation;
 - payments/authentication/security automation;
 - proactive notification intelligence;
@@ -46,63 +43,53 @@ Exclude from J5 MVP:
 - multimodal vision;
 - autonomous routines.
 
-Those are separate later gates.
-
 ## Reliability requirements
 
-J5 must be usable in all of these conditions:
+J5 Home must remain usable with no network, cloud provider disabled, local model absent/corrupt/killed, Notification Access denied, Contacts denied, neural TTS unavailable, and after app-process restart.
 
-- no network;
-- cloud provider disabled;
-- local model absent;
-- local model corrupt;
-- local brain process killed;
-- Notification Access denied;
-- Contacts denied;
-- neural TTS unavailable;
-- app process restarted.
+## Automated validation — PASS on exact source
 
-Basic app drawer/search/launch must remain available.
+Source: `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a`
 
-## Validation matrix
+- Android CI #2384: compile, full debug unit tests, all governed lint variants, Personal Alpha, minified Release/R8, FullTest and DocumentTest package/audits — PASS;
+- deterministic launcher app-search tests — PASS;
+- Personal Alpha and Release manifest audits explicitly require `MayraLauncherActivity`, `android.intent.category.HOME` and `android.intent.category.DEFAULT` — PASS;
+- normal application launchable-entry count remains exactly one (`MainActivity`) — PASS;
+- no new high-risk permissions were accepted by package audits — PASS;
+- J1 #493, J2 #389, J3 #211, J4 #162, Governance #565 — PASS.
 
-### CI
+## Device validation — next gate
 
-- compile/lint/unit tests for launcher surface;
-- manifest audit proves correct HOME intent and expected launcher count;
-- no accidental new high-risk permissions;
-- installed-app inventory/search tests;
-- fallback-state tests;
-- app launch intent tests;
-- persistence tests for favorites/layout where practical;
-- shared Android/J1/J2/J3/J4 regressions remain green.
-
-### Motorola
-
-- Mayra appears in Home app/default launcher selection;
-- selecting Mayra succeeds;
+On Motorola Edge 70 Fusion / Android 16 prove:
+- Mayra appears in Home/default launcher selection;
+- selection succeeds;
 - Home gesture/button returns to Mayra repeatedly;
-- installed apps are visible/searchable and launch;
-- reboot preserves expected Home behavior;
-- lock/unlock does not trap the owner;
-- local model disabled/killed leaves Home functional;
-- Mayra assistant invocation from Home works;
+- installed apps are visible/searchable and launch correctly;
+- lock/unlock and reboot preserve a usable Home;
+- model/provider failures leave Home functional;
+- Assistant invocation does not create navigation loops;
 - previous launcher can be restored;
-- no navigation loop between launcher and Digital Assistant;
-- idle RAM/battery/thermal behavior is acceptable.
+- RAM/battery/thermal behavior is acceptable.
+
+## Exact device-test artifact
+
+- source: `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a`
+- Android CI: #2384
+- Personal Alpha artifact ID: `8919388343`
+- artifact ZIP digest: `sha256:92a6aa72d54e48c9fbc835e277b5d3471ec4c9112dfa9ab6e65a16ff229a2e17`
+- APK SHA-256: `1ec6be33cb0c484552668145c48690094df3e44a0cb0cef613e28c1f88283096`
 
 ## Rollback
 
-- Keep previous launcher installed and documented.
-- Never remove Android's ability to choose another Home app.
-- Keep last protected green Mayra application baseline unchanged.
-- J5 engineering package/surface must not become the sole holder of owner-private data.
+- Previous launcher remains installed/choosable.
+- Android Home settings route is exposed from Mayra Home.
+- Protected J4 recovery baseline is unchanged.
+- J5 exact-green source is preserved in `backup/j5-home-contract-ci-green-2026-08-05`.
 
 ## Promotion
 
-Only after exact-source CI + Motorola acceptance:
-
-1. update canonical docs;
+J5 is **not a protected baseline yet**. Only after exact-source Motorola acceptance:
+1. synchronize canonical evidence;
 2. create immutable J5 milestone snapshot;
 3. create protected J5 baseline branch;
 4. then begin J6 context integration.
