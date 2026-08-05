@@ -4,107 +4,133 @@ Last updated: 2026-08-05
 Entry point: `START_HERE.md`
 Jarvis/launcher master plan: `docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md`
 Local LLM benchmark: `docs/testing/MAYRA_LOCAL_LLM_BENCHMARK.md`
-Self-learning decision: `docs/decisions/ADR_031_SAFE_SELF_LEARNING.md`
 
 ## Product direction locked on 2026-08-05
 
-Mayra is now explicitly targeting a practical **Jarvis-style personal Android operating layer**. The final experience will combine the existing Digital Assistant/voice foundation with an AI-native launcher/Home shell, context fabric, trust-gated action engine, proactive assistance, multimodal support and owner-defined routines.
+Mayra is targeting a practical **Jarvis-style personal Android operating layer**. The final experience combines the proven Digital Assistant/voice foundation with an AI-native launcher/Home shell, local-first brain, provenance-aware context, trust-gated typed actions, proactive assistance, later multimodal understanding and owner-defined routines.
 
-The launcher is the primary Home shell, not the privileged brain. Heavy AI, memory and action execution stay modular so Home remains usable if local model/provider/AI runtime fails.
-
-New major phases after J4 stabilization:
-
-- **J5 — AI-native launcher shell**: HOME/default launcher, app drawer/search, Mayra Home/orb, safe fallback/switch-back, crash/reboot resilience.
-- **J6 — Context fabric**: reminders, notifications, contacts/people, documents/media and bounded current-screen/app context.
-- **J7 — Trust/action orchestration**: GREEN/AMBER/RED action classification, deterministic adapters, audit history and no direct LLM execution.
-- **J8 — Proactive Mayra**: My Day, important notifications, follow-ups and quiet limits.
-- **J9 — Multimodal Mayra**: explicit camera/image/screen/document understanding after privacy/performance gates.
-- **J10 — Personal routines**: owner-defined typed workflows and narrowly reviewed automation.
+The launcher is the primary Home shell, not the privileged brain. Heavy AI/model/provider failure must never make basic Home/app access unusable.
 
 ## Overall program view
 
 | Track | Status | Current truth | Next gate |
 |---|---|---|---|
-| Governance/backups | DONE / CONTINUOUS | Canonical records, governance CI and protected baselines exist | Sync every meaningful batch and major-step checkpoint |
-| J1 Assistant role | DEVICE VERIFIED FOUNDATION | Motorola accepts/selects Mayra; power trigger invokes orb | Preserve regression baseline |
-| J2 recognition/privacy | DEVICE VERIFIED FOUNDATION | Hindi/Hinglish/English, dismissal, lock/reboot/privacy cycles pass | Preserve regressions |
-| Android system TTS | FALLBACK PASS | Offline speech works but owner finds it robotic | Keep as safe fallback |
-| J3 neural TTS | DEVICE BENCHMARK PASS / LICENSE BLOCKED | Offline model load/synthesis/playback pass, RTF 0.72 | Find production-license-clear voice |
-| J4 local LLM | ACTIVE / CI REPAIR GATE | Local-brain architecture and LiteRT-LM provenance work exist; current head has a Room/KSP schema failure that must be repaired before expansion | Restore exact-head J4 + shared CI green, then finish device quality/RAM/thermal/cancel gate |
-| Self-learning | POLICY FOUNDATION IN SOURCE | Deterministic candidate policy, secret rejection and confirmation gates added | Auditable local memory store + owner review UI |
-| Voice actions | SAFE FOUNDATION | Intent understanding exists without false execution claims | Connect only through deterministic confirmation-safe router |
-| Trusted install | IN_PROGRESS | Stable owner signing/trusted distribution required | Private certificate + upgrade proof |
-| J5 launcher shell | ACCEPTED / BLOCKED ON J4 GREEN | Canonical master plan + ADR accepted; no launcher implementation should stack on red J4 head | J4 green baseline, then launcher preflight/isolated proof |
-| J6 context fabric | ACCEPTED | Existing reminders/memory/documents/notifications foundations can feed typed context later | Start only after J5 Home reliability proof |
-| J7 trust/action orchestration | ACCEPTED | Existing typed actions/confirmations are foundation | Formal GREEN/AMBER/RED policy + audit tests |
-| J8 proactive Mayra | ACCEPTED | Briefing scheduler/notification foundations exist | Context-quality, privacy and battery gates |
-| J9 multimodal Mayra | ACCEPTED / LATER | Document/image path can be extended | Local/device privacy/RAM/thermal benchmark |
-| J10 personal routines | ACCEPTED / LATER | Typed workflow philosophy established | Add owner-defined routines after action trust layer |
+| Governance/backups | DONE / CONTINUOUS | Canonical records, immutable snapshots and protected recovery refs exist | Sync every meaningful batch |
+| J1 Assistant role | DEVICE VERIFIED FOUNDATION | Motorola accepts/selects Mayra; Power invocation works | Preserve regression |
+| J2 recognition/privacy | DEVICE VERIFIED FOUNDATION | Hindi/Hinglish/English recognition, dismissal, lock/privacy cycles proven | Preserve regression |
+| Android system TTS | FALLBACK PASS | Offline fallback works; quality is robotic | Keep safe fallback |
+| J3 neural TTS | DEVICE BENCHMARK PASS / LICENSE BLOCKED | Offline neural synthesis proven; tested Priyamvada pack not production-cleared | Find license-clear voice |
+| J4 local LLM runtime | DEVICE RUNTIME PROVEN | Gemma3-1B import/SHA, CPU Stage 5/5, fixed multilingual generation and close/reload physically proven | Quality/operability device round |
+| J4 CI recovery | DONE | Room/KSP shared-schema race repaired; exact source `e72488a…` green across Android/J1/J2/J3/J4/Governance | Preserve protected recovery ref |
+| J4 quality harness | CI GREEN / DEVICE VERIFY | Source `8624509…` adds useful prompts, RAM telemetry, rough generation metrics, 10-prompt stress and process-bounded cancel; all major CI green | Run Motorola quality/cancel/RAM/stability round |
+| Self-learning | POLICY FOUNDATION | Deterministic candidate policy + owner confirmation boundaries exist | Auditable learned-memory store/review UI later |
+| J5 launcher shell | ACCEPTED / NEXT AFTER J4 DEVICE ROUND | Architecture/preflight/acceptance contract exist; no production launcher code yet | HOME role + app inventory/search + switch-back proof |
+| J6 context fabric | ACCEPTED | Existing reminders/memory/documents/notification foundations can feed typed context | Start after J5 Home reliability |
+| J7 trust/action orchestration | ACCEPTED | Typed actions/confirmations are foundation | Formal GREEN/AMBER/RED policy |
+| J8 proactive Mayra | ACCEPTED | Briefing/notification foundations exist | Privacy/battery/context-quality gates |
+| J9 multimodal | ACCEPTED / LATER | Document/image architecture can expand | Local/device privacy/RAM/thermal benchmark |
+| J10 routines | ACCEPTED / LATER | Typed workflow philosophy established | Owner-defined routines after trust layer |
 
-## Protected application baseline
+## Protected recovery points
 
-`baseline/mayra-0.2.1-j2-privacy-tts-green-136`
+### J4 CI recovery baseline
 
-J3/J4 remain engineering evidence packages and do not replace the protected production baseline until their own exact-green promotion requirements are satisfied.
+`baseline/mayra-0.2.1-j4-ci-recovery-green-134`
+
+- source `e72488a6f6dceb24950f9b0f574ae223d52bd8bb`;
+- Android CI #2356 SUCCESS;
+- J1 #465 SUCCESS;
+- J2 #361 SUCCESS;
+- J3 #183 SUCCESS;
+- J4 #134 SUCCESS;
+- Governance #537 SUCCESS.
+
+This is the rollback point for current J4 quality work and future launcher work until a later milestone is formally promoted.
+
+### J4 quality engineering checkpoint
+
+Source `862450933da3700d4d1559e09ebde910a4185914` is backed by `backup/j4-quality-harness-ci-green-2026-08-05`.
+
+- Android CI #2364 SUCCESS;
+- J1 #473 SUCCESS;
+- J2 #369 SUCCESS;
+- J3 #191 SUCCESS;
+- J4 #142 SUCCESS;
+- Governance #545 SUCCESS.
+
+This is **not yet a production-quality local-brain baseline** because the new quality/cancel/RAM behaviors still need Motorola physical evidence.
+
+## J4 quality/operability implementation now in source
+
+The J4 engineering APK now provides:
+
+- useful Hindi, Hinglish and English prompts instead of only trivial arithmetic/location prompts;
+- safety-boundary and uncertainty prompts;
+- response character count;
+- explicitly labeled rough token estimate (`chars / 4`) and rough tokens/sec rather than pretending tokenizer-exact SDK telemetry exists;
+- total generation time;
+- local-brain PSS, Java heap and native-heap snapshots;
+- explicit runtime-metrics capture;
+- 10 sequential prompt stress benchmark;
+- generation run count;
+- explicit Cancel Generation / Benchmark control;
+- cancellation implemented as bounded isolated `:localbrain` process termination so the owner UI survives even if native synchronous generation cannot cooperate;
+- fresh localbrain process rebind after cancellation/close.
+
+## J4 Motorola quality acceptance still required
+
+1. install exact J4 #142 engineering APK;
+2. re-use/verify the pinned Gemma3-1B model;
+3. capture RAM before load and after Stage 5/5;
+4. run Hindi/Hinglish/English quality prompts and record actual outputs/timings;
+5. run safety and uncertainty prompts;
+6. run the 10-prompt benchmark and record summary;
+7. start a sufficiently long generation/benchmark and press Cancel; prove UI survives and fresh runtime rebinds;
+8. re-initialize and prove generation works after cancel;
+9. perform five close/reload cycles;
+10. exercise background, screen-lock and localbrain process-kill recovery;
+11. repeat in Airplane mode;
+12. record owner-observed battery/thermal behavior.
+
+No first-token-latency claim is made because the current reflection probe uses synchronous `sendMessage()` and does not expose proven streaming callback timing.
+
+## J5 — AI-native launcher next phase
+
+J5 first slice remains deliberately narrow:
+
+- standard Android HOME qualification (`ACTION_MAIN` + `CATEGORY_HOME` + `CATEGORY_DEFAULT`);
+- owner-controlled default Home selection;
+- launchable-app inventory via supported launcher/package APIs;
+- app drawer/search;
+- safe app launching;
+- basic favorites/layout persistence;
+- Mayra orb/voice entry;
+- switch-back/settings route;
+- deterministic Home UI when local model/provider is absent, corrupt or killed.
+
+The launcher does not gain private app data merely by being default Home. Notifications, contacts, Accessibility, screen context and other capabilities remain separate permission/trust gates.
 
 ## Major-step baseline discipline
 
-Every major phase now follows this mandatory lifecycle:
+Every major phase follows:
 
-1. record/update Idea Ledger;
-2. record architecture decision;
-3. update Blueprint;
-4. define Roadmap gate;
-5. add preflight/test matrix where applicable;
-6. implement one coherent batch;
-7. require relevant CI/package/permission/component audits;
-8. obtain Motorola evidence for device claims;
-9. synchronize Changelog + Latest Snapshot;
-10. create immutable milestone snapshot;
-11. create protected `baseline/*` branch only from the exact green commit;
-12. start the next risky phase only from a known recovery point.
+1. Idea Ledger/decision/Blueprint/Roadmap/preflight before risky implementation;
+2. coherent implementation batch;
+3. applicable compile/unit/lint/package/permission/component checks;
+4. Motorola evidence for device claims;
+5. Changelog + Latest Snapshot + test evidence synchronization;
+6. immutable milestone snapshot;
+7. protected `baseline/*` only from exact green + accepted milestone evidence;
+8. next risky phase starts from a known rollback point.
 
-A red/pending head is never a stable baseline. Failure analysis/documentation may continue, but unrelated speculative features do not stack on top.
-
-## J4 Motorola/device evidence record
-
-Earlier J4 records contain local CPU inference evidence and model/runtime measurements. Current canonical execution must nevertheless honor the newest exact-head CI state: the observed current PR head has a J4 Room/KSP schema failure, so no newer code state is promoted until the failure is repaired and all applicable workflows are green again.
-
-## Safe self-learning architecture
-
-Self-learning means Mayra may become more useful from owner corrections and repeated preferences, but the model never gets authority to silently write trusted memory.
-
-Source foundation:
-
-- `MayraSelfLearningPolicy` evaluates bounded `LearningCandidate` objects;
-- credential-like keys such as password/PIN/OTP/CVV/API keys are rejected;
-- sensitive identity, health, finance, relationships, locations and contacts require confirmation;
-- permanent memory always requires confirmation;
-- uncertain model inference is rejected;
-- only reversible low-risk response/language/UI preferences may be accepted without a blocking confirmation;
-- every future memory item must remain visible, editable, forgettable and resettable.
-
-Next implementation slice:
-
-1. add a local Room-backed learned-memory record with source, confidence, timestamps and lifecycle state;
-2. add candidate → pending review → approved/rejected/forgotten transitions;
-3. add `Remember this`, `Forget this` and `What have you learned?` deterministic commands;
-4. add owner review UI with edit/delete/reset;
-5. inject only approved memory into local/cloud prompts through a bounded structured context;
-6. add expiry/decay for repeated-behavior guesses;
-7. add export/import without secrets;
-8. later evaluate opt-in adapter/LoRA training only after RAM, battery, rollback and privacy gates.
+A red or pending head is never a stable baseline.
 
 ## Immediate next actions
 
-1. Repair the current J4 Room/KSP truncated-schema failure.
-2. Re-run J4 and preserve J1/J2/J3/Android/Governance regressions.
-3. Finish J4 longer-output, cancellation, RAM, thermal, Airplane/background/lock rounds.
-4. Synchronize exact evidence and promote a protected J4 recovery baseline only from exact green.
-5. Create J5 launcher feasibility/preflight and isolated launcher test surface.
-6. Prove default-HOME selection, Home-button return, reboot persistence, app drawer/search, fallback launcher and crash/model-failure survival on Motorola.
-7. Connect Mayra orb/voice to Home without moving heavy AI into critical launcher rendering.
-8. Add context cards incrementally: reminders → notifications → people → documents/media.
-9. Formalize J7 trust levels and auditable action history.
-10. Add proactive briefing/routines only after context quality, privacy and battery evidence.
-11. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Run J4 #142 quality/operability round on Motorola and record outputs/RAM/cancel/stress/stability evidence.
+2. If the quality model is acceptable enough for a first local-brain role, record the promotion decision; if Hinglish remains weak, keep local runtime proven but model candidate unpromoted.
+3. Preserve `baseline/mayra-0.2.1-j4-ci-recovery-green-134` regardless.
+4. Then begin J5 launcher implementation from supported Android HOME/LauncherApps APIs.
+5. Prove default-HOME selection, Home-button return, app drawer/search/launch, reboot persistence, switch-back and AI-process-failure survival on Motorola.
+6. Only after J5 reliability move into J6 context, J7 trust/action orchestration, J8 proactive behavior, J9 multimodal and J10 routines.
+7. Keep PR #12 Draft/open/unmerged until explicit owner approval.
