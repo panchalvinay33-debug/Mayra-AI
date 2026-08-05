@@ -1,20 +1,30 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: NOT RUN — implementation blocked until J4 exact-head green
+Status: **DEVICE_VERIFY READY — NOT YET PHYSICALLY RUN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
-## Artifact identity
+## Exact artifact identity
 
-Before installation record:
+- source commit: `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a`
+- Android workflow/run: Android CI #2384 (`30978034598`)
+- package: `ai.mayra.app.alpha`
+- version/versionCode: `0.2.1-alpha` / `4`
+- Personal Alpha artifact ID: `8919388343`
+- artifact ZIP digest: `sha256:92a6aa72d54e48c9fbc835e277b5d3471ec4c9112dfa9ab6e65a16ff229a2e17`
+- APK SHA-256: `1ec6be33cb0c484552668145c48690094df3e44a0cb0cef613e28c1f88283096`
+- signing/certificate provenance: verify on installed owner artifact before promotion; CI may use owner signing when configured, otherwise debug fallback.
+- exact-green backup: `backup/j5-home-contract-ci-green-2026-08-05`
 
-- source commit:
-- workflow/run:
-- package:
-- version/versionCode:
-- APK artifact ID:
-- APK SHA-256:
-- signing/certificate provenance:
+Automated evidence on this exact source: Android #2384, J1 #493, J2 #389, J3 #211, J4 #162 and Governance #565 all SUCCESS. The merged Personal Alpha and Release APK audits explicitly require `MayraLauncherActivity` plus HOME/DEFAULT categories while preserving one normal app LAUNCHER entry.
+
+## Installation precheck
+
+- [ ] Download artifact `8919388343` only.
+- [ ] Confirm extracted APK SHA-256 equals the value above.
+- [ ] Record installed certificate/signing identity.
+- [ ] Keep the current Motorola launcher installed and available as rollback.
+- [ ] Do not delete Mayra data merely to change Home app.
 
 ## A. Default Home selection
 
@@ -27,56 +37,65 @@ Before installation record:
 ## B. Basic launcher usability
 
 - [ ] Installed launchable apps are present.
-- [ ] App search finds common installed apps.
+- [ ] Search finds at least five known apps using label text.
+- [ ] Package-name search works for a known installed app where practical.
 - [ ] Tapping a result launches the correct app.
 - [ ] Returning Home returns to Mayra.
-- [ ] Favorites/basic layout persists across restart.
-- [ ] No duplicate/ghost app entries after install/update where tested.
+- [ ] Refresh apps does not create duplicate/ghost entries.
+- [ ] App install/update/uninstall is reflected after refresh where tested.
+
+Favorites/basic persistent layout is not implemented in the current slice and is therefore not falsely required for this first proof.
 
 ## C. AI failure independence
 
-- [ ] Local model unavailable: Home/app drawer still usable.
-- [ ] Local model process killed: Home/app drawer still usable.
-- [ ] Provider/network unavailable: Home/app drawer still usable.
-- [ ] Neural TTS unavailable: Home/app drawer still usable.
-- [ ] Notification Access denied: Home degrades cleanly.
-- [ ] Contacts denied: Home degrades cleanly.
+- [ ] Local model unavailable: Home/app list/search/launch still usable.
+- [ ] Local-brain process killed: Home/app list/search/launch still usable.
+- [ ] Provider/network unavailable: Home remains usable.
+- [ ] Airplane mode: Home remains usable.
+- [ ] Neural TTS unavailable: Home remains usable.
+- [ ] Notification Access denied: Home remains usable.
+- [ ] Contacts denied: Home remains usable.
 
 ## D. Assistant coexistence
 
-- [ ] Mayra voice/orb entry from Home works.
+- [ ] `Ask Mayra` opens the normal Mayra activity.
 - [ ] Power-button Digital Assistant invocation still works where configured.
 - [ ] Dismissing Assistant returns to a sane screen/Home.
 - [ ] No Assistant ↔ Launcher navigation loop.
 - [ ] Rapid invoke/dismiss/Home cycle remains stable.
 
+Deeper voice/orb integration into Home is intentionally a later J5 slice after base Home reliability proof.
+
 ## E. Recovery / switch-back
 
-- [ ] Owner can open Android Home app settings.
+- [ ] `Switch / restore Home app` opens Android Home settings.
 - [ ] Previous launcher can be selected again.
 - [ ] Switching away does not delete Mayra data.
 - [ ] Switching back to Mayra works.
-- [ ] A launcher crash/restart does not trap the owner.
+- [ ] Force-stop/restart does not trap the owner.
+- [ ] A launcher activity/process failure recovers to a selectable usable Home path.
 
 ## F. Resource behavior
 
-Record idle and active observations:
-
+Record:
 - launcher idle RAM:
 - launcher active RAM:
-- local-brain separate process RAM:
+- local-brain separate-process RAM:
 - 30-minute idle battery observation:
 - temperature/thermal notes:
 - visible jank/ANR/crash count:
 
+## G. Result recording
+
+For every failed item record exact step, visible error, screenshot/log if useful, and whether switching back to the previous launcher still works. Never convert a failed checkbox to pass by weakening the requirement.
+
 ## Promotion rule
 
-J5 remains `DEVICE_VERIFY` or lower until every required item above is proven on the exact promoted source. Any failure is recorded; it is not hidden by changing the checklist.
+J5 remains `DEVICE_VERIFY` until required items above are physically proven on the exact artifact/source. Any trap, Home loop, inability to restore another launcher, material data loss, crash loop, or basic app-access failure blocks promotion.
 
 After pass:
-
 1. synchronize Roadmap/Blueprint/Idea/Decision/Changelog/Latest Snapshot;
-2. record artifact/source/device evidence;
+2. record exact device/build/signing evidence;
 3. create immutable J5 milestone snapshot;
 4. create protected exact-green J5 baseline branch;
 5. only then begin J6 context-card integration.
