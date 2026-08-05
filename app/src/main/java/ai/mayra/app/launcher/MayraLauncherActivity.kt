@@ -63,11 +63,20 @@ class MayraLauncherActivity : ComponentActivity() {
     }
 }
 
-private data class LaunchableApp(
+internal data class LaunchableApp(
     val label: String,
     val packageName: String,
     val activityName: String
 )
+
+internal fun filterLaunchableApps(apps: List<LaunchableApp>, rawQuery: String): List<LaunchableApp> {
+    val query = rawQuery.trim()
+    if (query.isEmpty()) return apps
+    return apps.filter {
+        it.label.contains(query, ignoreCase = true) ||
+            it.packageName.contains(query, ignoreCase = true)
+    }
+}
 
 @Composable
 private fun MayraLauncherHome() {
@@ -76,11 +85,7 @@ private fun MayraLauncherHome() {
     var refreshKey by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf("Mayra Home ready") }
     val apps = remember(refreshKey) { loadLaunchableApps(context) }
-    val filtered = remember(apps, query) {
-        if (query.isBlank()) apps else apps.filter {
-            it.label.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
-        }
-    }
+    val filtered = remember(apps, query) { filterLaunchableApps(apps, query) }
     val roleManager = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.getSystemService(RoleManager::class.java) else null
     }
@@ -90,7 +95,7 @@ private fun MayraLauncherHome() {
     var roleHeld by remember(refreshKey, roleManager) {
         mutableStateOf(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) roleManager?.isRoleHeld(RoleManager.ROLE_HOME) == true else false)
     }
-    val roleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    val roleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refreshKey++
         roleHeld = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) roleManager?.isRoleHeld(RoleManager.ROLE_HOME) == true else false
         status = if (roleHeld) "Mayra is the default Home ✓" else "Home role not granted"
@@ -118,10 +123,7 @@ private fun MayraLauncherHome() {
                     onClick = { context.startActivity(Intent(context, MainActivity::class.java)) },
                     label = { Text("Ask Mayra") }
                 )
-                AssistChip(
-                    onClick = { refreshKey++ },
-                    label = { Text("Refresh apps") }
-                )
+                AssistChip(onClick = { refreshKey++ }, label = { Text("Refresh apps") })
             }
 
             if (!roleHeld) {
@@ -140,8 +142,7 @@ private fun MayraLauncherHome() {
 
             OutlinedButton(
                 onClick = {
-                    val intent = Intent(Settings.ACTION_HOME_SETTINGS)
-                    runCatching { context.startActivity(intent) }
+                    runCatching { context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
                         .onFailure { status = "Home settings are unavailable on this device" }
                 },
                 modifier = Modifier.fillMaxWidth()
