@@ -1,7 +1,7 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: **DEVICE VERIFY IN PROGRESS — DEFAULT HOME + SEARCH/LAUNCH/HOME RETURN PROVEN**
+Status: **DEVICE VERIFY IN PROGRESS — DEFAULT HOME + SEARCH/LAUNCH/HOME RETURN + LOCK/REBOOT PERSISTENCE PROVEN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
 ## Exact artifact identity
@@ -20,7 +20,7 @@ Automated evidence on this exact source: Android #2384, J1 #493, J2 #389, J3 #21
 
 ## Motorola evidence recorded 2026-08-05
 
-Owner-supplied screenshots prove:
+Owner-supplied screenshots / explicit owner confirmation prove:
 
 1. Android Default apps shows `Home app -> Mayra AI Personal Alpha`.
 2. Pressing/returning Home renders `Mayra Home` with `Default Home ✓`.
@@ -29,9 +29,11 @@ Owner-supplied screenshots prove:
 5. Searching `chro` filters the app list to matching results including `Chrome / com.android.chrome`.
 6. Tapping Chrome launches the real Chrome app successfully.
 7. Pressing Home after Chrome returns to Mayra Home with the search state still visible.
-8. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
+8. Locking and unlocking the phone returns to a usable Mayra Home state.
+9. Restarting/rebooting the phone preserves Mayra as the Home experience after unlock; owner reports Mayra remains on Home and works normally.
+10. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
 
-This now proves the core daily launcher loop: select Mayra as Home -> render Home -> search app -> launch app -> return Home. Repeated 20/20 Home returns, lock/reboot, switch-back, failure-independence and resource behavior remain pending.
+This proves the core daily launcher loop plus lock/unlock and reboot persistence. Repeated formal 20/20 Home returns, switch-back, failure-independence, assistant coexistence, refresh/install-change behavior and resource behavior remain pending.
 
 ## Installation precheck
 
@@ -46,8 +48,8 @@ This now proves the core daily launcher loop: select Mayra as Home -> render Hom
 - [x] Mayra appears in Android Home app/default launcher list.
 - [x] Owner can select Mayra without error.
 - [ ] Home gesture/button returns to Mayra 20/20 times. Multiple successful returns are proven; formal 20/20 count pending.
-- [ ] Lock -> unlock returns to a usable Home state.
-- [ ] Reboot retains/recovers expected default Home behavior.
+- [x] Lock -> unlock returns to a usable Home state.
+- [x] Reboot retains/recovers expected default Home behavior.
 
 ## B. Basic launcher usability
 
