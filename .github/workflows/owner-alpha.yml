@@ -7,11 +7,6 @@ on:
       - agent/document-library-foundation
     paths:
       - .github/owner-alpha-trigger
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/owner-alpha-trigger
 
 permissions:
   contents: read
