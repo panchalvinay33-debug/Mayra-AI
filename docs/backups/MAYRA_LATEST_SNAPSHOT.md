@@ -4,7 +4,7 @@ Snapshot date: 2026-08-05
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: **J5 unified Mayra owner-signing migration + device verification; J4 quality device gate remains separate**.
+Current phase: **J5 unified Mayra permanent owner-signing migration + device verification; J4 quality device gate remains separate**.
 
 ## Canonical direction
 
@@ -61,19 +61,32 @@ What changed:
 - unlocked voice-session response can continue into full Mayra;
 - lock-screen privacy and bounded assistant dismissal remain intact.
 
-## Owner signing migration — current blocker
+## Owner signing migration — current delivery gate
 
-The #2416 Personal Alpha could not install over the physically proven #2384 Personal Alpha. Android reported a package conflict because the application ID is the same (`ai.mayra.app.alpha`) but the signing certificate changed.
+The #2416 `ai.mayra.app.alpha` could not install over the physically proven #2384 `.alpha`. Android reported a package conflict because the application ID was the same but the signing certificate changed.
 
-Root cause: ordinary hosted Android CI falls back to a transient runner debug key when stable owner signing is unavailable. The old runner's private debug key was not preserved, so an in-place signer migration is not possible through normal package update semantics.
+Root cause: ordinary hosted Android CI falls back to a transient runner debug key when stable owner signing is unavailable. The old runner's private debug key was not preserved, so that `.alpha` line cannot be made durably updateable after the fact.
 
-Dedicated workflow: `.github/workflows/owner-alpha.yml`.
+Dedicated signing workflow: `.github/workflows/owner-alpha.yml`.
 
-Stable Owner Alpha run #6 (`30984237319`) was triggered successfully but failed at `Require and materialize stable owner signing` because GitHub Actions secret `MAYRA_OWNER_KEYSTORE_BASE64` is absent. Therefore stable owner signing is not yet configured.
+Stable Owner Alpha run #6 (`30984237319`) was triggered successfully but failed at `Require and materialize stable owner signing` because GitHub Actions secret `MAYRA_OWNER_KEYSTORE_BASE64` is absent. Stable owner signing is therefore not configured yet.
 
 Canonical migration record: `docs/testing/MAYRA_OWNER_SIGNING_MIGRATION_2026-08-05.md`.
+Immutable migration snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_OWNER_SIGNING_MIGRATION.md`.
 
 A permanent Mayra owner key has been generated outside repository source/history for owner custody. The key/passwords must remain in secure owner backup and GitHub Actions encrypted Secrets only; they must never be committed to GitHub files/issues/PR comments/logs.
+
+## Permanent side-by-side owner line
+
+To avoid uninstall-first risk, Mayra now has a dedicated owner build:
+
+- build type: `ownerAlpha`
+- package: `ai.mayra.app.owner`
+- visible label: `Mayra AI Owner`
+- stable signing: persistent owner key through Stable Owner Alpha only
+- code preflight: `.github/workflows/owner-alpha-preflight.yml`
+
+The working `.alpha` remains installed while `.owner` is installed and tested. This preserves rollback and continued access to old package-private data. Android isolates package-private data, so no silent `.alpha` → `.owner` data migration is claimed.
 
 Required GitHub Secrets:
 - `MAYRA_OWNER_KEYSTORE_BASE64`
@@ -81,21 +94,21 @@ Required GitHub Secrets:
 - `MAYRA_OWNER_KEY_ALIAS`
 - `MAYRA_OWNER_KEY_PASSWORD`
 
-## Controlled one-time migration
+## Controlled migration sequence
 
-1. preserve Mayra owner data that must survive uninstall;
-2. keep another launcher available as rollback;
-3. securely back up the permanent owner signing key;
+1. keep physically working `ai.mayra.app.alpha` installed;
+2. keep another Motorola launcher available;
+3. securely back up the permanent owner signing bundle;
 4. configure all four GitHub Actions Secrets;
-5. build first stable-owner Personal Alpha and record APK + signer SHA-256;
-6. one time only, uninstall transient-signed `ai.mayra.app.alpha` and install stable-owner build;
-7. restore/recreate preserved owner data as applicable and reselect Mayra as Home;
-8. produce a second stable-owner build and prove direct install-over-install without uninstall;
-9. only stable-owner APKs become owner-device update candidates afterward.
+5. build first stable `ai.mayra.app.owner` APK and record APK + signer SHA-256;
+6. install `Mayra AI Owner` side-by-side and verify Home/Assistant/orb/reboot/switch-back/Airplane behavior;
+7. keep `.alpha` until owner-package behavior and any needed owner data transfer/recreation are accepted;
+8. build a second stable-owner APK and prove direct install-over-install without uninstall;
+9. only stable `.owner` APKs become permanent owner-device update candidates afterward.
 
 ## Promotion rule
 
-Do not create a protected J5 baseline until the promoted exact source has green automated gates, stable owner-signing continuity and accepted Motorola evidence. Existing older device proof remains preserved but does not automatically prove the new unified source.
+Do not create a protected J5 baseline until the promoted exact source has green automated gates, stable owner-signing continuity and accepted Motorola evidence. Existing older device proof remains preserved but does not automatically prove the new unified owner package.
 
 ## Trust boundaries
 
@@ -110,4 +123,4 @@ Do not create a protected J5 baseline until the promoted exact source has green 
 
 ## Immediate next action
 
-Configure the four stable owner-signing GitHub Secrets from the private owner bundle, run Stable Owner Alpha to produce the first permanent-signer unified J5 APK, perform the controlled one-time migration, then immediately prove the second stable-owner build updates in place before resuming J5 physical promotion.
+Finish Owner Alpha preflight/shared regressions, configure the four stable owner-signing GitHub Secrets from the private owner bundle, build the first permanent `ai.mayra.app.owner` APK, install it side-by-side with `.alpha`, then immediately prove the second stable-owner build updates it in place before resuming J5 physical promotion.
