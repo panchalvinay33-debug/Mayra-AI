@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import ai.mayra.app.BuildConfig
+import ai.mayra.app.MayraEntryContract
 
 class MayraVoiceInteractionSessionService : VoiceInteractionSessionService() {
     override fun onNewSession(args: Bundle?): VoiceInteractionSession = MayraVoiceInteractionSession(this)
@@ -46,7 +47,7 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
             setPadding(24.dp(density), 24.dp(density), 24.dp(density), 72.dp(density))
             isClickable = true
             isFocusable = true
-            contentDescription = "Mayra assistant surface. Tap to close."
+            contentDescription = "Mayra assistant surface. Tap outside Mayra to close."
             setOnClickListener { hide() }
         }
 
@@ -64,7 +65,7 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
         val orbSize = 104.dp(density)
         root.addView(orb, FrameLayout.LayoutParams(orbSize, orbSize).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            bottomMargin = 102.dp(density)
+            bottomMargin = 112.dp(density)
         })
 
         nameLabel = TextView(context).apply {
@@ -77,20 +78,28 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
         }
         root.addView(nameLabel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            bottomMargin = 66.dp(density)
+            bottomMargin = 76.dp(density)
         })
 
         stateLabel = TextView(context).apply {
             textSize = 13f
-            setTextColor(Color.argb(220, 238, 240, 255))
+            setTextColor(Color.argb(235, 238, 240, 255))
             gravity = Gravity.CENTER
-            maxLines = 2
+            maxLines = 4
             isClickable = true
-            setOnClickListener { hide() }
+            setPadding(12.dp(density), 8.dp(density), 12.dp(density), 8.dp(density))
+            setOnClickListener {
+                val heard = voiceState as? MayraVoiceSessionState.Heard
+                if (heard != null && !isDeviceLocked()) {
+                    openFullMayra()
+                } else {
+                    hide()
+                }
+            }
         }
         root.addView(stateLabel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            bottomMargin = 18.dp(density)
+            bottomMargin = 10.dp(density)
             marginStart = 28.dp(density)
             marginEnd = 28.dp(density)
         })
@@ -156,12 +165,24 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
     private fun handleHeard(transcript: String) {
         val reply = MayraVoiceReplyPolicy.replyFor(transcript)
         if (isDeviceLocked()) {
-            // Never expose or speak transcript-derived/private content before unlock.
             stateLabel?.text = "Heard you. Unlock to continue."
             ttsSpeaker?.speak("Maine suna. Phone unlock karke continue karein.")
         } else {
-            stateLabel?.text = reply.text
+            stateLabel?.text = "${reply.text}\n\nTap here to continue in full Mayra"
             ttsSpeaker?.speak(reply.text)
+        }
+    }
+
+    private fun openFullMayra() {
+        runCatching {
+            context.startActivity(
+                MayraEntryContract.fullMayraIntent(context, MayraEntryContract.Source.VOICE_SESSION)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onSuccess {
+            hide()
+        }.onFailure {
+            stateLabel?.text = "Full Mayra could not open. Tap or Back to close."
         }
     }
 
@@ -176,6 +197,10 @@ class MayraVoiceInteractionSession(context: Context) : VoiceInteractionSession(c
                 is MayraVoiceSessionState.Preparing -> "Listening…"
                 is MayraVoiceSessionState.Heard -> "Heard you. Unlock to continue."
                 else -> voiceState.primaryText().takeUnless { it.startsWith("Heard:") } ?: "Mayra is ready"
+            }
+            voiceState is MayraVoiceSessionState.Heard -> {
+                val heard = voiceState as MayraVoiceSessionState.Heard
+                "${MayraVoiceReplyPolicy.replyFor(heard.text).text}\n\nTap here to continue in full Mayra"
             }
             else -> voiceState.primaryText()
         }
