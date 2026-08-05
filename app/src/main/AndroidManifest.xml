@@ -21,7 +21,7 @@
         android:label="Mayra AI"
         android:theme="@style/Theme.MayraAI">
 
-        <!-- The app intentionally exposes exactly one launcher entry. -->
+        <!-- Normal app entry remains exactly one LAUNCHER activity. -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -31,7 +31,22 @@
             </intent-filter>
         </activity>
 
-        <!-- Feature screens are reachable only from the Mayra home screen. -->
+        <!-- J5 Home shell. This qualifies Mayra for the user-controlled Android HOME role without
+             moving AI/model initialization onto the critical launcher rendering path. -->
+        <activity
+            android:name=".launcher.MayraLauncherActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:label="Mayra Home">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Feature screens are reachable only from the Mayra app/home surfaces. -->
         <activity
             android:name=".document.MayraDocumentActivity"
             android:exported="false"
