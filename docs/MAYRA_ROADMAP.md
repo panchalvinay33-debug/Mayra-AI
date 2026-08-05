@@ -17,8 +17,9 @@ Mayra targets a practical Jarvis-style personal Android operating layer. Home, q
 | J2 voice/privacy | DEVICE VERIFIED FOUNDATION | Multilingual recognition, dismissal, lock/privacy proven | Preserve regression |
 | J3 neural TTS | DEVICE BENCHMARK PASS / LICENSE BLOCKED | Technical offline voice proof exists; tested voice not production-cleared | License-clear voice later |
 | J4 local brain | RUNTIME PROVEN / QUALITY DEVICE VERIFY | Runtime, stress/cancel/RAM harness built | Finish physical quality round |
-| J5 Home core | STRONG DEVICE PROOF | Default Home, app search/launch, reboot, switch-back and Airplane behavior physically proven on #2384 | Preserve while verifying unified build |
-| J5 unified presence | **CI GREEN / DEVICE VERIFY** | Home orb + shared entry contract + voice-session-to-full-Mayra handoff green on `cc89a392…` | Motorola regression on #2416 |
+| J5 Home core | STRONG DEVICE PROOF | Default Home, app search/launch, reboot, switch-back and Airplane behavior physically proven on #2384 | Preserve while verifying permanent owner build |
+| J5 unified presence | CI GREEN / DEVICE VERIFY | Home orb + shared entry contract + voice-session-to-full-Mayra handoff green on `cc89a392…` | Verify on permanent owner package |
+| J5 owner delivery line | **STABLE SIGNER ESTABLISHED / DEVICE VERIFY** | First `ai.mayra.app.owner` APK built and certificate-verified on Stable Owner Alpha #16 | Install side-by-side, then prove second owner build updates in place |
 | J6 context fabric | ACCEPTED / BLOCKED ON J5 PROMOTION | reminders/memory/documents/notifications can feed typed context | Start after J5 protected baseline |
 | J7 trust/actions | ACCEPTED | typed action/confirmation foundation exists | Formal GREEN/AMBER/RED policy |
 | J8 proactive | ACCEPTED | briefing foundations exist | privacy/battery/context-quality gates |
@@ -64,28 +65,47 @@ Implemented:
 - locked-device assistant privacy and bounded dismissal remain intact;
 - all isolated and full packaging boundaries stay green.
 
-Exact Motorola candidate:
-- Android #2416 (`30981372713`)
-- Personal Alpha artifact `8920663408`
-- ZIP digest `sha256:978059bca48282eb0ee86cd0d981a8a74a3a090c12121136423cde5bf3d56f2a`
-- APK SHA-256 `fb4963e2678472fe471dd2f911a746e7dc8086743255952980ed4ef3c399ba77`
+## Permanent owner signing line — established
 
-## Unified J5 Motorola gate
+A durable owner-device update line now exists independently from transient `.alpha` signing:
 
-1. Install/update exact #2416 APK.
-2. Confirm Mayra remains/selects as default Home.
-3. Confirm new central orb/card renders.
-4. Tap orb/Open Mayra → full Mayra opens without duplicate-loop behavior.
+- build type: `ownerAlpha`;
+- package: `ai.mayra.app.owner`;
+- label: `Mayra AI Owner`;
+- encrypted GitHub Actions owner-signing Secrets configured;
+- exact stable signer held outside repository source/history;
+- working `.alpha` stays installed as rollback/reference during migration.
+
+First stable owner build:
+
+- exact source: `b72270aa83aecb24f120e619fc50094a77816f45`;
+- Stable Owner Alpha #16 / run `30987409944` — SUCCESS;
+- artifact `8922774120` / `mayra-stable-owner-apk-16`;
+- ZIP digest `sha256:9aa9ca2b5c3f8b7a6aab9582303003471a0da17775f3707ca2a116e2178ac19d`;
+- APK SHA-256 `233cb686851abeab1f923bf8be2a39dccf003d5debc3613951d2165db2d7d439`;
+- signer SHA-256 `1617672fc426020921598dc4cc5f361d464ed6e65d9d7e8919b6931964d289dd`;
+- v2/v3 signing verified;
+- package/label verification passed.
+
+Engineering backup: `backup/j5-stable-owner-signer-green-2026-08-05`.
+Immutable signer milestone: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_STABLE_OWNER_SIGNER_ESTABLISHED.md`.
+
+## Permanent owner Motorola gate
+
+1. Keep working `.alpha` installed.
+2. Install exact Stable Owner Alpha #16 APK side-by-side.
+3. Confirm `Mayra AI Owner` appears/selects as Home.
+4. Confirm central orb and full-Mayra handoff.
 5. Re-check app search/open/Home return.
-6. Re-check Power-button Android Assistant invocation/dismissal.
-7. Speak an unlocked request; tap assistant response → full Mayra opens without a navigation loop.
-8. Re-check lock/unlock, reboot, Airplane mode and launcher switch-back.
-9. Observe crashes/jank/thermal/battery regressions.
-10. Record signing identity when practical.
+6. Re-check Power-button Android Assistant invocation/dismissal where configured.
+7. Re-check lock/unlock, reboot, Airplane mode and launcher switch-back.
+8. Observe crashes/jank/thermal/battery regressions.
+9. Keep `.alpha` until `.owner` is accepted.
+10. Build a second stable-owner APK using the same signer and prove direct install-over-install without uninstall.
 
 ## Promotion rule
 
-Older J5 device evidence remains valid for its exact source but does not automatically prove the new unified source. Protected J5 promotion requires exact unified source + automated green + accepted Motorola evidence. After pass: synchronize docs → immutable J5 milestone snapshot → protected J5 baseline → begin J6.
+Older J5 device evidence remains valid for its exact source but does not automatically prove the permanent owner package. Protected J5 promotion requires exact promoted source + automated green + stable signer continuity + accepted Motorola evidence. After pass: synchronize docs → immutable J5 milestone snapshot → protected J5 baseline → begin J6.
 
 ## Major-step discipline
 
@@ -93,7 +113,9 @@ Idea/Decision/Blueprint/Roadmap/Preflight → coherent implementation → CI/pac
 
 ## Immediate next actions
 
-1. Physically verify #2416 unified J5 build on Motorola.
-2. If accepted, promote J5 protected baseline and then start J6 context cards.
-3. Separately finish J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal round.
-4. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Install Stable Owner Alpha #16 `ai.mayra.app.owner` on Motorola side-by-side with `.alpha`.
+2. Run unified launcher/assistant regression on the owner package.
+3. Produce a second stable owner build and prove update-over-update with the same signer.
+4. If accepted, promote J5 protected baseline and then start J6 context cards.
+5. Separately finish J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal round.
+6. Keep PR #12 Draft/open/unmerged until explicit owner approval.
