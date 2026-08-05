@@ -3,102 +3,97 @@
 Last updated: 2026-08-05
 Entry point: `START_HERE.md`
 Jarvis/launcher master plan: `docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md`
-Local LLM benchmark: `docs/testing/MAYRA_LOCAL_LLM_BENCHMARK.md`
 
 ## Product direction
 
-Mayra is targeting a practical **Jarvis-style personal Android operating layer** combining Digital Assistant voice, local-first AI, owner-controlled memory/documents, AI-native Home, provenance-aware context, trust-gated actions, proactive assistance, later multimodal understanding and owner-defined routines.
-
-The launcher is the resilient Home shell, not privileged authority. Heavy AI/model/provider failure must never block basic Home/app access.
+Mayra targets a practical Jarvis-style personal Android operating layer. Home, quick voice presence and full conversation should feel like one Mayra while internal modules remain isolated enough that AI/model/provider failure cannot break basic Home/app access.
 
 ## Overall program view
 
 | Track | Status | Current truth | Next gate |
 |---|---|---|---|
-| Governance/backups | DONE / CONTINUOUS | Canonical records, immutable snapshots, protected recovery and engineering backup refs exist | Sync every meaningful batch |
-| J1 Assistant role | DEVICE VERIFIED FOUNDATION | Motorola accepts/selects Mayra; Power invocation works | Preserve regression |
-| J2 recognition/privacy | DEVICE VERIFIED FOUNDATION | Hindi/Hinglish/English recognition, dismissal, lock/privacy cycles proven | Preserve regression |
-| Android system TTS | FALLBACK PASS | Offline fallback works; quality is robotic | Keep safe fallback |
-| J3 neural TTS | DEVICE BENCHMARK PASS / LICENSE BLOCKED | Offline neural synthesis proven; tested voice pack not production-cleared | Find license-clear voice |
-| J4 local LLM runtime | DEVICE RUNTIME PROVEN | Gemma3-1B import/SHA, CPU Stage 5/5, fixed multilingual generation and close/reload physically proven | Quality/operability device round |
-| J4 CI recovery | DONE / PROTECTED | Room/KSP race repaired; protected baseline exists | Preserve immutable baseline |
-| J4 quality harness | CI GREEN / DEVICE VERIFY | Longer prompts, RAM telemetry, stress, cancel/rebind are green | Motorola quality/RAM/thermal/lock/Airplane round |
-| J5 launcher shell | **CI GREEN / DEVICE VERIFY** | HOME shell, app list/search/launch, switch-back, contract tests and merged-APK HOME audits pass on exact source `6d5e773…` | Motorola default-HOME/reboot/switch-back/AI-failure proof |
-| J6 context fabric | ACCEPTED / BLOCKED ON J5 DEVICE PASS | Existing reminders/memory/documents/notifications can feed typed context | Start after protected J5 promotion |
-| J7 trust/action orchestration | ACCEPTED | Typed action/confirmation foundation exists | Formal GREEN/AMBER/RED policy after context boundary |
-| J8 proactive Mayra | ACCEPTED | Briefing/notification foundations exist | Privacy/battery/context-quality gates |
-| J9 multimodal | ACCEPTED / LATER | Document/image architecture can expand | Privacy/RAM/thermal benchmark |
-| J10 routines | ACCEPTED / LATER | Typed workflow philosophy established | Owner-defined routines after trust layer |
+| Governance/backups | DONE / CONTINUOUS | Canonical docs, protected recovery and engineering backups exist | Sync every meaningful batch |
+| J1 Assistant | DEVICE VERIFIED FOUNDATION | Android Assistant/Power invocation previously proven | Preserve regression |
+| J2 voice/privacy | DEVICE VERIFIED FOUNDATION | Multilingual recognition, dismissal, lock/privacy proven | Preserve regression |
+| J3 neural TTS | DEVICE BENCHMARK PASS / LICENSE BLOCKED | Technical offline voice proof exists; tested voice not production-cleared | License-clear voice later |
+| J4 local brain | RUNTIME PROVEN / QUALITY DEVICE VERIFY | Runtime, stress/cancel/RAM harness built | Finish physical quality round |
+| J5 Home core | STRONG DEVICE PROOF | Default Home, app search/launch, reboot, switch-back and Airplane behavior physically proven on #2384 | Preserve while verifying unified build |
+| J5 unified presence | **CI GREEN / DEVICE VERIFY** | Home orb + shared entry contract + voice-session-to-full-Mayra handoff green on `cc89a392…` | Motorola regression on #2416 |
+| J6 context fabric | ACCEPTED / BLOCKED ON J5 PROMOTION | reminders/memory/documents/notifications can feed typed context | Start after J5 protected baseline |
+| J7 trust/actions | ACCEPTED | typed action/confirmation foundation exists | Formal GREEN/AMBER/RED policy |
+| J8 proactive | ACCEPTED | briefing foundations exist | privacy/battery/context-quality gates |
+| J9 multimodal | LATER | architecture can expand | privacy/RAM/thermal gate |
+| J10 routines | LATER | typed workflow philosophy established | owner-defined routines after trust layer |
 
-## Protected recovery baseline
+## Protected rollback
 
-`baseline/mayra-0.2.1-j4-ci-recovery-green-134`
+`baseline/mayra-0.2.1-j4-ci-recovery-green-134` at `e72488a6f6dceb24950f9b0f574ae223d52bd8bb` remains immutable.
 
-Exact source `e72488a6f6dceb24950f9b0f574ae223d52bd8bb`. Preserve unchanged while J4 quality and J5 physical verification proceed.
+## J5 Home core device evidence
 
-## J4 quality checkpoint
+Exact old device-proven source `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a` / Android #2384 proved on Motorola Edge 70 Fusion / Android 16:
 
-Source `862450933da3700d4d1559e09ebde910a4185914`, backup `backup/j4-quality-harness-ci-green-2026-08-05`.
+- Mayra accepted as default Home;
+- 81/81 launchable apps rendered;
+- search → Chrome → Home works;
+- lock/unlock and reboot preserve usable Mayra Home;
+- previous launcher ↔ Mayra switching works;
+- Airplane mode keeps Home/search/app launch usable;
+- `Ask Mayra` opens normal Mayra;
+- normal Mayra has bounded offline-core behavior without general provider connectivity.
 
-Android #2364, J1 #473, J2 #369, J3 #191, J4 #142 and Governance #545 all passed. Physical quality/RAM/thermal/background/lock/Airplane evidence remains pending, so the tested local model is not yet promoted as production conversational brain.
+## J5 unified presence checkpoint
 
-## J5 automated milestone — DEVICE_VERIFY entry point
+Exact source `cc89a392a53fcb910166c92badaab3543b5520ff`.
+Backup: `backup/j5-unified-mayra-ci-green-2026-08-05`.
 
-Exact implementation source: `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a`
+Green automated evidence:
+- Android CI #2416
+- J1 #525
+- J2 #421
+- J3 #243
+- J4 #194
+- Governance #597
 
-Engineering backup: `backup/j5-home-contract-ci-green-2026-08-05`
-Immutable snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_J5_HOME_CONTRACT_CI_GREEN.md`
+Implemented:
+- shared `MayraEntryContract` between launcher, Android voice session and full Mayra;
+- large central Mayra orb/card on Home;
+- orb/Open Mayra launches the same full Mayra activity using clear-top/single-top semantics;
+- heard unlocked Android Assistant response can be tapped to continue in full Mayra;
+- Home still does not initialize heavy AI/memory/privileged-action runtime;
+- locked-device assistant privacy and bounded dismissal remain intact;
+- all isolated and full packaging boundaries stay green.
 
-Green evidence:
-- Android CI #2384
-- J1 #493
-- J2 #389
-- J3 #211
-- J4 #162
-- Governance #565
+Exact Motorola candidate:
+- Android #2416 (`30981372713`)
+- Personal Alpha artifact `8920663408`
+- ZIP digest `sha256:978059bca48282eb0ee86cd0d981a8a74a3a090c12121136423cde5bf3d56f2a`
+- APK SHA-256 `fb4963e2678472fe471dd2f911a746e7dc8086743255952980ed4ef3c399ba77`
 
-Current J5 slice includes:
-- separate `MayraLauncherActivity`;
-- `MAIN + HOME + DEFAULT` Home qualification;
-- user-consent `ROLE_HOME` request;
-- launchable-app inventory;
-- case-insensitive label/package search with unit tests;
-- direct app launching;
-- `Ask Mayra` bridge;
-- explicit Home-settings switch/restore route;
-- Home rendering independent of model/provider/memory/privileged-action startup;
-- Personal Alpha and minified Release contract audits explicitly proving HOME component/categories while preserving one normal app LAUNCHER entry.
+## Unified J5 Motorola gate
 
-Exact Motorola artifact:
-- Android #2384 Personal Alpha artifact `8919388343`;
-- artifact ZIP digest `sha256:92a6aa72d54e48c9fbc835e277b5d3471ec4c9112dfa9ab6e65a16ff229a2e17`;
-- extracted APK SHA-256 `1ec6be33cb0c484552668145c48690094df3e44a0cb0cef613e28c1f88283096`.
+1. Install/update exact #2416 APK.
+2. Confirm Mayra remains/selects as default Home.
+3. Confirm new central orb/card renders.
+4. Tap orb/Open Mayra → full Mayra opens without duplicate-loop behavior.
+5. Re-check app search/open/Home return.
+6. Re-check Power-button Android Assistant invocation/dismissal.
+7. Speak an unlocked request; tap assistant response → full Mayra opens without a navigation loop.
+8. Re-check lock/unlock, reboot, Airplane mode and launcher switch-back.
+9. Observe crashes/jank/thermal/battery regressions.
+10. Record signing identity when practical.
 
-## J5 Motorola promotion gate
+## Promotion rule
 
-1. Verify exact APK hash and signing identity.
-2. Mayra appears in Android Home/default launcher selection.
-3. Selecting Mayra succeeds.
-4. Home gesture/button returns to Mayra 20/20.
-5. App list/search/open work reliably.
-6. Lock/unlock and reboot preserve a usable Home.
-7. Previous launcher can be restored and Mayra re-selected.
-8. Local model absent/killed, provider/network unavailable, TTS unavailable, contacts/notification access denied: basic Home still works.
-9. Assistant invocation does not create Home/Assistant loops.
-10. Record RAM/battery/thermal/jank/ANR/crash observations.
+Older J5 device evidence remains valid for its exact source but does not automatically prove the new unified source. Protected J5 promotion requires exact unified source + automated green + accepted Motorola evidence. After pass: synchronize docs → immutable J5 milestone snapshot → protected J5 baseline → begin J6.
 
-Only after this exact-source physical pass: synchronize evidence → immutable J5 device milestone snapshot → protected J5 baseline → then J6.
+## Major-step discipline
 
-## Major-step baseline discipline
-
-Every major phase follows Idea/Decision/Blueprint/Roadmap/Preflight before implementation, then coherent code batch → CI/package audits → Motorola proof for device claims → canonical evidence sync → immutable milestone snapshot → protected baseline only when promotion requirements are satisfied.
-
-A red/pending head or CI-only device feature is never mislabelled as a protected device-verified baseline.
+Idea/Decision/Blueprint/Roadmap/Preflight → coherent implementation → CI/package audits → Motorola proof → canonical evidence sync → immutable milestone snapshot → protected baseline. A red/pending head is never stable.
 
 ## Immediate next actions
 
-1. Physically run J4 #142 quality gate and J5 #2384 HOME gate on Motorola.
-2. For J5 use only exact artifact `8919388343` and verify APK SHA-256 first.
-3. If J5 passes, promote protected J5 exact-green baseline and update all canonical records.
-4. Then deepen voice/orb integration into Home and begin J6 typed context cards: reminders → notifications → people → documents/media.
-5. Keep PR #12 Draft/open/unmerged until explicit owner approval.
+1. Physically verify #2416 unified J5 build on Motorola.
+2. If accepted, promote J5 protected baseline and then start J6 context cards.
+3. Separately finish J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal round.
+4. Keep PR #12 Draft/open/unmerged until explicit owner approval.
