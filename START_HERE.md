@@ -8,11 +8,12 @@ Last synchronized: **2026-08-05**
 Current development branch: **`agent/document-library-foundation`**
 Current pull request: **#12 — Draft, open, unmerged**
 Current app version: **0.2.1 / versionCode 4**
-Current active phase: **J5 unified Mayra owner-signing migration + device verification; separate J4 quality device gate**
+Current active phase: **J5 unified Mayra permanent owner-signing migration + device verification; separate J4 quality device gate**
 Latest protected recovery baseline: **`baseline/mayra-0.2.1-j4-ci-recovery-green-134`** at `e72488a6f6dceb24950f9b0f574ae223d52bd8bb`
 Latest unified J5 exact-green code: **`cc89a392a53fcb910166c92badaab3543b5520ff`**
 J5 unified backup: **`backup/j5-unified-mayra-ci-green-2026-08-05`**
 Owner signing migration record: **`docs/testing/MAYRA_OWNER_SIGNING_MIGRATION_2026-08-05.md`**
+Immutable signing-migration snapshot: **`docs/backups/MAYRA_SNAPSHOT_2026-08-05_OWNER_SIGNING_MIGRATION.md`**
 
 ## 1. Product north star
 
@@ -75,17 +76,25 @@ Exact-head automated evidence:
 - J4 #194 — SUCCESS
 - Governance #597 — SUCCESS
 
-### Owner signing migration — current blocker before unified device install
+### Owner signing migration — current delivery gate
 
-The #2416 Personal Alpha could not install over the physically proven #2384 Personal Alpha because ordinary hosted CI used a different transient debug signing certificate. Android correctly blocks same-package replacement when the signer changes.
+The #2416 `ai.mayra.app.alpha` could not install over the physically proven #2384 `.alpha` because ordinary hosted CI used a different transient debug signing certificate. Android correctly blocks same-package replacement when the signer changes.
 
-Stable Owner Alpha run #6 (`30984237319`) was triggered and failed at the signing-material gate because `MAYRA_OWNER_KEYSTORE_BASE64` is not configured. The persistent owner key must live only in secure owner backup + GitHub Actions encrypted Secrets, never in source/history.
+Stable Owner Alpha run #6 (`30984237319`) proved the dedicated signing workflow path but failed at the signing-material gate because `MAYRA_OWNER_KEYSTORE_BASE64` is not configured. A permanent owner key has been generated outside repository source/history for owner custody.
 
-Because the currently installed transient signer private key was not preserved, migration to the permanent owner signer requires one controlled uninstall/install after preserving needed owner data and retaining another launcher as rollback. After that migration, a second stable-owner build must install directly over the first to prove future update continuity.
+To avoid uninstall-first risk, Mayra now has a dedicated permanent **side-by-side owner package**:
+
+- build type: `ownerAlpha`
+- package: `ai.mayra.app.owner`
+- visible label: `Mayra AI Owner`
+- signing: one persistent owner key through Stable Owner Alpha only
+- preflight: `Owner Alpha Preflight` compiles/lints the owner variant without exposing private signing material
+
+The working `.alpha` remains installed while `.owner` is installed and tested. Android isolates their private data, so no silent cross-package data migration is claimed.
 
 ## 4. Jarvis execution phases
 
-- **J5 Launcher/Unified Presence:** current owner-signing migration + device-verification gate.
+- **J5 Launcher/Unified Presence:** current permanent owner-signing + device-verification gate.
 - **J6 Context:** provenance-aware reminders, notifications, people, documents/media and bounded app/screen context.
 - **J7 Actions:** GREEN/AMBER/RED trust policy, deterministic typed adapters and audit history.
 - **J8 Proactive:** My Day, pending-item assistance, quiet/battery/privacy limits.
@@ -103,16 +112,17 @@ A red/pending head is never called stable.
 ## 6. Current ordered work
 
 1. Keep the protected J4 recovery baseline immutable.
-2. Securely create/back up one permanent Mayra owner signing key.
-3. Configure GitHub Actions Secrets `MAYRA_OWNER_KEYSTORE_BASE64`, `MAYRA_OWNER_STORE_PASSWORD`, `MAYRA_OWNER_KEY_ALIAS`, `MAYRA_OWNER_KEY_PASSWORD`.
-4. Run Stable Owner Alpha and record APK SHA-256 + signer SHA-256.
-5. Preserve any Mayra owner data that must survive uninstall and keep another launcher available.
-6. One time only: replace the transient-signed alpha with the first stable-owner-signed alpha.
-7. Build a second stable-owner alpha and prove direct install-over-install without uninstall.
-8. Re-run unified J5 orb/assistant/Home regressions on the stable owner line.
-9. If unified J5 physical acceptance is accepted, create immutable J5 milestone snapshot + protected J5 baseline.
-10. Only then begin J6 context integration.
-11. Separately complete J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal acceptance.
+2. Keep the physically working `ai.mayra.app.alpha` installed as rollback/reference.
+3. Securely preserve the permanent Mayra owner signing bundle outside GitHub source/history.
+4. Configure GitHub Actions Secrets `MAYRA_OWNER_KEYSTORE_BASE64`, `MAYRA_OWNER_STORE_PASSWORD`, `MAYRA_OWNER_KEY_ALIAS`, `MAYRA_OWNER_KEY_PASSWORD`.
+5. Run Stable Owner Alpha to build `ai.mayra.app.owner`; record APK SHA-256 + signer SHA-256.
+6. Install `Mayra AI Owner` side-by-side; do not uninstall `.alpha` first.
+7. Test `.owner` as Home and, where desired, Digital Assistant: orb/full-Mayra handoff, app search/open/Home return, lock/unlock, reboot, switch-back, Airplane mode and failure independence.
+8. Build a second stable-owner APK and prove direct install-over-install without uninstall.
+9. Keep `.alpha` until owner-package behavior and any needed owner data transfer/recreation are accepted.
+10. If unified J5 physical acceptance is accepted, create immutable J5 milestone snapshot + protected J5 baseline.
+11. Only then begin J6 context integration.
+12. Separately complete J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal acceptance.
 
 ## 7. Mandatory resume procedure
 
@@ -129,6 +139,7 @@ After every meaningful batch synchronize applicable Roadmap, Latest Snapshot, Pi
 - no secrets/private keys/owner-private data in GitHub;
 - stable owner-device updates must use one persistent owner signer;
 - ordinary transient CI APKs are not assumed update-compatible;
+- permanent owner package is `ai.mayra.app.owner` unless a later explicit migration changes it;
 - no false device/audio/action claims;
 - free-form LLM text cannot directly execute privileged actions or write trusted owner memory;
 - context provenance stays structured and owner-controlled;
@@ -142,4 +153,4 @@ Git history is primary backup. `baseline/*` branches are immutable promoted reco
 
 ## 11. Immediate next action
 
-Complete the one-time stable owner-signing setup, produce the first stable-owner unified J5 APK, migrate the owner device once, then immediately prove a second stable-owner build installs over it without uninstall before resuming J5 physical promotion.
+Finish Owner Alpha preflight/shared regressions, configure the four encrypted signing Secrets from the private owner bundle, produce the first `ai.mayra.app.owner` APK, install it side-by-side with the working `.alpha`, then prove a second stable-owner build updates it in place before J5 protected promotion.
