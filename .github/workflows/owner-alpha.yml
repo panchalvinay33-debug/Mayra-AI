@@ -2,6 +2,11 @@ name: Stable Owner Alpha
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - agent/document-library-foundation
+    paths:
+      - .github/owner-alpha-trigger
 
 permissions:
   contents: read
@@ -72,6 +77,7 @@ jobs:
           "$AAPT" dump badging "$APK" | tee build/owner-signing/badging.txt
           grep -Fq "package: name='ai.mayra.app.alpha'" build/owner-signing/badging.txt
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee build/owner-signing/signing-certificate.txt
+          grep -Fq "Signer #1 certificate SHA-256 digest:" build/owner-signing/signing-certificate.txt
           cp "$APK" build/owner-signing/Mayra-AI-Owner-Update.apk
           sha256sum build/owner-signing/Mayra-AI-Owner-Update.apk | tee build/owner-signing/apk-sha256.txt
 
