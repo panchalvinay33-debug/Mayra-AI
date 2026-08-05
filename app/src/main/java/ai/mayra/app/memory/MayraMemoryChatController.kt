@@ -19,7 +19,8 @@ sealed interface MayraMemoryChatResult {
 /** Deterministic, model-independent chat commands for owner-controlled personal memory. */
 class MayraMemoryChatController(
     private val manager: MayraPersonalMemoryManager,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val preferenceLearner: MayraPreferenceLearner = MayraPreferenceLearner(clock)
 ) {
     fun handle(message: String): MayraMemoryChatResult {
         val text = message.trim()
@@ -40,17 +41,7 @@ class MayraMemoryChatController(
                 category = inferCategory(key),
                 provenance = MayraMemoryProvenance("chat", "owner-command", Instant.now(clock))
             )
-            return when (val result = manager.propose(candidate)) {
-                is MayraMemoryProposalResult.ApprovalRequired -> MayraMemoryChatResult.NeedsApproval(
-                    PendingMemoryApproval(
-                        proposalId = result.proposalId,
-                        key = result.candidate.key,
-                        newValue = result.candidate.value,
-                        previousValue = result.conflictingMemory?.value
-                    )
-                )
-                is MayraMemoryProposalResult.Rejected -> MayraMemoryChatResult.Reply(result.reason)
-            }
+            return proposalResult(manager.propose(candidate))
         }
         FORGET.matchEntire(text)?.groupValues?.get(1)?.trim()?.let { query ->
             val matches = manager.retrieve(query, limit = 10)
@@ -72,6 +63,13 @@ class MayraMemoryChatController(
                 else memories.take(10).joinToString(prefix = "Approved memories: ", separator = "; ") { "${it.key} = ${it.value}" }
             )
         }
+
+        // Safe self-learning: only explicit standalone preferences are recognized, and even those
+        // become ordinary pending proposals. Nothing is written to trusted memory until approval.
+        preferenceLearner.observe(text)?.let { preference ->
+            return proposalResult(manager.propose(preferenceLearner.toCandidate(preference)))
+        }
+
         return MayraMemoryChatResult.NotHandled
     }
 
@@ -94,6 +92,18 @@ class MayraMemoryChatController(
         return PendingMemoryApproval(proposal.id, proposal.candidate.key, proposal.candidate.value, previous)
     }
 
+    private fun proposalResult(result: MayraMemoryProposalResult): MayraMemoryChatResult = when (result) {
+        is MayraMemoryProposalResult.ApprovalRequired -> MayraMemoryChatResult.NeedsApproval(
+            PendingMemoryApproval(
+                proposalId = result.proposalId,
+                key = result.candidate.key,
+                newValue = result.candidate.value,
+                previousValue = result.conflictingMemory?.value
+            )
+        )
+        is MayraMemoryProposalResult.Rejected -> MayraMemoryChatResult.Reply(result.reason)
+    }
+
     private fun inferCategory(key: String): MayraMemoryCategory = when {
         key.contains("prefer", true) || key.contains("favorite", true) -> MayraMemoryCategory.PREFERENCE
         key.contains("project", true) || key.contains("business", true) -> MayraMemoryCategory.PROJECT
@@ -108,6 +118,6 @@ class MayraMemoryChatController(
         val CONFIRM = Regex("(?i)^confirm memory\\s+([a-f0-9]{64})$")
         val CANCEL = Regex("(?i)^cancel memory\\s+([a-f0-9]{64})$")
         val FORGET = Regex("(?is)^(?:mayra[, ]+)?(?:forget|bhool jao|भूल जाओ)\\s+(.+)$")
-        val LIST = Regex("(?i)^(?:mayra[, ]+)?(?:what do you remember|show my memories|tumhe kya yaad hai|क्या याद है)\\??$")
+        val LIST = Regex("(?i)^(?:mayra[, ]+)?(?:what do you remember|show my memories|tumhe kya yaad hai|tumne kya seekha|क्या याद है|तुमने क्या सीखा)\\??$")
     }
 }
