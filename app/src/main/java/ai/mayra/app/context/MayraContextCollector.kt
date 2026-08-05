@@ -1,6 +1,7 @@
 package ai.mayra.app.context
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -24,6 +25,15 @@ private fun readConnectivity(context: Context): ContextValue<ConnectivityState> 
     if (context.checkSelfPermission(Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
         return ContextValue.NotGranted
     }
+    return readGrantedConnectivity(context)
+}
+
+/**
+ * Called only after [ACCESS_NETWORK_STATE] is verified at runtime. Lint cannot infer that custom
+ * manifest-aware guard for variants such as the deliberately zero-permission document test.
+ */
+@SuppressLint("MissingPermission")
+private fun readGrantedConnectivity(context: Context): ContextValue<ConnectivityState> {
     return runCatching {
         val manager = context.getSystemService(ConnectivityManager::class.java)
             ?: return ContextValue.Unavailable
