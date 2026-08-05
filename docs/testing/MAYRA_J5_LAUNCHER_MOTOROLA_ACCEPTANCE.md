@@ -1,7 +1,7 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: **DEVICE VERIFY IN PROGRESS — DEFAULT HOME + INITIAL HOME RENDER PROVEN**
+Status: **DEVICE VERIFY IN PROGRESS — DEFAULT HOME + SEARCH/LAUNCH/HOME RETURN PROVEN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
 ## Exact artifact identity
@@ -25,10 +25,13 @@ Owner-supplied screenshots prove:
 1. Android Default apps shows `Home app -> Mayra AI Personal Alpha`.
 2. Pressing/returning Home renders `Mayra Home` with `Default Home ✓`.
 3. The Home surface enumerates `81 of 81 launchable apps` on the device.
-4. The visible app list is usable enough to render multiple installed apps including admin, Adobe Scan, Amazon, Amritvani, Apk Extractor, Assistant and Bajaj Finance.
-5. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
+4. The visible app list renders installed apps correctly.
+5. Searching `chro` filters the app list to matching results including `Chrome / com.android.chrome`.
+6. Tapping Chrome launches the real Chrome app successfully.
+7. Pressing Home after Chrome returns to Mayra Home with the search state still visible.
+8. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
 
-This proves default-Home selection and initial launcher render only. Search, app launch, repeated Home returns, lock/reboot, switch-back, failure-independence and resource behavior remain unproven until explicitly tested.
+This now proves the core daily launcher loop: select Mayra as Home -> render Home -> search app -> launch app -> return Home. Repeated 20/20 Home returns, lock/reboot, switch-back, failure-independence and resource behavior remain pending.
 
 ## Installation precheck
 
@@ -42,17 +45,17 @@ This proves default-Home selection and initial launcher render only. Search, app
 
 - [x] Mayra appears in Android Home app/default launcher list.
 - [x] Owner can select Mayra without error.
-- [ ] Home gesture/button returns to Mayra 20/20 times. One successful return is proven so far.
-- [ ] Lock → unlock returns to a usable Home state.
+- [ ] Home gesture/button returns to Mayra 20/20 times. Multiple successful returns are proven; formal 20/20 count pending.
+- [ ] Lock -> unlock returns to a usable Home state.
 - [ ] Reboot retains/recovers expected default Home behavior.
 
 ## B. Basic launcher usability
 
 - [x] Installed launchable apps are present; first device render reports 81/81 launchable apps.
-- [ ] Search finds at least five known apps using label text.
+- [ ] Search finds at least five known apps using label text. Chrome label search is proven; four more known-app label searches remain.
 - [ ] Package-name search works for a known installed app where practical.
-- [ ] Tapping a result launches the correct app.
-- [ ] Returning Home returns to Mayra after launching another app.
+- [x] Tapping a result launches the correct app; Chrome physically proven.
+- [x] Returning Home returns to Mayra after launching another app; Chrome -> Home physically proven.
 - [ ] Refresh apps does not create duplicate/ghost entries.
 - [ ] App install/update/uninstall is reflected after refresh where tested.
 
@@ -73,7 +76,7 @@ Favorites/basic persistent layout is not implemented in the current slice and is
 - [ ] `Ask Mayra` opens the normal Mayra activity.
 - [ ] Power-button Digital Assistant invocation still works where configured.
 - [ ] Dismissing Assistant returns to a sane screen/Home.
-- [ ] No Assistant ↔ Launcher navigation loop.
+- [ ] No Assistant <-> Launcher navigation loop.
 - [ ] Rapid invoke/dismiss/Home cycle remains stable.
 
 Deeper voice/orb integration into Home is intentionally a later J5 slice after base Home reliability proof.
