@@ -1,11 +1,23 @@
 # Mayra AI — Secure Baseline and Rollback Playbook
 
-Last updated: 2026-08-03
+Last updated: 2026-08-05
 Entry point: `START_HERE.md`
+Jarvis/launcher direction: `docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md`
 
 ## Purpose
 
 Mayra development must be ambitious without making known-good states disposable. This playbook defines how green baselines are created, protected, promoted and recovered.
+
+## Major-step checkpoint rule
+
+Every major capability now has **two different checkpoint types** and they must never be confused:
+
+1. **Planning/direction snapshot** — immutable record of the accepted idea, architecture, risks, validation gate and rollback path. It may be created even while the active head is red, but it is explicitly NOT a stable application baseline.
+2. **Green recovery baseline** — protected `baseline/*` branch pointing to the exact implementation commit only after every applicable automated/device gate passes.
+
+Before a major step begins, synchronize applicable Idea Ledger, Decision/ADR, Blueprint, Roadmap and preflight/test records. After a major step becomes exact-green, synchronize Changelog, Latest Snapshot, test/device evidence and create an immutable milestone snapshot before moving to the next risky phase.
+
+This lifecycle is mandatory for J5 launcher, J6 context, J7 action trust, J8 proactive Mayra, J9 multimodal and J10 routines as well as future major tracks.
 
 ## Current protected baselines
 
@@ -61,6 +73,8 @@ Create a new `baseline/<milestone>-green-<run>` branch only when all applicable 
 8. Roadmap and rolling snapshot are synchronized.
 9. Major architecture/release transitions receive an immutable snapshot.
 10. Any claimed device behavior has dated Motorola evidence.
+11. For launcher milestones: HOME-role/default selection, app reachability, crash/model-failure fallback and switch-back behavior are physically validated where applicable.
+12. The exact next risky phase and rollback point are recorded.
 
 A pending or failed head can never become a baseline.
 
@@ -74,6 +88,8 @@ Documentation-only commits after a validated application commit do not move the 
 - On failure, inspect the exact CI/device evidence and repair or revert the smallest responsible change.
 - Never weaken tests, permission audits or governance merely to force green.
 - Never use a baseline branch as an experimental branch.
+- A planning snapshot may document a future direction while the head is red, but implementation of unrelated major features waits for recovery to green.
+- Each major step must identify the last known recovery point before implementation begins.
 
 ## Recovery levels
 
@@ -119,7 +135,8 @@ For owner-device testing:
 - never bypass Play Protect;
 - understand whether uninstall will erase local data before testing an update path;
 - if a candidate crashes or corrupts behavior, stop that candidate and return to the last recorded compatible package where signing/package identity permits;
-- J1/J2 are disposable engineering packages and must not be treated as the final personal-data container.
+- J1/J2/J3/J4 and future isolated J5 engineering packages are disposable engineering packages and must not be treated as the final personal-data container;
+- launcher testing must always preserve a documented route to select the previous/default launcher again.
 
 ## Data and secret recovery
 
@@ -134,15 +151,17 @@ Every promoted baseline must record:
 - version/versionCode;
 - CI/Governance run numbers;
 - artifact IDs, sizes and SHA-256 digests;
-- package/permission/component boundary;
+- package/permission/component/launcher boundary;
 - device verification state;
 - known limitations;
-- exact next risky phase.
+- exact next risky phase;
+- rollback target and recovery instructions.
 
 ## Forbidden actions
 
 - Force-moving a protected baseline branch.
 - Calling a failed/pending commit stable.
+- Calling a planning snapshot a green application baseline.
 - Deleting failed history to hide a problem.
 - Reusing an artifact without source/run/digest provenance.
 - Merging PR #12 or marking it ready without explicit owner approval.
