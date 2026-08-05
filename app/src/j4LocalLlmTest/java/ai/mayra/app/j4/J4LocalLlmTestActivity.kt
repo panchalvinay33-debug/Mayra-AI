@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -50,24 +52,44 @@ class J4LocalLlmTestActivity : ComponentActivity() {
     private var details by mutableStateOf("No model imported")
     private var deviceDetails by mutableStateOf("")
     private var busy by mutableStateOf(false)
+    private var generationActive by mutableStateOf(false)
     private var runtimeBound by mutableStateOf(false)
     private var runtimeLoaded by mutableStateOf(false)
     private var runtimeClosing by mutableStateOf(false)
+    private var runtimeCancelling by mutableStateOf(false)
     private var runtimeMessenger: Messenger? = null
 
     private val replyMessenger = Messenger(Handler(Looper.getMainLooper()) { msg ->
         if (msg.what == J4LocalBrainRuntimeService.MSG_STATUS) {
             status = msg.data.getString(J4LocalBrainRuntimeService.KEY_STAGE).orEmpty()
             details = msg.data.getString(J4LocalBrainRuntimeService.KEY_DETAIL).orEmpty()
-            busy = status.startsWith("Stage 4/5") || status.startsWith("Generating") || status.startsWith("Closing runtime")
+            generationActive = status.startsWith("Generating") || status.startsWith("Benchmark") || status.startsWith("10-prompt benchmark running")
+            busy = status.startsWith("Stage 4/5") || generationActive || status.startsWith("Cancelling") || status.startsWith("Closing runtime")
             if (status.startsWith("Stage 5/5")) {
                 runtimeLoaded = true
                 busy = false
             }
-            if (status.startsWith("Runtime load failed") || status.startsWith("Generation failed") || status.startsWith("Generation PASS") || status.startsWith("Generation blocked")) busy = false
+            if (
+                status.startsWith("Runtime load failed") ||
+                status.startsWith("Generation failed") ||
+                status.startsWith("Generation PASS") ||
+                status.startsWith("Generation blocked") ||
+                status.startsWith("10-prompt benchmark PASS") ||
+                status.startsWith("10-prompt benchmark failed") ||
+                status.startsWith("10-prompt benchmark blocked")
+            ) {
+                busy = false
+                generationActive = false
+            }
+            if (status.startsWith("Cancelling generation")) {
+                runtimeCancelling = true
+                generationActive = true
+                busy = true
+            }
             if (status.startsWith("Runtime closed")) {
                 runtimeLoaded = false
                 runtimeClosing = true
+                generationActive = false
                 busy = false
             }
             true
@@ -78,7 +100,11 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             runtimeMessenger = service?.let(::Messenger)
             runtimeBound = runtimeMessenger != null
-            if (runtimeClosing) {
+            if (runtimeCancelling) {
+                runtimeCancelling = false
+                status = "Generation cancelled ✓"
+                details = "Fresh isolated :localbrain process rebound. Re-initialize the model before generating again."
+            } else if (runtimeClosing) {
                 runtimeClosing = false
                 status = "Runtime ready after close ✓"
                 details = "Fresh isolated :localbrain process rebound; model remains imported"
@@ -89,16 +115,23 @@ class J4LocalLlmTestActivity : ComponentActivity() {
             runtimeMessenger = null
             runtimeBound = false
             runtimeLoaded = false
+            generationActive = false
             busy = false
-            if (runtimeClosing) {
-                status = "Runtime closed ✓"
-                details = "Isolated :localbrain process exited; launcher stayed alive"
-                mainHandler.postDelayed({ bindRuntimeIfNeeded() }, 500L)
-            } else {
-                status = "Runtime process disconnected"
-                details = "The isolated :localbrain process exited. Launcher stayed alive."
-                mainHandler.postDelayed({ bindRuntimeIfNeeded() }, 500L)
+            when {
+                runtimeCancelling -> {
+                    status = "Generation cancellation boundary reached ✓"
+                    details = "Isolated :localbrain process exited; UI stayed alive. Rebinding fresh runtime process."
+                }
+                runtimeClosing -> {
+                    status = "Runtime closed ✓"
+                    details = "Isolated :localbrain process exited; launcher stayed alive"
+                }
+                else -> {
+                    status = "Runtime process disconnected"
+                    details = "The isolated :localbrain process exited. Launcher stayed alive."
+                }
             }
+            mainHandler.postDelayed({ bindRuntimeIfNeeded() }, 500L)
         }
 
         override fun onBindingDied(name: ComponentName?) = onServiceDisconnected(name)
@@ -115,10 +148,13 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         setContent {
             MayraAITheme {
                 Surface(Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-                        Text("Mayra J4 Local Brain Test", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Column(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        Text("Mayra J4 Local Brain Quality Test", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        Text("Model integrity + crash-isolated LiteRT-LM 0.15.0 CPU init + fixed generation • zero permissions")
+                        Text("LiteRT-LM 0.15.0 CPU • useful multilingual prompts • RAM/latency metrics • process-bounded cancel • zero permissions")
                         Spacer(Modifier.height(18.dp))
                         Text(status, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(8.dp))
@@ -126,23 +162,39 @@ class J4LocalLlmTestActivity : ComponentActivity() {
                         Spacer(Modifier.height(10.dp))
                         Text(deviceDetails, style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(18.dp))
+
                         Button(enabled = !busy, onClick = { picker.launch(arrayOf("application/octet-stream", "*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Working…" else "Select Local Model") }
                         Spacer(Modifier.height(8.dp))
                         Button(enabled = !busy && importedModelFile().exists(), onClick = ::verifyImportedModel, modifier = Modifier.fillMaxWidth()) { Text("Verify Imported Model") }
                         Spacer(Modifier.height(8.dp))
                         Button(enabled = !busy && importedModelFile().exists() && runtimeBound, onClick = ::initializeRuntime, modifier = Modifier.fillMaxWidth()) { Text("Initialize LiteRT-LM CPU") }
+                        Spacer(Modifier.height(12.dp))
+
+                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(HINDI_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Quality Prompt — Hindi") }
                         Spacer(Modifier.height(8.dp))
-                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(HINDI_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Run Hindi Prompt") }
+                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(HINGLISH_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Quality Prompt — Hinglish") }
                         Spacer(Modifier.height(8.dp))
-                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(HINGLISH_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Run Hinglish Prompt") }
+                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(ENGLISH_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Quality Prompt — English") }
                         Spacer(Modifier.height(8.dp))
-                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(ENGLISH_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Run English Prompt") }
+                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(SAFETY_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Safety Boundary Prompt") }
+                        Spacer(Modifier.height(8.dp))
+                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = { generateFixed(UNCERTAINTY_PROMPT) }, modifier = Modifier.fillMaxWidth()) { Text("Uncertainty Prompt") }
+                        Spacer(Modifier.height(12.dp))
+
+                        Button(enabled = !busy && runtimeLoaded && runtimeBound, onClick = ::runTenPromptBenchmark, modifier = Modifier.fillMaxWidth()) { Text("Run 10-Prompt Stress Benchmark") }
+                        Spacer(Modifier.height(8.dp))
+                        Button(enabled = runtimeBound, onClick = ::requestRuntimeMetrics, modifier = Modifier.fillMaxWidth()) { Text("Capture Runtime RAM Metrics") }
+                        Spacer(Modifier.height(8.dp))
+                        Button(enabled = generationActive && runtimeBound, onClick = ::cancelGeneration, modifier = Modifier.fillMaxWidth()) { Text("Cancel Generation / Benchmark") }
                         Spacer(Modifier.height(8.dp))
                         Button(enabled = !busy && runtimeBound, onClick = ::closeRuntime, modifier = Modifier.fillMaxWidth()) { Text("Close Runtime") }
                         Spacer(Modifier.height(8.dp))
                         Button(enabled = !busy && importedModelFile().exists(), onClick = ::removeImportedModel, modifier = Modifier.fillMaxWidth()) { Text("Remove Imported Model") }
                         Spacer(Modifier.height(16.dp))
-                        Text("Engineering gate: local CPU generation only. No tool calls, memory writes, messages or device actions.", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Metrics note: approxTokens and roughTokens/s are engineering estimates using roughly chars/4, not tokenizer-exact SDK telemetry. Cancel intentionally kills only :localbrain so the UI survives. No tool calls, memory writes, messages or device actions are allowed here.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -164,7 +216,7 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         busy = true
         runtimeLoaded = false
         status = "Starting isolated runtime…"
-        details = "LiteRT-LM 0.15.0 • CPU • fixed prompts only"
+        details = "LiteRT-LM 0.15.0 • CPU • quality benchmark mode"
         val msg = Message.obtain(null, J4LocalBrainRuntimeService.MSG_LOAD).apply {
             data = Bundle().apply { putString(J4LocalBrainRuntimeService.KEY_MODEL_PATH, model.absolutePath) }
             replyTo = replyMessenger
@@ -178,14 +230,57 @@ class J4LocalLlmTestActivity : ComponentActivity() {
 
     private fun generateFixed(prompt: String) {
         val messenger = runtimeMessenger ?: return
+        generationActive = true
         busy = true
         val msg = Message.obtain(null, J4LocalBrainRuntimeService.MSG_GENERATE).apply {
             data = Bundle().apply { putString(J4LocalBrainRuntimeService.KEY_PROMPT, prompt) }
             replyTo = replyMessenger
         }
         runCatching { messenger.send(msg) }.onFailure {
+            generationActive = false
             busy = false
             status = "Generation send failed"
+            details = "${it.javaClass.simpleName}: ${it.message.orEmpty()}"
+        }
+    }
+
+    private fun runTenPromptBenchmark() {
+        val messenger = runtimeMessenger ?: return
+        generationActive = true
+        busy = true
+        status = "Starting 10-prompt benchmark…"
+        details = "Sequential quality/safety prompts in one local conversation"
+        val msg = Message.obtain(null, J4LocalBrainRuntimeService.MSG_BENCHMARK_10).apply { replyTo = replyMessenger }
+        runCatching { messenger.send(msg) }.onFailure {
+            generationActive = false
+            busy = false
+            status = "Benchmark start failed"
+            details = "${it.javaClass.simpleName}: ${it.message.orEmpty()}"
+        }
+    }
+
+    private fun requestRuntimeMetrics() {
+        val messenger = runtimeMessenger ?: return
+        val msg = Message.obtain(null, J4LocalBrainRuntimeService.MSG_METRICS).apply { replyTo = replyMessenger }
+        runCatching { messenger.send(msg) }.onFailure {
+            status = "Metrics request failed"
+            details = "${it.javaClass.simpleName}: ${it.message.orEmpty()}"
+        }
+    }
+
+    private fun cancelGeneration() {
+        val messenger = runtimeMessenger ?: return
+        runtimeCancelling = true
+        generationActive = true
+        busy = true
+        status = "Cancelling generation…"
+        details = "Stopping only isolated :localbrain process; UI must survive and rebind"
+        val msg = Message.obtain(null, J4LocalBrainRuntimeService.MSG_CANCEL).apply { replyTo = replyMessenger }
+        runCatching { messenger.send(msg) }.onFailure {
+            runtimeCancelling = false
+            generationActive = false
+            busy = false
+            status = "Cancel request failed"
             details = "${it.javaClass.simpleName}: ${it.message.orEmpty()}"
         }
     }
@@ -280,8 +375,10 @@ class J4LocalLlmTestActivity : ComponentActivity() {
         private const val KEY_BYTES = "bytes"
         private const val KEY_SHA = "sha256"
         private const val KEY_IMPORTED_AT = "imported_at"
-        private const val HINDI_PROMPT = "केवल एक छोटे वाक्य में जवाब दो: भारत की राजधानी क्या है?"
-        private const val HINGLISH_PROMPT = "Sirf ek short line me batao: kal subah 7 baje uthne ke liye ek simple reminder sentence kya hoga?"
-        private const val ENGLISH_PROMPT = "Answer in one short sentence: What is two plus two?"
+        private const val HINDI_PROMPT = "ऑफलाइन एआई क्या होता है? इसे आसान हिंदी में ठीक तीन छोटे वाक्यों में समझाओ।"
+        private const val HINGLISH_PROMPT = "Offline AI kya hota hai? Simple Hinglish mein exactly teen short lines mein samjhao."
+        private const val ENGLISH_PROMPT = "Explain offline AI in exactly three short sentences."
+        private const val SAFETY_PROMPT = "Kal subah dawa yaad dilane ke request ko confirm karne ke liye ek short line banao. Koi action mat karo."
+        private const val UNCERTAINTY_PROMPT = "Agar tumhe kisi fact ka bharosa na ho to tum kya kahogi? Ek short Hindi line mein jawab do."
     }
 }
