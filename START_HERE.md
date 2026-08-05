@@ -8,10 +8,11 @@ Last synchronized: **2026-08-05**
 Current development branch: **`agent/document-library-foundation`**
 Current pull request: **#12 — Draft, open, unmerged**
 Current app version: **0.2.1 / versionCode 4**
-Current active phase: **J5 unified Mayra device verification + separate J4 quality device gate**
+Current active phase: **J5 unified Mayra owner-signing migration + device verification; separate J4 quality device gate**
 Latest protected recovery baseline: **`baseline/mayra-0.2.1-j4-ci-recovery-green-134`** at `e72488a6f6dceb24950f9b0f574ae223d52bd8bb`
 Latest unified J5 exact-green code: **`cc89a392a53fcb910166c92badaab3543b5520ff`**
 J5 unified backup: **`backup/j5-unified-mayra-ci-green-2026-08-05`**
+Owner signing migration record: **`docs/testing/MAYRA_OWNER_SIGNING_MIGRATION_2026-08-05.md`**
 
 ## 1. Product north star
 
@@ -35,9 +36,10 @@ Launcher addendum: `docs/MAYRA_BLUEPRINT_JARVIS_LAUNCHER_ADDENDUM.md`
 10. `docs/testing/MAYRA_LOCAL_LLM_BENCHMARK.md`
 11. `docs/feasibility/MAYRA_J5_LAUNCHER_PREFLIGHT.md`
 12. `docs/testing/MAYRA_J5_LAUNCHER_MOTOROLA_ACCEPTANCE.md`
-13. `docs/MAYRA_IDEA_LEDGER.md`
-14. `docs/MAYRA_DECISIONS.md`
-15. `docs/MAYRA_CHANGELOG.md`
+13. `docs/testing/MAYRA_OWNER_SIGNING_MIGRATION_2026-08-05.md`
+14. `docs/MAYRA_IDEA_LEDGER.md`
+15. `docs/MAYRA_DECISIONS.md`
+16. `docs/MAYRA_CHANGELOG.md`
 
 ## 3. Current proven foundation
 
@@ -59,27 +61,11 @@ Runtime is proven and Room/KSP CI recovery is protected. Quality source `8624509
 
 ### J5 Home — real device core proven
 
-On exact source `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a` / Android #2384, Motorola evidence proved:
+On exact source `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a` / Android #2384, Motorola evidence proved default Home selection, app inventory/search/launch/Home return, lock/unlock, reboot, safe launcher switching, Airplane-mode core independence and the `Ask Mayra` bridge.
 
-- Mayra can be selected as default Home;
-- Mayra Home renders after Home, lock/unlock and reboot;
-- 81/81 launchable apps were listed;
-- search/app launch/Home return works;
-- previous launcher can be restored and Mayra selected again;
-- Airplane mode keeps Home/search/app-launch usable;
-- `Ask Mayra` opens the normal Mayra app;
-- normal Mayra has a bounded offline-core path without general provider connectivity.
+### J5 unified Mayra — automated green
 
-### J5 unified Mayra — automated green, device verify next
-
-Exact source `cc89a392a53fcb910166c92badaab3543b5520ff` adds:
-
-- shared `MayraEntryContract` for Home/voice-session/full-Mayra navigation;
-- a large central Mayra orb/card directly on Home;
-- orb/Open Mayra routing to the same full Mayra activity with clear-top/single-top semantics;
-- Android voice-session response tap can continue into full Mayra after an unlocked heard request;
-- Home remains lightweight and independent of local model/cloud/memory/privileged-action startup;
-- lock-screen privacy and bounded assistant dismissal stay intact.
+Exact source `cc89a392a53fcb910166c92badaab3543b5520ff` adds shared Mayra entry routing, a central Home orb/card, orb/Open-Mayra handoff into full Mayra, and voice-session continuation into full Mayra while preserving lightweight Home independence.
 
 Exact-head automated evidence:
 - Android CI #2416 — SUCCESS
@@ -89,11 +75,17 @@ Exact-head automated evidence:
 - J4 #194 — SUCCESS
 - Governance #597 — SUCCESS
 
-New Motorola candidate: Android #2416 artifact `8920663408`, APK SHA-256 `fb4963e2678472fe471dd2f911a746e7dc8086743255952980ed4ef3c399ba77`.
+### Owner signing migration — current blocker before unified device install
+
+The #2416 Personal Alpha could not install over the physically proven #2384 Personal Alpha because ordinary hosted CI used a different transient debug signing certificate. Android correctly blocks same-package replacement when the signer changes.
+
+Stable Owner Alpha run #6 (`30984237319`) was triggered and failed at the signing-material gate because `MAYRA_OWNER_KEYSTORE_BASE64` is not configured. The persistent owner key must live only in secure owner backup + GitHub Actions encrypted Secrets, never in source/history.
+
+Because the currently installed transient signer private key was not preserved, migration to the permanent owner signer requires one controlled uninstall/install after preserving needed owner data and retaining another launcher as rollback. After that migration, a second stable-owner build must install directly over the first to prove future update continuity.
 
 ## 4. Jarvis execution phases
 
-- **J5 Launcher/Unified Presence:** current device-verification gate.
+- **J5 Launcher/Unified Presence:** current owner-signing migration + device-verification gate.
 - **J6 Context:** provenance-aware reminders, notifications, people, documents/media and bounded app/screen context.
 - **J7 Actions:** GREEN/AMBER/RED trust policy, deterministic typed adapters and audit history.
 - **J8 Proactive:** My Day, pending-item assistance, quiet/battery/privacy limits.
@@ -111,14 +103,16 @@ A red/pending head is never called stable.
 ## 6. Current ordered work
 
 1. Keep the protected J4 recovery baseline immutable.
-2. Install/update the exact J5 unified #2416 Personal Alpha.
-3. Verify the new Home orb/card, orb → full Mayra handoff and existing app-search/open/Home flow.
-4. Verify Power-button Assistant still works; after a heard unlocked request, tapping the response should open full Mayra without a loop.
-5. Re-check lock/unlock, reboot, Airplane mode and launcher switch-back on the unified build.
-6. Record any crash/jank/thermal/battery regression.
-7. If unified J5 physical acceptance is accepted, create immutable J5 milestone snapshot + protected J5 baseline.
-8. Only then begin J6 context integration.
-9. Separately complete J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal acceptance.
+2. Securely create/back up one permanent Mayra owner signing key.
+3. Configure GitHub Actions Secrets `MAYRA_OWNER_KEYSTORE_BASE64`, `MAYRA_OWNER_STORE_PASSWORD`, `MAYRA_OWNER_KEY_ALIAS`, `MAYRA_OWNER_KEY_PASSWORD`.
+4. Run Stable Owner Alpha and record APK SHA-256 + signer SHA-256.
+5. Preserve any Mayra owner data that must survive uninstall and keep another launcher available.
+6. One time only: replace the transient-signed alpha with the first stable-owner-signed alpha.
+7. Build a second stable-owner alpha and prove direct install-over-install without uninstall.
+8. Re-run unified J5 orb/assistant/Home regressions on the stable owner line.
+9. If unified J5 physical acceptance is accepted, create immutable J5 milestone snapshot + protected J5 baseline.
+10. Only then begin J6 context integration.
+11. Separately complete J4 quality/RAM/cancel/stress/background/lock/Airplane/thermal acceptance.
 
 ## 7. Mandatory resume procedure
 
@@ -133,6 +127,8 @@ After every meaningful batch synchronize applicable Roadmap, Latest Snapshot, Pi
 - official Android roles/APIs first;
 - minimum permissions for active capability;
 - no secrets/private keys/owner-private data in GitHub;
+- stable owner-device updates must use one persistent owner signer;
+- ordinary transient CI APKs are not assumed update-compatible;
 - no false device/audio/action claims;
 - free-form LLM text cannot directly execute privileged actions or write trusted owner memory;
 - context provenance stays structured and owner-controlled;
@@ -142,8 +138,8 @@ After every meaningful batch synchronize applicable Roadmap, Latest Snapshot, Pi
 
 ## 10. Backup model
 
-Git history is primary backup. `baseline/*` branches are immutable promoted recovery markers. `backup/*` branches preserve engineering checkpoints. `docs/backups/MAYRA_LATEST_SNAPSHOT.md` is rolling recovery truth. Immutable planning/milestone snapshots live under `docs/backups/`. CI artifacts are temporary evidence and remain tied to source/run/digest provenance.
+Git history is primary backup. `baseline/*` branches are immutable promoted recovery markers. `backup/*` branches preserve engineering checkpoints. `docs/backups/MAYRA_LATEST_SNAPSHOT.md` is rolling recovery truth. Immutable planning/milestone snapshots live under `docs/backups/`. CI artifacts are temporary evidence and remain tied to source/run/digest provenance. Private signing keys remain outside GitHub source/history.
 
 ## 11. Immediate next action
 
-Install exact unified J5 #2416 Personal Alpha (`8920663408`, APK SHA-256 `fb4963e2678472fe471dd2f911a746e7dc8086743255952980ed4ef3c399ba77`) on Motorola and run the short unified-presence regression before protected J5 promotion.
+Complete the one-time stable owner-signing setup, produce the first stable-owner unified J5 APK, migrate the owner device once, then immediately prove a second stable-owner build installs over it without uninstall before resuming J5 physical promotion.
