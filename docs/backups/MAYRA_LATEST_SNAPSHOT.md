@@ -1,19 +1,41 @@
 # Mayra AI — Latest Project Snapshot
 
-Snapshot date: 2026-08-04
+Snapshot date: 2026-08-05
 Branch: `agent/document-library-foundation`
 PR: #12 — Draft/open/unmerged
 App version: 0.2.1 / versionCode 4
-Current phase: J2 voice is device-proven; J3 neural TTS is device-stable but the tested voice pack is production-license blocked; J4 local-brain model lifecycle/integrity is now the active offline-intelligence gate.
+Current phase: repair current J4 CI red head, then complete J4 green recovery baseline before J5 AI-native launcher implementation.
+
+## Canonical product direction
+
+Mayra is now explicitly targeting a practical **Jarvis-style personal Android operating layer**.
+
+The final product combines:
+
+- Android Digital Assistant / voice presence;
+- local-first conversational brain with deterministic fallback;
+- owner-approved memory and private documents;
+- reminders, notification intelligence and people/context;
+- AI-native default launcher/Home shell;
+- trust-gated typed action engine;
+- proactive My Day/pending-item assistance;
+- later multimodal understanding and owner-defined routines through separate gates.
+
+Canonical plan: `docs/MAYRA_JARVIS_LAUNCHER_MASTER_PLAN.md`
+Decision: `docs/decisions/ADR_033_AI_NATIVE_LAUNCHER_AND_MAJOR_STEP_BASELINES.md`
+Immutable planning snapshot: `docs/backups/MAYRA_SNAPSHOT_2026-08-05_JARVIS_LAUNCHER_DIRECTION.md`
 
 ## Canonical truth
 
-- Final product remains one Mayra app; J1/J2/J3/J4 are engineering packages only.
+- Final product remains one Mayra app plus one AI-native launcher/Home shell; J1/J2/J3/J4 and future isolated engineering packages are test/proof packages only.
+- The launcher is Mayra's Home surface, not the privileged action authority.
+- Heavy AI/model/provider failure must not make Home unusable.
 - PR #12 is not authorized for merge/ready.
-- Protected baselines are immutable.
+- Protected `baseline/*` branches are immutable exact-green recovery markers.
+- Planning/failure snapshots are not green application baselines.
 - Device capability claims require Motorola evidence.
 - Android offline TTS remains the production-safe speech fallback until a license-clear neural voice is selected.
-- Heavy local LLM integration remains isolated from final Mayra until Motorola benchmark evidence exists.
+- Free-form LLM output never directly executes privileged actions or writes trusted owner memory/context.
 
 ## Latest protected application baseline
 
@@ -48,76 +70,77 @@ Passing source: `1ed0cd3e8d9ebe7671f3027fe0ab85b41da0294a`
 
 The Priyamvada voice remains benchmark-only because its model-card dataset terms are not production-cleared. Keep system TTS fallback and reuse J3 architecture only with a license-clear voice pack.
 
-## J4 local brain foundation
+## J4 local brain — current exact-head truth
 
-### Green L0 milestone
+J4 has accumulated model import/integrity, isolated local-brain and LiteRT-LM provenance work. However the latest inspected PR head before this documentation synchronization had one failing workflow:
 
-Source `062894809bb8b0989f79ab99db644c9d0cbdfa2d`:
+- **J4 Local LLM Test — failure**;
+- Android CI — success;
+- J1 Assistant Test — success;
+- J2 Voice Test — success;
+- J3 Neural TTS Test — success;
+- Project Governance — success.
 
-- J4 Local LLM Test #2 — success;
-- Android CI #2224 — success;
-- Governance #405 — success;
-- J1 #333 / J2 #229 / J3 #51 — success.
+Failure root cause observed in the J4 job:
 
-L0 proves a dedicated zero-permission `ai.mayra.app.j4` package can import an owner-selected `.litertlm` file into app-private storage without bundling a huge model or requesting broad storage/network permissions.
+- LiteRT-LM Android 0.15.0 AAR download and SHA-256 verification passed;
+- classfile probe passed (`Engine.class`, Java 21 classfile major 65);
+- compile classpath isolation check passed;
+- `kspJ4LocalLlmTestKotlin` failed when Room/KSP deserialized a truncated schema JSON;
+- error: `Expected colon ':', but had 'EOF'` with JSON input ending after `"formatVersion"`.
 
-### Hardened L1 now in source
+Conclusion: this is a localized Room/KSP schema-data/build failure in the current head, not evidence that the LiteRT-LM AAR probe itself failed. The head remains red and must not be promoted.
 
-- reusable `MayraLocalModelIntegrity` boundary;
-- unit tests for filename policy, storage headroom/overflow and SHA-256 known vector;
-- `.litertlm` filename gate;
-- provider-size validation;
-- 256 MB private-storage safety headroom;
-- atomic `.partial` → final import;
-- copy-byte verification;
-- SHA-256 during import;
-- saved model name/bytes/hash;
-- independent SHA-256 re-verification;
-- remove/re-import lifecycle;
-- visible Motorola/Android/ABI/RAM/app-heap/private-free-space diagnostics.
+## Major-step baseline discipline
 
-Fresh CI for this hardened source is pending.
+Before every major capability:
 
-### LiteRT-LM SDK provenance probe
+1. Idea Ledger update;
+2. ADR/decision;
+3. Blueprint update;
+4. Roadmap gate;
+5. preflight/test contract where needed;
+6. rollback point;
+7. immutable planning snapshot for material direction changes.
 
-J4 CI now downloads the current Android Maven AAR **without linking it into the app** and records:
+After implementation becomes exact-green:
 
-- resolved Maven release;
-- AAR SHA-256;
-- POM;
-- class-file major / approximate Java level;
-- AAR contents.
+1. all applicable CI/lint/unit/package/permission/component audits;
+2. Motorola evidence for device claims;
+3. Changelog + Latest Snapshot + test evidence synchronization;
+4. immutable milestone snapshot;
+5. protected `baseline/*` branch on the exact green commit;
+6. next risky phase recorded.
 
-This is required because Mayra currently builds with Kotlin 2.0.21 / Java 17. Toolchain changes will be made only from evidence and must preserve J1/J2/J3/full-app regressions.
+## Jarvis phases accepted
 
-## First local-model candidate
+- J5 AI-native launcher shell;
+- J6 provenance-aware context fabric;
+- J7 GREEN/AMBER/RED trust/action orchestration;
+- J8 proactive My Day/pending-item intelligence;
+- J9 multimodal Mayra;
+- J10 owner-defined routines.
 
-**Gemma3-1B chat-ready LiteRT-LM model** — upstream reference around 557 MB, 4-bit, 4096 context.
+None of these should be stacked on the current red J4 head.
 
-It is chosen for first runtime compatibility proof because it is a current LiteRT-LM reference model and is smaller than the multi-GB alternatives. It is not yet declared Mayra's final Hindi/Hinglish brain.
+## Immediate next gate
 
-## J4 ordered next gate
-
-1. settle fresh J4/J1/J2/J3/Android/Governance CI on hardened L1;
-2. record J4 APK + audit provenance;
-3. install J4 on Motorola and capture RAM/private-storage diagnostics;
-4. import exact Gemma3-1B `.litertlm` model;
-5. require import SHA-256 + re-verify + reopen persistence + remove/re-import lifecycle pass;
-6. inspect SDK probe, pin exact LiteRT-LM Android version;
-7. link runtime to J4 only;
-8. initialize CPU engine off UI thread with exact load/error diagnostics and explicit close;
-9. run fixed Hindi/Hinglish/English prompt set in Airplane mode;
-10. record cold/warm load, first-token latency, tokens/sec, RAM and thermal behavior;
-11. only then compare GPU or a stronger multilingual model.
+1. repair the Room/KSP truncated-schema failure;
+2. restore exact-head J4 + J1/J2/J3/Android/Governance green;
+3. complete J4 longer-output/cancel/RAM/thermal/background/lock/Airplane regressions;
+4. synchronize evidence and create a protected J4 recovery baseline only from exact green;
+5. then begin J5 launcher preflight and isolated implementation;
+6. prove default HOME selection, Home-button return, reboot persistence, app drawer/search, launcher switch-back and model/crash failure survival on Motorola.
 
 ## Trust boundary
 
 - local LLM never directly executes calls/messages/device actions;
 - local LLM never directly writes owner memory;
-- document provenance remains structured;
+- context provenance remains structured;
 - confirmation tokens remain typed/action-bound/expiring;
 - local mode never silently sends owner context to network;
-- missing/corrupt/killed local model falls back to deterministic Mayra.
+- missing/corrupt/killed local model falls back to deterministic Mayra;
+- launcher remains usable when heavy AI is unavailable.
 
 ## Distribution truth
 
