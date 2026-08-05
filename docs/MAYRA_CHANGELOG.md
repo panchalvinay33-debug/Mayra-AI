@@ -8,10 +8,15 @@ This changelog records meaningful user-visible and engineering milestones. It do
 - Declared `MAIN + HOME + DEFAULT` qualification for the Mayra Home surface while keeping exactly one normal `CATEGORY_LAUNCHER` app entry.
 - Added user-consent `ROLE_HOME` request where the Android role is available.
 - Added searchable launchable-app discovery and direct app launching.
+- Added deterministic case-insensitive app-search tests by label/package.
 - Added an `Ask Mayra` bridge into the existing normal Mayra experience.
-- Added an explicit `Settings.ACTION_HOME_SETTINGS` switch/restore path so the owner can return to another launcher.
+- Added an explicit Android Home-settings switch/restore path so the owner can return to another launcher.
 - The J5 Home rendering path intentionally does not initialize the local LLM, cloud provider, memory or privileged action engine.
-- Device success is not yet claimed; fresh CI plus Motorola HOME-selection/reboot/switch-back/model-failure acceptance are required.
+- Hardened Android package audits so Personal Alpha and minified Release must contain `MayraLauncherActivity` plus HOME/DEFAULT categories while retaining exactly one normal app LAUNCHER entry.
+- Exact J5 source `6d5e773df2ef822b50061ffee2851d8f5d8b3e9a` passed Android #2384, J1 #493, J2 #389, J3 #211, J4 #162 and Governance #565.
+- Preserved the exact CI-green checkpoint as `backup/j5-home-contract-ci-green-2026-08-05` and immutable snapshot `docs/backups/MAYRA_SNAPSHOT_2026-08-05_J5_HOME_CONTRACT_CI_GREEN.md`.
+- Motorola test artifact: Android #2384 Personal Alpha ID `8919388343`; extracted APK SHA-256 `1ec6be33cb0c484552668145c48690094df3e44a0cb0cef613e28c1f88283096`.
+- J5 is now `DEVICE_VERIFY`, not yet a protected promoted baseline. Physical default-HOME, reboot, app access, switch-back, AI-failure independence and resource evidence remain required.
 
 ## Unreleased — J4 quality/operability harness
 
