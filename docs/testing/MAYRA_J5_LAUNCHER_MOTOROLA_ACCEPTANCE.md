@@ -1,7 +1,7 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: **DEVICE VERIFY IN PROGRESS — CORE DAILY LOOP + LOCK/REBOOT + SWITCH-BACK PROVEN**
+Status: **DEVICE VERIFY IN PROGRESS — CORE DAILY LOOP + LOCK/REBOOT + SWITCH-BACK + AIRPLANE-MODE INDEPENDENCE PROVEN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
 ## Exact artifact identity
@@ -34,10 +34,12 @@ Owner-supplied screenshots / explicit owner confirmation prove:
 10. `Switch / restore Home app` / Android Home settings allows easy selection of the previous launcher.
 11. Switching away from Mayra works normally and does not trap the owner.
 12. Switching back to `Mayra AI Personal Alpha` works normally and restores Mayra Home.
-13. Owner reports the selected launcher is otherwise functioning normally in day-to-day use.
-14. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
+13. With Airplane mode enabled, Mayra Home still renders normally, installed-app search still works, Chrome can still be launched as an app, and returning Home restores Mayra Home.
+14. The Airplane-mode proof shows the core launcher shell/search/app-launch path is not dependent on network/cloud availability.
+15. Owner reports the selected launcher is otherwise functioning normally in day-to-day use.
+16. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
 
-This proves the core daily launcher loop plus lock/unlock, reboot persistence and safe launcher switching. Repeated formal 20/20 Home returns, broader search/refresh checks, failure-independence, assistant coexistence, force-stop recovery and resource behavior remain pending.
+This proves the core daily launcher loop plus lock/unlock, reboot persistence, safe launcher switching and offline/Airplane-mode launcher independence. Repeated formal 20/20 Home returns, broader search/refresh checks, localbrain-kill/provider/TTS/permission independence, assistant coexistence, force-stop recovery and resource behavior remain pending.
 
 ## Installation precheck
 
@@ -71,8 +73,8 @@ Favorites/basic persistent layout is not implemented in the current slice and is
 
 - [ ] Local model unavailable: Home/app list/search/launch still usable.
 - [ ] Local-brain process killed: Home/app list/search/launch still usable.
-- [ ] Provider/network unavailable: Home remains usable.
-- [ ] Airplane mode: Home remains usable.
+- [x] Provider/network unavailable: core Home/search/app-launch path remains usable under Airplane mode.
+- [x] Airplane mode: Home/search/app launch/Home return remain usable.
 - [ ] Neural TTS unavailable: Home remains usable.
 - [ ] Notification Access denied: Home remains usable.
 - [ ] Contacts denied: Home remains usable.
