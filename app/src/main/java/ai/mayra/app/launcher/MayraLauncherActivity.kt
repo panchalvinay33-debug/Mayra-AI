@@ -42,8 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import ai.mayra.app.MainActivity
+import ai.mayra.app.MayraEntryContract
 import ai.mayra.app.ui.theme.MayraAITheme
 
 /**
@@ -101,6 +102,14 @@ private fun MayraLauncherHome() {
         status = if (roleHeld) "Mayra is the default Home ✓" else "Home role not granted"
     }
 
+    fun openFullMayra() {
+        runCatching {
+            context.startActivity(MayraEntryContract.fullMayraIntent(context, MayraEntryContract.Source.LAUNCHER))
+        }.onFailure {
+            status = "Could not open Mayra"
+        }
+    }
+
     Surface(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 20.dp),
@@ -118,11 +127,37 @@ private fun MayraLauncherHome() {
                 }
             }
 
+            Card(
+                onClick = ::openFullMayra,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        tonalElevation = 10.dp,
+                        modifier = Modifier.size(104.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("M", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Text("Mayra", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Tap the orb to talk, ask, use memory or continue a conversation.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                AssistChip(
-                    onClick = { context.startActivity(Intent(context, MainActivity::class.java)) },
-                    label = { Text("Ask Mayra") }
-                )
+                AssistChip(onClick = ::openFullMayra, label = { Text("Open Mayra") })
                 AssistChip(onClick = { refreshKey++ }, label = { Text("Refresh apps") })
             }
 
@@ -188,7 +223,7 @@ private fun MayraLauncherHome() {
             }
 
             Text(
-                "Safe J5 foundation: Home/app access does not initialize the local model, cloud provider, memory or privileged action engine.",
+                "Mayra Home stays lightweight. Deeper AI, memory and actions open through the same Mayra entry without becoming a Home dependency.",
                 style = MaterialTheme.typography.bodySmall
             )
         }
