@@ -87,7 +87,8 @@ jobs:
           grep -Fq "application-label:'Mayra AI Owner'" build/owner-signing/badging.txt
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee build/owner-signing/signing-certificate.txt
           grep -Fq "Verified using v2 scheme (APK Signature Scheme v2): true" build/owner-signing/signing-certificate.txt
-          grep -Fq "Signer #1 certificate SHA-256 digest:" build/owner-signing/signing-certificate.txt
+          grep -Eq "certificate SHA-256 digest: [0-9a-fA-F]{64}$" build/owner-signing/signing-certificate.txt
+          grep -E "certificate SHA-256 digest: [0-9a-fA-F]{64}$" build/owner-signing/signing-certificate.txt | head -n 1 | sed 's/.*digest: //' > build/owner-signing/signer-sha256.txt
           cp "$APK" build/owner-signing/Mayra-AI-Owner-Update.apk
           sha256sum build/owner-signing/Mayra-AI-Owner-Update.apk | tee build/owner-signing/apk-sha256.txt
 
