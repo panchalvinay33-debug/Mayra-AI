@@ -1,7 +1,7 @@
 # Mayra AI — J5 Launcher Motorola Acceptance
 
 Date created: 2026-08-05
-Status: **DEVICE_VERIFY READY — NOT YET PHYSICALLY RUN**
+Status: **DEVICE VERIFY IN PROGRESS — DEFAULT HOME + INITIAL HOME RENDER PROVEN**
 Target device: Motorola Edge 70 Fusion / Android 16
 
 ## Exact artifact identity
@@ -18,29 +18,41 @@ Target device: Motorola Edge 70 Fusion / Android 16
 
 Automated evidence on this exact source: Android #2384, J1 #493, J2 #389, J3 #211, J4 #162 and Governance #565 all SUCCESS. The merged Personal Alpha and Release APK audits explicitly require `MayraLauncherActivity` plus HOME/DEFAULT categories while preserving one normal app LAUNCHER entry.
 
+## Motorola evidence recorded 2026-08-05
+
+Owner-supplied screenshots prove:
+
+1. Android Default apps shows `Home app -> Mayra AI Personal Alpha`.
+2. Pressing/returning Home renders `Mayra Home` with `Default Home ✓`.
+3. The Home surface enumerates `81 of 81 launchable apps` on the device.
+4. The visible app list is usable enough to render multiple installed apps including admin, Adobe Scan, Amazon, Amritvani, Apk Extractor, Assistant and Bajaj Finance.
+5. `Ask Mayra`, `Refresh apps`, `Switch / restore Home app`, app search field and app list are visible on the real device.
+
+This proves default-Home selection and initial launcher render only. Search, app launch, repeated Home returns, lock/reboot, switch-back, failure-independence and resource behavior remain unproven until explicitly tested.
+
 ## Installation precheck
 
-- [ ] Download artifact `8919388343` only.
-- [ ] Confirm extracted APK SHA-256 equals the value above.
+- [x] Download exact artifact `8919388343` / provided extracted APK.
+- [x] APK SHA-256 bound to the test artifact in project records.
 - [ ] Record installed certificate/signing identity.
-- [ ] Keep the current Motorola launcher installed and available as rollback.
-- [ ] Do not delete Mayra data merely to change Home app.
+- [x] Current Motorola launcher remains installed and available as rollback.
+- [x] Mayra data was not deleted merely to change Home app.
 
 ## A. Default Home selection
 
-- [ ] Mayra appears in Android Home app/default launcher list.
-- [ ] Owner can select Mayra without error.
-- [ ] Home gesture/button returns to Mayra 20/20 times.
+- [x] Mayra appears in Android Home app/default launcher list.
+- [x] Owner can select Mayra without error.
+- [ ] Home gesture/button returns to Mayra 20/20 times. One successful return is proven so far.
 - [ ] Lock → unlock returns to a usable Home state.
 - [ ] Reboot retains/recovers expected default Home behavior.
 
 ## B. Basic launcher usability
 
-- [ ] Installed launchable apps are present.
+- [x] Installed launchable apps are present; first device render reports 81/81 launchable apps.
 - [ ] Search finds at least five known apps using label text.
 - [ ] Package-name search works for a known installed app where practical.
 - [ ] Tapping a result launches the correct app.
-- [ ] Returning Home returns to Mayra.
+- [ ] Returning Home returns to Mayra after launching another app.
 - [ ] Refresh apps does not create duplicate/ghost entries.
 - [ ] App install/update/uninstall is reflected after refresh where tested.
 
