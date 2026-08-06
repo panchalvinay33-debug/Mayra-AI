@@ -51,6 +51,7 @@ import ai.mayra.app.MayraEntryContract
 import ai.mayra.app.background.MayraNotificationListener
 import ai.mayra.app.context.NotificationContextStore
 import ai.mayra.app.context.collectCalendarContext
+import ai.mayra.app.context.collectContactsContext
 import ai.mayra.app.context.collectMayraContext
 import ai.mayra.app.context.collectReminderContext
 import ai.mayra.app.context.summaryLine
@@ -114,11 +115,23 @@ private fun MayraLauncherHome() {
     val reminderSnapshot = remember(refreshKey) { collectReminderContext(context) }
     val reminderLine = remember(reminderSnapshot) { reminderSnapshot.summaryLine() }
 
+    val contactsPermissionGranted = remember(refreshKey) { isContactsPermissionGranted(context) }
+    val contactsSnapshot = remember(refreshKey, contactsPermissionGranted) {
+        collectContactsContext(context)
+    }
+    val contactsLine = remember(contactsSnapshot) { contactsSnapshot.summaryLine() }
+
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         refreshKey++
         status = if (granted) "Calendar context enabled ✓" else "Calendar access not granted"
+    }
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        refreshKey++
+        status = if (granted) "People context enabled ✓" else "Contacts access not granted"
     }
 
     val roleManager = remember(context) {
@@ -249,6 +262,28 @@ private fun MayraLauncherHome() {
                 }
             }
 
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("People", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(contactsLine, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Counts only — no contact names, phone numbers, email, address or notes.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (!contactsPermissionGranted) {
+                        OutlinedButton(
+                            onClick = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Enable people context")
+                        }
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AssistChip(onClick = ::openFullMayra, label = { Text("Open Mayra") })
                 AssistChip(onClick = { refreshKey++ }, label = { Text("Refresh") })
@@ -325,6 +360,10 @@ private fun MayraLauncherHome() {
 
 private fun isCalendarPermissionGranted(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) ==
+        PackageManager.PERMISSION_GRANTED
+
+private fun isContactsPermissionGranted(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
         PackageManager.PERMISSION_GRANTED
 
 private fun isNotificationAccessGranted(context: Context): Boolean {
