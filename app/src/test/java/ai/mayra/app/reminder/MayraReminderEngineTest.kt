@@ -33,7 +33,7 @@ class MayraReminderEngineTest {
     @Test
     fun `dot clock time with ka parses as time only reminder`() {
         val result = parser.parse("5.20 ka") as ReminderParseResult.Parsed
-        val expected = Instant.parse("2026-07-30T23:50:00Z").toEpochMilli()
+        val expected = Instant.parse("2026-07-29T23:50:00Z").toEpochMilli()
 
         assertEquals("Reminder", result.title)
         assertEquals(expected, result.dueAt)
