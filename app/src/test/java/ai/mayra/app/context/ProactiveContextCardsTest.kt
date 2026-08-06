@@ -62,6 +62,23 @@ class ProactiveContextCardsTest {
     }
 
     @Test
+    fun staleNotificationAggregateDoesNotDriveAttentionCard() {
+        val cards = rankProactiveContextCards(
+            bundle(
+                notification = NotificationAggregate(5, 3, emptyMap()),
+                notificationCapturedAt = now.minusMinutes(121)
+            )
+        )
+        assertFalse(cards.any { it.kind == ProactiveCardKind.NOTIFICATION_ATTENTION })
+    }
+
+    @Test
+    fun futureDatedSnapshotIsNeverFresh() {
+        assertFalse(isFreshSnapshot(now.plusMinutes(1), now, 120))
+        assertTrue(isFreshSnapshot(now.minusMinutes(120), now, 120))
+    }
+
+    @Test
     fun noSignalsProducesNoProactiveCard() {
         val cards = rankProactiveContextCards(bundle())
         assertTrue(cards.isEmpty())
@@ -71,6 +88,7 @@ class ProactiveContextCardsTest {
         reminder: ReminderAggregate? = null,
         calendar: CalendarAggregate? = null,
         notification: NotificationAggregate? = null,
+        notificationCapturedAt: LocalDateTime = now,
         power: PowerState? = null,
         connectivity: ConnectivityState? = null,
         session: SessionAggregate? = null
@@ -95,7 +113,7 @@ class ProactiveContextCardsTest {
                 ?: ContextValue.Unavailable
         ),
         notifications = NotificationContextSnapshot(
-            now,
+            notificationCapturedAt,
             notification?.let { ContextValue.Available(it, ContextSource.NOTIFICATION_ACCESS) }
                 ?: ContextValue.Unavailable
         ),
