@@ -93,13 +93,39 @@ class AssistantIntentEngine(
         }
     }
 
+    /**
+     * Reminder commands are commonly spoken either before or after the time phrase in Hinglish.
+     * Keep the owner's original punctuation (for example 5.20) and select whichever side of the
+     * command contains the useful reminder request.
+     */
     private fun parseReminderIntent(original: String, normalized: String): AssistantIntent {
         val match = REMINDER_COMMANDS
             .mapNotNull { keyword -> normalized.indexOf(keyword).takeIf { it >= 0 }?.let { CommandMatch(keyword, it) } }
-            .minByOrNull(CommandMatch::index)
+            .sortedWith(compareBy<CommandMatch> { it.index }.thenByDescending { it.keyword.length })
+            .firstOrNull()
             ?: return AssistantIntent.Invalid("What should I remind you about?")
-        val request = original.substringAfterKeyword(match.keyword)
-            .trim().removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
+
+        val originalLower = original.lowercase(locale)
+        val originalMatchIndex = originalLower.indexOf(match.keyword)
+        val beforeOriginal = if (originalMatchIndex >= 0) {
+            original.substring(0, originalMatchIndex)
+        } else {
+            normalized.substring(0, match.index)
+        }
+        val afterOriginal = if (originalMatchIndex >= 0) {
+            original.substring(originalMatchIndex + match.keyword.length)
+        } else {
+            normalized.substring(match.index + match.keyword.length)
+        }
+
+        val after = afterOriginal.cleanReminderSide()
+        val before = beforeOriginal.cleanReminderSide()
+        val request = when {
+            after.isUsefulReminderRequest() -> after
+            before.isUsefulReminderRequest() -> before
+            else -> ""
+        }
+
         return if (request.isBlank()) {
             AssistantIntent.Invalid("What should I remind you about?")
         } else {
@@ -133,6 +159,11 @@ class AssistantIntentEngine(
         .removeTrailingWordsIgnoreCase(COMMAND_TRAILING_WORDS)
         .cleanTarget()
 
+    private fun String.cleanReminderSide(): String = trim()
+        .removeLeadingWordsIgnoreCase(REMINDER_SIDE_FILLER_WORDS)
+        .removeTrailingWordsIgnoreCase(REMINDER_SIDE_FILLER_WORDS)
+        .cleanTarget()
+
     private fun String.isUsefulTarget(): Boolean =
         isNotBlank() && split(' ').any { it !in COMMAND_FILLER_WORDS && it !in COMMAND_TRAILING_WORDS }
 
@@ -140,6 +171,11 @@ class AssistantIntentEngine(
         isNotBlank() && split(' ').any {
             val normalized = it.lowercase(locale)
             normalized !in COMMAND_FILLER_WORDS && normalized !in COMMAND_TRAILING_WORDS
+        }
+
+    private fun String.isUsefulReminderRequest(): Boolean =
+        isNotBlank() && split(Regex("\\s+")).any {
+            it.lowercase(locale) !in REMINDER_SIDE_FILLER_WORDS
         }
 
     private fun String.removeLeadingWords(words: Set<String>): String {
@@ -195,7 +231,20 @@ private fun String.matchesAny(vararg values: String): Boolean = values.any(::con
 private val OPEN_COMMANDS = listOf("open", "launch", "khol", "kholo", "chalao", "start")
 private val CALL_COMMANDS = listOf("call", "phone", "dial", "lagao", "milao")
 private val MESSAGE_COMMANDS = listOf("send message to", "send sms to", "message", "text", "sms", "msg")
-private val REMINDER_COMMANDS = listOf("remind me", "set reminder", "yaad dilana", "reminder laga")
+private val REMINDER_COMMANDS = listOf(
+    "reminder set kar do",
+    "reminder set karo",
+    "reminder set karna",
+    "reminder laga do",
+    "reminder lagao",
+    "set reminder",
+    "remind me",
+    "yaad dilana",
+    "reminder set",
+    "reminder laga",
+    "रिमाइंडर सेट करो",
+    "रिमाइंडर लगा दो"
+)
 
 private val COMMAND_FILLER_WORDS = setOf(
     "mayra", "mira", "please", "jara", "zara", "mera", "meri", "mere", "the",
@@ -206,5 +255,8 @@ private val COMMAND_TRAILING_WORDS = setOf(
     "open", "call", "phone", "dial", "launch", "start", "khol", "kholo", "chalao"
 )
 private val MESSAGE_ACTION_WORDS = setOf("to", "ko", "likho", "bolo", "saying", "that")
-private val REMINDER_FILLER_WORDS = setOf("to", "ki", "please", "mujhe")
+private val REMINDER_SIDE_FILLER_WORDS = setOf(
+    "please", "mayra", "mira", "mera", "meri", "mere", "mujhe", "to", "ko",
+    "karo", "kar", "karna", "do", "de", "laga", "lagao", "set"
+)
 private val MESSAGE_SEPARATORS = listOf(":", " saying ", " that ", " bolo ", " likho ")
