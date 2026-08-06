@@ -18,7 +18,8 @@ data class MayraContextBundle(
     val calendar: CalendarContextSnapshot,
     val reminders: ReminderContextSnapshot,
     val notifications: NotificationContextSnapshot,
-    val contacts: ContactsContextSnapshot
+    val contacts: ContactsContextSnapshot,
+    val session: SessionContextSnapshot
 )
 
 class MayraContextRepository(private val context: Context) {
@@ -32,7 +33,8 @@ class MayraContextRepository(private val context: Context) {
             calendar = collectCalendarContext(appContext, now),
             reminders = collectReminderContext(appContext, now),
             notifications = NotificationContextStore(appContext).read(notificationAccess, now),
-            contacts = collectContactsContext(appContext, now)
+            contacts = collectContactsContext(appContext, now),
+            session = MayraSessionContextStore(appContext).read(now)
         )
     }
 
