@@ -52,6 +52,7 @@ import ai.mayra.app.background.MayraNotificationListener
 import ai.mayra.app.context.NotificationContextStore
 import ai.mayra.app.context.collectCalendarContext
 import ai.mayra.app.context.collectMayraContext
+import ai.mayra.app.context.collectReminderContext
 import ai.mayra.app.context.summaryLine
 import ai.mayra.app.context.summaryLines
 import ai.mayra.app.ui.theme.MayraAITheme
@@ -110,6 +111,8 @@ private fun MayraLauncherHome() {
         collectCalendarContext(context)
     }
     val calendarLine = remember(calendarSnapshot) { calendarSnapshot.summaryLine() }
+    val reminderSnapshot = remember(refreshKey) { collectReminderContext(context) }
+    val reminderLine = remember(reminderSnapshot) { reminderSnapshot.summaryLine() }
 
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -228,10 +231,11 @@ private fun MayraLauncherHome() {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("Calendar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(calendarLine, style = MaterialTheme.typography.bodyMedium)
+                    Text("Agenda", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Calendar · $calendarLine", style = MaterialTheme.typography.bodyMedium)
+                    Text("Reminders · $reminderLine", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Timing only — no event title, location, attendees, meeting link or notes.",
+                        "Timing and counts only — no calendar event text or reminder title/detail.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     if (!calendarPermissionGranted) {
