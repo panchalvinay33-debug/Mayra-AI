@@ -21,6 +21,41 @@ class MayraConversationalProviderTest {
         assertEquals("remote answer", assistant.reply("hello").getOrThrow())
     }
 
+    @Test fun carriesBoundedTrustedContextWithoutChangingUserMessage() = runBlocking {
+        var captured: MayraProviderRequest? = null
+        val assistant = ResilientMayraProviderAssistant(
+            provider = MayraConversationalProvider { request ->
+                captured = request
+                MayraProviderResult.Success("ok")
+            },
+            fallback = fallback,
+            retryDelayMillis = 0,
+            trustedContextSource = {
+                listOf("day_part=morning", "battery_percent=80", "day_part=morning")
+            }
+        )
+
+        assertEquals("ok", assistant.reply("what should I do?").getOrThrow())
+        assertEquals("what should I do?", captured?.message)
+        assertEquals(listOf("day_part=morning", "battery_percent=80"), captured?.trustedContext)
+    }
+
+    @Test fun contextSourceFailureDoesNotBreakConversation() = runBlocking {
+        var captured: MayraProviderRequest? = null
+        val assistant = ResilientMayraProviderAssistant(
+            provider = MayraConversationalProvider { request ->
+                captured = request
+                MayraProviderResult.Success("ok")
+            },
+            fallback = fallback,
+            retryDelayMillis = 0,
+            trustedContextSource = { error("context unavailable") }
+        )
+
+        assertEquals("ok", assistant.reply("hello").getOrThrow())
+        assertTrue(captured?.trustedContext?.isEmpty() == true)
+    }
+
     @Test fun retriesTemporaryFailureThenSucceeds() = runBlocking {
         var attempts = 0
         val assistant = ResilientMayraProviderAssistant(
@@ -43,7 +78,8 @@ class MayraConversationalProviderTest {
             provider = MayraConversationalProvider { attempts++; MayraProviderResult.PermanentFailure("bad request") },
             fallback = fallback,
             maxAttempts = 3,
-            retryDelayMillis = 0
+            retryDelayMillis = 0,
+            trustedContextSource = { listOf("day_part=night") }
         )
         assertEquals("offline:hello", assistant.reply("hello").getOrThrow())
         assertEquals(1, attempts)
@@ -74,5 +110,26 @@ class MayraConversationalProviderTest {
     @Test fun requestRejectsUnboundedConversation() {
         val messages = List(101) { MayraMessage("x", MayraMessage.Sender.USER, it.toLong()) }
         assertTrue(runCatching { MayraProviderRequest("hello", messages) }.isFailure)
+    }
+
+    @Test fun requestRejectsUnboundedTrustedContext() {
+        assertTrue(
+            runCatching {
+                MayraProviderRequest(
+                    message = "hello",
+                    conversation = emptyList(),
+                    trustedContext = List(13) { "context_$it=value" }
+                )
+            }.isFailure
+        )
+        assertTrue(
+            runCatching {
+                MayraProviderRequest(
+                    message = "hello",
+                    conversation = emptyList(),
+                    trustedContext = listOf("x".repeat(161))
+                )
+            }.isFailure
+        )
     }
 }
