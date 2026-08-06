@@ -48,6 +48,7 @@ enum class ContextSource {
     BATTERY_MANAGER,
     REMINDERS,
     NOTIFICATION_ACCESS,
+    CALENDAR_PROVIDER,
     CONTACTS,
     SESSION
 }
