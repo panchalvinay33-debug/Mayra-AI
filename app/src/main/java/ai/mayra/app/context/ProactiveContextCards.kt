@@ -1,6 +1,8 @@
 package ai.mayra.app.context
 
 import ai.mayra.app.MayraEntryContract
+import java.time.Duration
+import java.time.LocalDateTime
 
 /** Deterministic, local-only J6 proactive cards. No model ranking and no free-form private content. */
 enum class ProactiveCardKind {
@@ -75,14 +77,16 @@ fun rankProactiveContextCards(
         }
     }
 
-    (bundle.notifications.access as? ContextValue.Available)?.value?.let { notifications ->
-        if (notifications.attentionCount > 0) {
-            cards += ProactiveContextCard(
-                ProactiveCardKind.NOTIFICATION_ATTENTION,
-                75,
-                "Notifications need attention",
-                "${notifications.attentionCount} may need attention"
-            )
+    if (isFreshSnapshot(bundle.notifications.capturedAt, bundle.capturedAt, MAX_NOTIFICATION_CARD_AGE_MINUTES)) {
+        (bundle.notifications.access as? ContextValue.Available)?.value?.let { notifications ->
+            if (notifications.attentionCount > 0) {
+                cards += ProactiveContextCard(
+                    ProactiveCardKind.NOTIFICATION_ATTENTION,
+                    75,
+                    "Notifications need attention",
+                    "${notifications.attentionCount} may need attention"
+                )
+            }
         }
     }
 
@@ -125,3 +129,15 @@ fun rankProactiveContextCards(
         .sortedWith(compareByDescending<ProactiveContextCard> { it.priority }.thenBy { it.kind.ordinal })
         .take(maxCards)
 }
+
+internal fun isFreshSnapshot(
+    capturedAt: LocalDateTime,
+    now: LocalDateTime,
+    maxAgeMinutes: Long
+): Boolean {
+    require(maxAgeMinutes >= 0L)
+    if (capturedAt.isAfter(now)) return false
+    return Duration.between(capturedAt, now).toMinutes() <= maxAgeMinutes
+}
+
+private const val MAX_NOTIFICATION_CARD_AGE_MINUTES = 120L
