@@ -62,6 +62,31 @@ class MayraHttpConversationalProviderTest {
         assertFalse(body.contains("\"locale\""))
     }
 
+    @Test fun trustedContextIsDeveloperDataAndUserMessageRemainsSeparate() = runBlocking {
+        val connection = FakeConnection(URL("https://example.test"), 200, simpleText("ok"))
+        val provider = provider(connection)
+        val contextualRequest = MayraProviderRequest(
+            message = "What should I do now?",
+            conversation = emptyList(),
+            trustedContext = listOf(
+                "day_part=afternoon",
+                "calendar_next_minutes=20",
+                "reminders_due_or_overdue=1"
+            )
+        )
+
+        provider.answer(contextualRequest)
+
+        val body = connection.writtenBody()
+        assertTrue(body.contains("Deterministic phone context follows"))
+        assertTrue(body.contains("day_part=afternoon"))
+        assertTrue(body.contains("calendar_next_minutes=20"))
+        assertTrue(body.contains("reminders_due_or_overdue=1"))
+        assertTrue(body.contains("\"role\":\"user\",\"content\":\"What should I do now?\""))
+        assertFalse(body.contains("notification"))
+        assertFalse(body.contains("contact"))
+    }
+
     @Test fun compatibleTopLevelTextIsStillAccepted() = runBlocking {
         val result = provider(FakeConnection(URL("https://example.test"), 200, simpleText("Hello")))
             .answer(request) as MayraProviderResult.Success
