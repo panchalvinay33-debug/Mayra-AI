@@ -1,6 +1,8 @@
 package ai.mayra.app.core
 
 import ai.mayra.app.MayraRuntime
+import ai.mayra.app.context.MayraContextRepository
+import ai.mayra.app.context.MayraRemoteContextPolicy
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
 import ai.mayra.app.platform.device.AndroidActionExecutor
@@ -27,12 +29,16 @@ object MayraAssistantComposition {
         val conversationalAssistant: MayraAssistant = if (
             providerConfig.enabled && credentials.hasCredential()
         ) {
+            val contextRepository = MayraContextRepository(appContext)
             ResilientMayraProviderAssistant(
                 provider = MayraHttpConversationalProvider(providerConfig, credentials),
                 fallback = localAssistant,
                 timeoutMillis = providerConfig.readTimeoutMillis.toLong().coerceAtMost(60_000L),
                 maxAttempts = 2,
-                retryDelayMillis = 350
+                retryDelayMillis = 350,
+                trustedContextSource = {
+                    MayraRemoteContextPolicy.lines(contextRepository.snapshot())
+                }
             )
         } else {
             localAssistant
