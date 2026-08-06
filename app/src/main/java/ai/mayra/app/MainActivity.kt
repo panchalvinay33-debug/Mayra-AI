@@ -1,6 +1,7 @@
 package ai.mayra.app
 
 import ai.mayra.app.chat.ChatViewModel
+import ai.mayra.app.context.MayraSessionContextStore
 import ai.mayra.app.core.AndroidMayraProviderCredentialStore
 import ai.mayra.app.core.AndroidMayraProviderSettingsStore
 import ai.mayra.app.core.MayraActivityHistoryActivity
@@ -77,11 +78,25 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        recordEntry(intent)
         setContent {
             MayraAITheme {
                 MayraOwnerSetupGate { MayraHome() }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        recordEntry(intent)
+    }
+
+    private fun recordEntry(intent: Intent?) {
+        val wireValue = intent?.getStringExtra(MayraEntryContract.EXTRA_SOURCE)
+        val source = MayraEntryContract.Source.entries.firstOrNull { it.wireValue == wireValue }
+            ?: MayraEntryContract.Source.OTHER
+        MayraSessionContextStore(this).record(source)
     }
 }
 
