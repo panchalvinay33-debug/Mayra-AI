@@ -26,14 +26,13 @@ fun collectCalendarContext(
         return CalendarContextSnapshot(capturedAt, ContextValue.NotGranted)
     }
 
-    val startOfDay = capturedAt.toLocalDate().atStartOfDay(zoneId).toInstant().toEpochMilli()
-    val endOfDay = capturedAt.toLocalDate().plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+    val window = calendarQueryWindow(capturedAt.toLocalDate(), zoneId)
     val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
-        .appendPath(startOfDay.toString())
-        .appendPath(endOfDay.toString())
+        .appendPath(window.first.toString())
+        .appendPath((window.last + 1).toString())
         .build()
 
-    val metadata = runCatching {
+    val metadata = try {
         context.contentResolver.query(
             uri,
             arrayOf(CalendarContract.Instances.BEGIN, CalendarContract.Instances.END),
@@ -53,7 +52,9 @@ fun collectCalendarContext(
                 }
             }
         } ?: emptyList()
-    }.getOrElse {
+    } catch (_: SecurityException) {
+        return CalendarContextSnapshot(capturedAt, ContextValue.NotGranted)
+    } catch (_: RuntimeException) {
         return CalendarContextSnapshot(capturedAt, ContextValue.Unavailable)
     }
 
