@@ -1,9 +1,11 @@
 package ai.mayra.app.launcher
 
+import android.Manifest
 import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -44,9 +46,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import ai.mayra.app.MayraEntryContract
 import ai.mayra.app.background.MayraNotificationListener
 import ai.mayra.app.context.NotificationContextStore
+import ai.mayra.app.context.collectCalendarContext
 import ai.mayra.app.context.collectMayraContext
 import ai.mayra.app.context.summaryLine
 import ai.mayra.app.context.summaryLines
@@ -94,11 +98,26 @@ private fun MayraLauncherHome() {
     val filtered = remember(apps, query) { filterLaunchableApps(apps, query) }
     val contextSnapshot = remember(refreshKey) { collectMayraContext(context) }
     val contextLines = remember(contextSnapshot) { contextSnapshot.summaryLines() }
+
     val notificationAccessGranted = remember(refreshKey) { isNotificationAccessGranted(context) }
     val notificationSnapshot = remember(refreshKey, notificationAccessGranted) {
         NotificationContextStore(context).read(notificationAccessGranted)
     }
     val notificationLine = remember(notificationSnapshot) { notificationSnapshot.summaryLine() }
+
+    val calendarPermissionGranted = remember(refreshKey) { isCalendarPermissionGranted(context) }
+    val calendarSnapshot = remember(refreshKey, calendarPermissionGranted) {
+        collectCalendarContext(context)
+    }
+    val calendarLine = remember(calendarSnapshot) { calendarSnapshot.summaryLine() }
+
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        refreshKey++
+        status = if (granted) "Calendar context enabled ✓" else "Calendar access not granted"
+    }
+
     val roleManager = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) context.getSystemService(RoleManager::class.java) else null
     }
@@ -204,6 +223,28 @@ private fun MayraLauncherHome() {
                 }
             }
 
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Calendar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(calendarLine, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Timing only — no event title, location, attendees, meeting link or notes.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (!calendarPermissionGranted) {
+                        OutlinedButton(
+                            onClick = { calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Enable calendar context")
+                        }
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 AssistChip(onClick = ::openFullMayra, label = { Text("Open Mayra") })
                 AssistChip(onClick = { refreshKey++ }, label = { Text("Refresh") })
@@ -277,6 +318,10 @@ private fun MayraLauncherHome() {
         }
     }
 }
+
+private fun isCalendarPermissionGranted(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) ==
+        PackageManager.PERMISSION_GRANTED
 
 private fun isNotificationAccessGranted(context: Context): Boolean {
     val expected = ComponentName(context, MayraNotificationListener::class.java)
