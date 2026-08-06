@@ -48,8 +48,8 @@ class MayraSessionContextStore(context: Context) {
         val source = MayraEntryContract.Source.entries.firstOrNull { it.wireValue == sourceValue }
             ?: MayraEntryContract.Source.OTHER
         val entryTime = java.time.Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalDateTime()
-        val minutes = Duration.between(entryTime, now).toMinutes().coerceAtLeast(0L)
-            .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val minutes = sessionMinutesSince(entryTime, now)
+            ?: return SessionContextSnapshot(now, ContextValue.Unavailable)
         return SessionContextSnapshot(
             capturedAt = now,
             access = ContextValue.Available(
@@ -64,6 +64,13 @@ class MayraSessionContextStore(context: Context) {
         const val KEY_SOURCE = "entry_source"
         const val KEY_EPOCH_MILLIS = "entry_epoch_millis"
     }
+}
+
+internal fun sessionMinutesSince(entryTime: LocalDateTime, now: LocalDateTime): Int? {
+    if (entryTime.isAfter(now)) return null
+    return Duration.between(entryTime, now).toMinutes()
+        .coerceAtMost(Int.MAX_VALUE.toLong())
+        .toInt()
 }
 
 fun SessionContextSnapshot.summaryLine(): String? {
