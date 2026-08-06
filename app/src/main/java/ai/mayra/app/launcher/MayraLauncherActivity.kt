@@ -49,11 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import ai.mayra.app.MayraEntryContract
 import ai.mayra.app.background.MayraNotificationListener
-import ai.mayra.app.context.NotificationContextStore
-import ai.mayra.app.context.collectCalendarContext
-import ai.mayra.app.context.collectContactsContext
-import ai.mayra.app.context.collectMayraContext
-import ai.mayra.app.context.collectReminderContext
+import ai.mayra.app.context.MayraContextRepository
+import ai.mayra.app.context.rankProactiveContextCards
 import ai.mayra.app.context.summaryLine
 import ai.mayra.app.context.summaryLines
 import ai.mayra.app.ui.theme.MayraAITheme
@@ -98,28 +95,18 @@ private fun MayraLauncherHome() {
     var status by remember { mutableStateOf("Mayra Home ready") }
     val apps = remember(refreshKey) { loadLaunchableApps(context) }
     val filtered = remember(apps, query) { filterLaunchableApps(apps, query) }
-    val contextSnapshot = remember(refreshKey) { collectMayraContext(context) }
-    val contextLines = remember(contextSnapshot) { contextSnapshot.summaryLines() }
+
+    val contextBundle = remember(refreshKey) { MayraContextRepository(context).snapshot() }
+    val contextLines = remember(contextBundle) { contextBundle.device.summaryLines() }
+    val notificationLine = remember(contextBundle) { contextBundle.notifications.summaryLine() }
+    val calendarLine = remember(contextBundle) { contextBundle.calendar.summaryLine() }
+    val reminderLine = remember(contextBundle) { contextBundle.reminders.summaryLine() }
+    val contactsLine = remember(contextBundle) { contextBundle.contacts.summaryLine() }
+    val proactiveCards = remember(contextBundle) { rankProactiveContextCards(contextBundle) }
 
     val notificationAccessGranted = remember(refreshKey) { isNotificationAccessGranted(context) }
-    val notificationSnapshot = remember(refreshKey, notificationAccessGranted) {
-        NotificationContextStore(context).read(notificationAccessGranted)
-    }
-    val notificationLine = remember(notificationSnapshot) { notificationSnapshot.summaryLine() }
-
     val calendarPermissionGranted = remember(refreshKey) { isCalendarPermissionGranted(context) }
-    val calendarSnapshot = remember(refreshKey, calendarPermissionGranted) {
-        collectCalendarContext(context)
-    }
-    val calendarLine = remember(calendarSnapshot) { calendarSnapshot.summaryLine() }
-    val reminderSnapshot = remember(refreshKey) { collectReminderContext(context) }
-    val reminderLine = remember(reminderSnapshot) { reminderSnapshot.summaryLine() }
-
     val contactsPermissionGranted = remember(refreshKey) { isContactsPermissionGranted(context) }
-    val contactsSnapshot = remember(refreshKey, contactsPermissionGranted) {
-        collectContactsContext(context)
-    }
-    val contactsLine = remember(contactsSnapshot) { contactsSnapshot.summaryLine() }
 
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -208,6 +195,25 @@ private fun MayraLauncherHome() {
                     Text("Now", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(contextLines.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
                     Text("System context only — no AI inference needed.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            if (proactiveCards.isNotEmpty()) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("For you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        proactiveCards.forEach { card ->
+                            Text(card.title, fontWeight = FontWeight.SemiBold)
+                            Text(card.detail, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(
+                            "Ranked locally from coarse context — no AI ranking or private content.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 
