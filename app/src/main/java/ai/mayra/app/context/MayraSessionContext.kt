@@ -66,15 +66,15 @@ class MayraSessionContextStore(context: Context) {
     }
 }
 
-fun SessionContextSnapshot.summaryLine(): String? = when (val value = access) {
-    ContextValue.NotGranted, ContextValue.Unavailable -> null
-    is ContextValue.Available -> {
-        if (value.value.minutesSinceEntry > 180) return null
-        val source = when (value.value.source) {
-            MayraEntryContract.Source.LAUNCHER -> "Home"
-            MayraEntryContract.Source.VOICE_SESSION -> "Voice"
-            MayraEntryContract.Source.OTHER -> "Mayra"
-        }
-        "$source session · ${value.value.minutesSinceEntry} min ago"
+fun SessionContextSnapshot.summaryLine(): String? {
+    val value = access
+    if (value !is ContextValue.Available) return null
+    if (value.value.minutesSinceEntry > 180) return null
+
+    val source = when (value.value.source) {
+        MayraEntryContract.Source.LAUNCHER -> "Home"
+        MayraEntryContract.Source.VOICE_SESSION -> "Voice"
+        MayraEntryContract.Source.OTHER -> "Mayra"
     }
+    return "$source session · ${value.value.minutesSinceEntry} min ago"
 }
