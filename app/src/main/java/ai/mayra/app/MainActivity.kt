@@ -35,15 +35,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -105,15 +105,19 @@ class MainActivity : ComponentActivity() {
 private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
     var voiceState by remember { mutableStateOf(VoiceState()) }
     var lastSpokenMessageId by remember { mutableStateOf<Long?>(null) }
     var showReadiness by remember { mutableStateOf(false) }
     var readinessRefresh by remember { mutableIntStateOf(0) }
     val voiceAssistant = remember { AndroidVoiceAssistant(context) { newState -> voiceState = newState } }
     val permissionReader = remember(context, readinessRefresh) { AndroidDevicePermissionStateReader(context) }
-    val permissionSnapshot = remember(permissionReader, readinessRefresh) { DevicePermissionSnapshotProvider(permissionReader).snapshot() }
-    val installedAppsCount = remember(context, readinessRefresh) { runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0) }
+    val permissionSnapshot = remember(permissionReader, readinessRefresh) {
+        DevicePermissionSnapshotProvider(permissionReader).snapshot()
+    }
+    val installedAppsCount = remember(context, readinessRefresh) {
+        runCatching { AndroidInstalledAppDataSource(context).loadLaunchableApps().size }.getOrDefault(0)
+    }
     val microphoneReady = remember(context, readinessRefresh) { MicrophonePermission.isGranted(context) }
     val providerConfigured = remember(context, readinessRefresh) {
         runCatching {
@@ -127,54 +131,80 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
         if (voiceState.transcript.isNotBlank()) viewModel.updateInput(voiceState.transcript)
     }
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
         val latest = state.messages.lastOrNull()
         if (latest?.sender == MayraMessage.Sender.MAYRA && latest.timestamp != lastSpokenMessageId) {
             lastSpokenMessageId = latest.timestamp
             voiceAssistant.speak(latest.text)
+        }
+        if (state.messages.isNotEmpty()) {
+            scrollState.animateScrollTo(scrollState.maxValue)
         }
     }
     DisposableEffect(Unit) { onDispose { voiceAssistant.release() } }
 
     val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         readinessRefresh++
-        if (granted) voiceAssistant.startListening() else voiceState = VoiceState(error = "Microphone permission is required for voice input")
+        if (granted) voiceAssistant.startListening()
+        else voiceState = VoiceState(error = "Microphone permission is required for voice input")
     }
     val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readinessRefresh++ }
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readinessRefresh++ }
 
     fun startVoice() {
-        if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening() else microphoneLauncher.launch(MicrophonePermission.permission)
+        if (MicrophonePermission.isGranted(context)) voiceAssistant.startListening()
+        else microphoneLauncher.launch(MicrophonePermission.permission)
     }
     fun requestContactsPermission() { contactsLauncher.launch(Manifest.permission.READ_CONTACTS) }
     fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        else readinessRefresh++
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else readinessRefresh++
     }
-    fun openActivity(activity: Class<out ComponentActivity>) { context.startActivity(Intent(context, activity)) }
+    fun openActivity(activity: Class<out ComponentActivity>) {
+        context.startActivity(Intent(context, activity))
+    }
 
-    val interactionEnabled = !state.isThinking && state.pendingConfirmation == null && state.pendingMemoryApproval == null
+    val interactionEnabled = !state.isThinking &&
+        state.pendingConfirmation == null && state.pendingMemoryApproval == null
+
     Scaffold { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Surface(shape = CircleShape, tonalElevation = 6.dp, modifier = Modifier.size(58.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text("M", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("M", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    }
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Mayra AI", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(when {
-                        state.isThinking -> "Thinking…"
-                        state.pendingConfirmation != null || state.pendingMemoryApproval != null -> "Waiting for confirmation"
-                        voiceState.isListening -> "Listening…"
-                        providerConfigured -> "● Online AI configured"
-                        else -> "● Offline core ready"
-                    })
-                    Text(if (providerConfigured) "Local privacy controls · online answers" else "Private on-device mode", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        when {
+                            state.isThinking -> "Thinking…"
+                            state.pendingConfirmation != null || state.pendingMemoryApproval != null -> "Waiting for confirmation"
+                            voiceState.isListening -> "Listening…"
+                            providerConfigured -> "● Online AI configured"
+                            else -> "● Offline core ready"
+                        }
+                    )
+                    Text(
+                        if (providerConfigured) "Local privacy controls · online answers" else "Private on-device mode",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                if (state.messages.isNotEmpty()) TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) { Text("Clear") }
+                if (state.messages.isNotEmpty()) {
+                    TextButton(onClick = viewModel::clearConversation, enabled = interactionEnabled) { Text("Clear") }
+                }
             }
-            Spacer(Modifier.height(8.dp))
+
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -187,28 +217,37 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 AssistChip(onClick = { openActivity(MayraProviderSettingsActivity::class.java) }, label = { Text("Provider") })
                 AssistChip(onClick = { showReadiness = true }, label = { Text("Setup") })
             }
-            Spacer(Modifier.height(10.dp))
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.messages.isEmpty()) item { Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium) }
-                items(state.messages, key = { it.timestamp }) { message ->
-                    val label = if (message.sender == MayraMessage.Sender.USER) "You" else "Mayra"
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(label, fontWeight = FontWeight.Bold)
-                            Text(message.text)
-                            if (message.usedPersonalMemoryKeys.isNotEmpty()) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    message.usedPersonalMemoryKeys.take(3).forEach { key -> AssistChip(onClick = {}, label = { Text("🧠 $key") }) }
+
+            if (state.messages.isEmpty()) {
+                Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium)
+            }
+
+            state.messages.takeLast(MAX_VISIBLE_CHAT_MESSAGES).forEach { message ->
+                val label = if (message.sender == MayraMessage.Sender.USER) "You" else "Mayra"
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(label, fontWeight = FontWeight.Bold)
+                        Text(message.text)
+                        if (message.usedPersonalMemoryKeys.isNotEmpty()) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                message.usedPersonalMemoryKeys.take(3).forEach { key ->
+                                    AssistChip(onClick = {}, label = { Text("🧠 $key") })
                                 }
-                                if (message.usedPersonalMemoryKeys.size > 3) Text("+${message.usedPersonalMemoryKeys.size - 3} more approved memories", style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (message.usedPersonalMemoryKeys.size > 3) {
+                                Text(
+                                    "+${message.usedPersonalMemoryKeys.size - 3} more approved memories",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
                     }
                 }
             }
+
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             voiceState.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Spacer(Modifier.height(8.dp))
+
             OutlinedTextField(
                 value = state.input,
                 onValueChange = viewModel::updateInput,
@@ -219,7 +258,7 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { viewModel.sendMessage() })
             )
-            Spacer(Modifier.height(10.dp))
+
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = { if (voiceState.isListening) voiceAssistant.stopListening() else startVoice() },
@@ -232,6 +271,8 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                     modifier = Modifier.weight(2f).height(52.dp)
                 ) { Text(if (state.isThinking) "Thinking…" else "Send to Mayra") }
             }
+
+            Spacer(Modifier.height(6.dp))
         }
     }
 
@@ -243,13 +284,21 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(pending.prompt)
                     Text(pending.message, fontWeight = FontWeight.SemiBold)
-                    Text("This approval is one-time, bound to this exact request, and expires automatically.", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "This approval is one-time, bound to this exact request, and expires automatically.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             },
-            confirmButton = { Button(onClick = viewModel::confirmPendingAction, enabled = !state.isThinking) { Text("Confirm") } },
-            dismissButton = { TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) { Text("Cancel") } }
+            confirmButton = {
+                Button(onClick = viewModel::confirmPendingAction, enabled = !state.isThinking) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelPendingAction, enabled = !state.isThinking) { Text("Cancel") }
+            }
         )
     }
+
     state.pendingMemoryApproval?.let { pending ->
         AlertDialog(
             onDismissRequest = viewModel::cancelPendingMemory,
@@ -257,15 +306,32 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(pending.key, fontWeight = FontWeight.Bold)
-                    pending.previousValue?.let { Text("Current: $it"); HorizontalDivider() }
+                    pending.previousValue?.let {
+                        Text("Current: $it")
+                        HorizontalDivider()
+                    }
                     Text("New: ${pending.newValue}")
-                    Text(if (pending.previousValue == null) "Mayra will store this locally only after you tap Save." else "Saving will replace the current value and increase its revision.", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (pending.previousValue == null) {
+                            "Mayra will store this locally only after you tap Save."
+                        } else {
+                            "Saving will replace the current value and increase its revision."
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             },
-            confirmButton = { Button(onClick = viewModel::savePendingMemory, enabled = !state.isThinking) { Text(if (pending.previousValue == null) "Save" else "Replace") } },
-            dismissButton = { TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) { Text("Not now") } }
+            confirmButton = {
+                Button(onClick = viewModel::savePendingMemory, enabled = !state.isThinking) {
+                    Text(if (pending.previousValue == null) "Save" else "Replace")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelPendingMemory, enabled = !state.isThinking) { Text("Not now") }
+            }
         )
     }
+
     if (showReadiness) {
         DeviceReadinessDialog(
             microphoneReady = microphoneReady,
@@ -322,3 +388,5 @@ private fun ReadinessRow(label: String, ready: Boolean) {
         Text(if (ready) "Ready ✓" else "Needed")
     }
 }
+
+private const val MAX_VISIBLE_CHAT_MESSAGES = 100
