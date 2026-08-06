@@ -13,12 +13,20 @@ fun interface MayraConversationalProvider {
 data class MayraProviderRequest(
     val message: String,
     val conversation: List<MayraMessage>,
-    val localeTag: String = "en-IN"
+    val localeTag: String = "en-IN",
+    val trustedContext: List<String> = emptyList()
 ) {
     init {
         require(message.isNotBlank())
         require(conversation.size <= 100)
         require(localeTag.isNotBlank())
+        require(trustedContext.size <= MAX_TRUSTED_CONTEXT_LINES)
+        require(trustedContext.all { it.isNotBlank() && it.length <= MAX_TRUSTED_CONTEXT_LINE_CHARS })
+    }
+
+    private companion object {
+        const val MAX_TRUSTED_CONTEXT_LINES = 12
+        const val MAX_TRUSTED_CONTEXT_LINE_CHARS = 160
     }
 }
 
@@ -39,7 +47,8 @@ class ResilientMayraProviderAssistant(
     private val fallback: MayraAssistant,
     private val timeoutMillis: Long = 20_000,
     private val maxAttempts: Int = 2,
-    private val retryDelayMillis: Long = 350
+    private val retryDelayMillis: Long = 350,
+    private val trustedContextSource: () -> List<String> = { emptyList() }
 ) : MayraAssistant {
     init {
         require(timeoutMillis in 1_000..60_000)
@@ -48,7 +57,16 @@ class ResilientMayraProviderAssistant(
     }
 
     override suspend fun reply(message: String, conversation: List<MayraMessage>): Result<String> {
-        val request = MayraProviderRequest(message.trim(), conversation.takeLast(100))
+        val trustedContext = runCatching { trustedContextSource() }
+            .getOrDefault(emptyList())
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(12)
+        val request = MayraProviderRequest(
+            message = message.trim(),
+            conversation = conversation.takeLast(100),
+            trustedContext = trustedContext
+        )
         repeat(maxAttempts) { index ->
             val result = try {
                 withTimeout(timeoutMillis) { provider.answer(request) }
