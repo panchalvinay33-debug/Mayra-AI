@@ -32,7 +32,7 @@ fun collectCalendarContext(
         .appendPath((window.last + 1).toString())
         .build()
 
-    val metadata = try {
+    val metadata: List<CalendarEventMetadata> = try {
         context.contentResolver.query(
             uri,
             arrayOf(CalendarContract.Instances.BEGIN, CalendarContract.Instances.END),
@@ -42,7 +42,7 @@ fun collectCalendarContext(
         )?.use { cursor ->
             val beginIndex = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
             val endIndex = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
-            buildList {
+            buildList<CalendarEventMetadata> {
                 while (cursor.moveToNext()) {
                     val startsAt = epochMillisToLocalDateTime(cursor.getLong(beginIndex), zoneId)
                     val endsAt = epochMillisToLocalDateTime(cursor.getLong(endIndex), zoneId)
