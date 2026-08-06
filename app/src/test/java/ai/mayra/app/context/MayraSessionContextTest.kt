@@ -36,6 +36,12 @@ class MayraSessionContextTest {
     }
 
     @Test
+    fun futureEntryTimeIsRejectedInsteadOfLookingRecent() {
+        assertNull(sessionMinutesSince(now.plusMinutes(1), now))
+        assertEquals(15, sessionMinutesSince(now.minusMinutes(15), now))
+    }
+
+    @Test
     fun sessionContractContainsNoConversationOrExternalAppFields() {
         val fields = SessionAggregate::class.java.declaredFields.map { it.name.lowercase() }
         assertTrue(fields.contains("source"))
