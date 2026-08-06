@@ -31,6 +31,15 @@ class MayraReminderEngineTest {
     }
 
     @Test
+    fun `dot clock time with ka parses as time only reminder`() {
+        val result = parser.parse("5.20 ka") as ReminderParseResult.Parsed
+        val expected = Instant.parse("2026-07-30T23:50:00Z").toEpochMilli()
+
+        assertEquals("Reminder", result.title)
+        assertEquals(expected, result.dueAt)
+    }
+
+    @Test
     fun `kal subah seven parses in local timezone`() {
         val result = parser.parse("kal subah 7 baje medicine lena") as ReminderParseResult.Parsed
         val expected = Instant.parse("2026-07-30T01:30:00Z").toEpochMilli()
