@@ -1,6 +1,8 @@
 package ai.mayra.app.context
 
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -68,6 +70,22 @@ class CalendarContextTest {
         assertEquals(
             "Calendar context unavailable",
             CalendarContextSnapshot(capturedAt, ContextValue.Unavailable).summaryLine()
+        )
+    }
+
+    @Test
+    fun queryWindowCoversExactlyLocalDayInIndia() {
+        val zone = ZoneId.of("Asia/Kolkata")
+        val window = calendarQueryWindow(LocalDate.of(2026, 8, 6), zone)
+
+        assertEquals(86_400_000L, window.last - window.first + 1)
+        assertEquals(
+            LocalDateTime.of(2026, 8, 6, 0, 0),
+            epochMillisToLocalDateTime(window.first, zone)
+        )
+        assertEquals(
+            LocalDateTime.of(2026, 8, 7, 0, 0),
+            epochMillisToLocalDateTime(window.last + 1, zone)
         )
     }
 
