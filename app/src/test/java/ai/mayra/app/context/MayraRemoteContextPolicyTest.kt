@@ -1,5 +1,6 @@
 package ai.mayra.app.context
 
+import ai.mayra.app.MayraEntryContract
 import java.time.LocalDateTime
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,6 +46,13 @@ class MayraRemoteContextPolicyTest {
                     ContactsAggregate(totalContacts = 456, phoneCapableContacts = 400),
                     ContextSource.CONTACTS
                 )
+            ),
+            session = SessionContextSnapshot(
+                capturedAt = now,
+                access = ContextValue.Available(
+                    SessionAggregate(MayraEntryContract.Source.VOICE_SESSION, 2),
+                    ContextSource.SESSION
+                )
             )
         )
 
@@ -58,6 +66,8 @@ class MayraRemoteContextPolicyTest {
         assertTrue("reminders_due_or_overdue=1" in lines)
         assertFalse(joined.contains("notification", ignoreCase = true))
         assertFalse(joined.contains("contact", ignoreCase = true))
+        assertFalse(joined.contains("session", ignoreCase = true))
+        assertFalse(joined.contains("voice", ignoreCase = true))
         assertFalse(joined.contains("99"))
         assertFalse(joined.contains("456"))
         assertTrue(lines.size <= 12)
@@ -76,7 +86,8 @@ class MayraRemoteContextPolicyTest {
             calendar = CalendarContextSnapshot(now, ContextValue.NotGranted),
             reminders = ReminderContextSnapshot(now, ContextValue.Unavailable),
             notifications = NotificationContextSnapshot(now, ContextValue.NotGranted),
-            contacts = ContactsContextSnapshot(now, ContextValue.NotGranted)
+            contacts = ContactsContextSnapshot(now, ContextValue.NotGranted),
+            session = SessionContextSnapshot(now, ContextValue.Unavailable)
         )
 
         val lines = MayraRemoteContextPolicy.lines(bundle)
