@@ -13,6 +13,7 @@ enum class ProactiveCardKind {
     LOW_BATTERY,
     OFFLINE,
     REMINDER_SOON,
+    DOCUMENT_LIBRARY_ATTENTION,
     RECENT_VOICE_SESSION
 }
 
@@ -30,8 +31,8 @@ data class ProactiveContextCard(
 }
 
 /**
- * Produces a bounded, deterministic local ranking from already-normalized context. Contacts are not
- * ranked because a contact count alone is not an actionable situation. No raw source data enters
+ * Produces a bounded, deterministic local ranking from already-normalized context. Contacts and
+ * memory counts are not ranked because counts alone are not actionable. No raw source data enters
  * these cards.
  */
 fun rankProactiveContextCards(
@@ -109,6 +110,17 @@ fun rankProactiveContextCards(
                 65,
                 "Offline",
                 "Mayra Home and local features remain available"
+            )
+        }
+    }
+
+    (bundle.knowledge.documents as? ContextValue.Available)?.value?.let { documents ->
+        if (documents.savedCount > 0 && documents.needsAttentionCount > 0) {
+            cards += ProactiveContextCard(
+                ProactiveCardKind.DOCUMENT_LIBRARY_ATTENTION,
+                50,
+                "Library needs attention",
+                "${documents.needsAttentionCount} document${if (documents.needsAttentionCount == 1) "" else "s"} need indexing or refresh"
             )
         }
     }
