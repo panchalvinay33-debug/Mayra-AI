@@ -2,6 +2,7 @@ package ai.mayra.app.core
 
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.context.MayraContextRepository
+import ai.mayra.app.context.MayraLocalContextAssistant
 import ai.mayra.app.context.MayraRemoteContextPolicy
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
@@ -18,6 +19,7 @@ object MayraAssistantComposition {
         check(MayraRuntime.personalMemoryInstalled) { "Personal memory runtime is not ready yet." }
 
         val appContext = context.applicationContext
+        val contextRepository = MayraContextRepository(appContext)
         val localAssistant = LocalMayraAssistant(
             LocalCommandEngine(
                 actionDispatcher = ActionDispatcher(AndroidActionExecutor(appContext))
@@ -26,10 +28,9 @@ object MayraAssistantComposition {
         val settings = AndroidMayraProviderSettingsStore(appContext).read()
         val credentials = AndroidMayraProviderCredentialStore(appContext)
         val providerConfig = settings.validatedConfig().getOrThrow()
-        val conversationalAssistant: MayraAssistant = if (
+        val providerOrLocalAssistant: MayraAssistant = if (
             providerConfig.enabled && credentials.hasCredential()
         ) {
-            val contextRepository = MayraContextRepository(appContext)
             ResilientMayraProviderAssistant(
                 provider = MayraHttpConversationalProvider(providerConfig, credentials),
                 fallback = localAssistant,
@@ -43,6 +44,13 @@ object MayraAssistantComposition {
         } else {
             localAssistant
         }
+
+        // Explicit context/status questions are answered before any remote provider call. The local
+        // layer sees only J6 normalized aggregates; normal conversation and actions delegate unchanged.
+        val conversationalAssistant: MayraAssistant = MayraLocalContextAssistant(
+            delegate = providerOrLocalAssistant,
+            contextSource = { contextRepository.snapshot() }
+        )
 
         MayraRuntime.assistant = PersonalMemoryAwareMayraAssistant(
             delegate = DocumentInsightAwareMayraAssistant(
