@@ -28,19 +28,24 @@ class KnowledgeContextTest {
 
     @Test
     fun aggregateContractsCannotCarryPrivateContent() {
-        val memoryFields = MemoryAggregate::class.java.declaredFields.map { it.name.lowercase() }
-        val documentFields = DocumentAggregate::class.java.declaredFields.map { it.name.lowercase() }
-        val joined = (memoryFields + documentFields).joinToString(" ")
+        val memoryFields = MemoryAggregate::class.java.declaredFields
+            .map { it.name.lowercase() }
+            .filterNot { it.startsWith("$") }
+        val documentFields = DocumentAggregate::class.java.declaredFields
+            .map { it.name.lowercase() }
+            .filterNot { it.startsWith("$") }
 
-        assertTrue(memoryFields == listOf("savedcount"))
-        assertFalse(joined.contains("value"))
-        assertFalse(joined.contains("key"))
-        assertFalse(joined.contains("title"))
-        assertFalse(joined.contains("name"))
-        assertFalse(joined.contains("text"))
-        assertFalse(joined.contains("content"))
-        assertFalse(joined.contains("snippet"))
-        assertFalse(joined.contains("uri"))
+        assertEquals(listOf("savedcount"), memoryFields)
+        assertEquals(
+            setOf("savedcount", "currentindexedcount", "needsattentioncount"),
+            documentFields.toSet()
+        )
+
+        val forbiddenRawFields = setOf(
+            "key", "value", "title", "name", "text", "content", "snippet", "uri",
+            "body", "detail", "path", "filename", "documentname", "memoryvalue"
+        )
+        assertFalse((memoryFields + documentFields).any { it in forbiddenRawFields })
     }
 
     @Test(expected = IllegalArgumentException::class)
