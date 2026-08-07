@@ -54,6 +54,20 @@ class ProactiveContextCardsTest {
     }
 
     @Test
+    fun documentHealthCreatesOnlyCoarseActionableCard() {
+        val cards = rankProactiveContextCards(
+            bundle(documents = DocumentAggregate(savedCount = 4, currentIndexedCount = 2, needsAttentionCount = 2))
+        )
+        val card = cards.single { it.kind == ProactiveCardKind.DOCUMENT_LIBRARY_ATTENTION }
+
+        assertEquals("Library needs attention", card.title)
+        assertTrue(card.detail.contains("2 documents"))
+        assertFalse(card.detail.contains("name", ignoreCase = true))
+        assertFalse(card.detail.contains("content", ignoreCase = true))
+        assertFalse(card.detail.contains("uri", ignoreCase = true))
+    }
+
+    @Test
     fun staleSessionDoesNotCreateCard() {
         val cards = rankProactiveContextCards(
             bundle(session = SessionAggregate(MayraEntryContract.Source.VOICE_SESSION, 16))
@@ -91,7 +105,8 @@ class ProactiveContextCardsTest {
         notificationCapturedAt: LocalDateTime = now,
         power: PowerState? = null,
         connectivity: ConnectivityState? = null,
-        session: SessionAggregate? = null
+        session: SessionAggregate? = null,
+        documents: DocumentAggregate? = null
     ) = MayraContextBundle(
         capturedAt = now,
         device = MayraContextSnapshot(
@@ -121,6 +136,11 @@ class ProactiveContextCardsTest {
         session = SessionContextSnapshot(
             now,
             session?.let { ContextValue.Available(it, ContextSource.SESSION) }
+                ?: ContextValue.Unavailable
+        ),
+        knowledge = KnowledgeContextSnapshot(
+            capturedAt = now,
+            documents = documents?.let { ContextValue.Available(it, ContextSource.DOCUMENT_LIBRARY) }
                 ?: ContextValue.Unavailable
         )
     )
