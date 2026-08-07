@@ -53,6 +53,14 @@ class MayraRemoteContextPolicyTest {
                     SessionAggregate(MayraEntryContract.Source.VOICE_SESSION, 2),
                     ContextSource.SESSION
                 )
+            ),
+            knowledge = KnowledgeContextSnapshot(
+                capturedAt = now,
+                memory = ContextValue.Available(MemoryAggregate(17), ContextSource.MEMORY),
+                documents = ContextValue.Available(
+                    DocumentAggregate(savedCount = 23, currentIndexedCount = 20, needsAttentionCount = 3),
+                    ContextSource.DOCUMENT_LIBRARY
+                )
             )
         )
 
@@ -68,8 +76,13 @@ class MayraRemoteContextPolicyTest {
         assertFalse(joined.contains("contact", ignoreCase = true))
         assertFalse(joined.contains("session", ignoreCase = true))
         assertFalse(joined.contains("voice", ignoreCase = true))
+        assertFalse(joined.contains("memory", ignoreCase = true))
+        assertFalse(joined.contains("document", ignoreCase = true))
+        assertFalse(joined.contains("library", ignoreCase = true))
         assertFalse(joined.contains("99"))
         assertFalse(joined.contains("456"))
+        assertFalse(joined.contains("17"))
+        assertFalse(joined.contains("23"))
         assertTrue(lines.size <= 12)
     }
 
@@ -87,7 +100,8 @@ class MayraRemoteContextPolicyTest {
             reminders = ReminderContextSnapshot(now, ContextValue.Unavailable),
             notifications = NotificationContextSnapshot(now, ContextValue.NotGranted),
             contacts = ContactsContextSnapshot(now, ContextValue.NotGranted),
-            session = SessionContextSnapshot(now, ContextValue.Unavailable)
+            session = SessionContextSnapshot(now, ContextValue.Unavailable),
+            knowledge = KnowledgeContextSnapshot(now)
         )
 
         val lines = MayraRemoteContextPolicy.lines(bundle)
