@@ -19,7 +19,8 @@ data class MayraContextBundle(
     val reminders: ReminderContextSnapshot,
     val notifications: NotificationContextSnapshot,
     val contacts: ContactsContextSnapshot,
-    val session: SessionContextSnapshot
+    val session: SessionContextSnapshot,
+    val knowledge: KnowledgeContextSnapshot = KnowledgeContextSnapshot(capturedAt)
 )
 
 class MayraContextRepository(private val context: Context) {
@@ -34,7 +35,8 @@ class MayraContextRepository(private val context: Context) {
             reminders = collectReminderContext(appContext, now),
             notifications = NotificationContextStore(appContext).read(notificationAccess, now),
             contacts = collectContactsContext(appContext, now),
-            session = MayraSessionContextStore(appContext).read(now)
+            session = MayraSessionContextStore(appContext).read(now),
+            knowledge = collectKnowledgeContext(appContext, now)
         )
     }
 
