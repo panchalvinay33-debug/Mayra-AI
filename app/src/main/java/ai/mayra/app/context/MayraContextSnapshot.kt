@@ -50,7 +50,9 @@ enum class ContextSource {
     NOTIFICATION_ACCESS,
     CALENDAR_PROVIDER,
     CONTACTS,
-    SESSION
+    SESSION,
+    MEMORY,
+    DOCUMENT_LIBRARY
 }
 
 internal fun deriveDayPart(hourOfDay: Int): DayPart {
