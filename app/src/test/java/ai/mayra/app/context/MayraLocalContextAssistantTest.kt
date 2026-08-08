@@ -134,9 +134,9 @@ class MayraLocalContextAssistantTest {
         connectivity: ConnectivityState = ConnectivityState.ONLINE,
         calendarRemaining: Int = 2,
         busyNow: Boolean = false,
-        calendarNextMinutes: Long? = 45,
+        calendarNextMinutes: Int? = 45,
         dueReminders: Int = 1,
-        reminderNextMinutes: Long? = 20,
+        reminderNextMinutes: Int? = 20,
         notificationAttention: Int = 2,
         notificationCapturedAt: LocalDateTime = now,
         libraryNeedsAttention: Int = 1
