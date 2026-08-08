@@ -218,6 +218,29 @@ private fun MayraHome(viewModel: ChatViewModel = viewModel()) {
                 AssistChip(onClick = { showReadiness = true }, label = { Text("Setup") })
             }
 
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                maxItemsInEachRow = 3
+            ) {
+                AssistChip(
+                    onClick = { viewModel.sendPreset("daily brief") },
+                    enabled = interactionEnabled,
+                    label = { Text("Daily brief") }
+                )
+                AssistChip(
+                    onClick = { viewModel.sendPreset("what next") },
+                    enabled = interactionEnabled,
+                    label = { Text("What next?") }
+                )
+                AssistChip(
+                    onClick = { viewModel.sendPreset("Mayra context status") },
+                    enabled = interactionEnabled,
+                    label = { Text("Context status") }
+                )
+            }
+
             if (state.messages.isEmpty()) {
                 Text("Namaste. I’m Mayra. What can I help you with today?", style = MaterialTheme.typography.titleMedium)
             }
