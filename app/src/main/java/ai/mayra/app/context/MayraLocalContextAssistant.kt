@@ -41,6 +41,7 @@ object MayraLocalContextAnswers {
         if (message.isBlank() || message.looksLikeActionCommand()) return null
 
         return when {
+            message.isDailyBriefQuestion() -> dailyBrief(bundle)
             message.isCombinedContextQuestion() -> combined(bundle)
             message.isMemoryStatusQuestion() -> memory(bundle.knowledge)
             message.isLibraryStatusQuestion() -> library(bundle.knowledge)
@@ -50,6 +51,76 @@ object MayraLocalContextAnswers {
             message.isPowerStatusQuestion() -> power(bundle.device)
             message.isConnectivityStatusQuestion() -> connectivity(bundle.device)
             else -> null
+        }
+    }
+
+    private fun dailyBrief(bundle: MayraContextBundle): String {
+        val items = mutableListOf<BriefItem>()
+
+        (bundle.reminders.access as? ContextValue.Available)?.value?.let { reminders ->
+            when {
+                reminders.dueOrOverdueCount > 0 -> items += BriefItem(
+                    priority = 100,
+                    text = "${reminders.dueOrOverdueCount} reminder${if (reminders.dueOrOverdueCount == 1) " is" else "s are"} due or overdue."
+                )
+                reminders.minutesUntilNextReminder != null && reminders.minutesUntilNextReminder <= 60 ->
+                    items += BriefItem(60, "Next reminder is in ${reminders.minutesUntilNextReminder} min.")
+            }
+        }
+
+        (bundle.calendar.access as? ContextValue.Available)?.value?.let { calendar ->
+            when {
+                calendar.busyNow -> items += BriefItem(95, "Calendar shows you are busy now.")
+                calendar.minutesUntilNextEvent != null && calendar.minutesUntilNextEvent <= 60 ->
+                    items += BriefItem(80, "Next calendar event is in ${calendar.minutesUntilNextEvent} min.")
+            }
+        }
+
+        if (isFreshSnapshot(bundle.notifications.capturedAt, bundle.capturedAt, MAX_NOTIFICATION_BRIEF_AGE_MINUTES)) {
+            (bundle.notifications.access as? ContextValue.Available)?.value?.let { notifications ->
+                if (notifications.attentionCount > 0) {
+                    items += BriefItem(
+                        75,
+                        "${notifications.attentionCount} notification${if (notifications.attentionCount == 1) " may" else "s may"} need attention."
+                    )
+                }
+            }
+        }
+
+        (bundle.device.power as? ContextValue.Available)?.value?.let { power ->
+            val percent = power.batteryPercent
+            if (!power.isCharging && percent != null && percent <= 20) {
+                items += BriefItem(70, "Battery is low at $percent%.")
+            }
+        }
+
+        (bundle.device.connectivity as? ContextValue.Available)?.value?.let { connectivity ->
+            if (connectivity == ConnectivityState.OFFLINE) {
+                items += BriefItem(65, "Device is offline; Mayra's local features remain available.")
+            }
+        }
+
+        (bundle.knowledge.documents as? ContextValue.Available)?.value?.let { documents ->
+            if (documents.needsAttentionCount > 0) {
+                items += BriefItem(
+                    45,
+                    "Library has ${documents.needsAttentionCount} document${if (documents.needsAttentionCount == 1) "" else "s"} needing indexing or refresh."
+                )
+            }
+        }
+
+        val ranked = items
+            .sortedByDescending(BriefItem::priority)
+            .take(MAX_DAILY_BRIEF_ITEMS)
+
+        return if (ranked.isEmpty()) {
+            "Daily brief: nothing urgent is visible in Mayra's coarse local context right now."
+        } else {
+            buildString {
+                append("Daily brief:\n")
+                ranked.forEach { append("• ").append(it.text).append('\n') }
+                append("Based only on coarse local context; private source text is not included.")
+            }
         }
     }
 
@@ -160,6 +231,12 @@ object MayraLocalContextAnswers {
 
     private fun String.looksLikeActionCommand(): Boolean = ACTION_MARKERS.any(::contains)
 
+    private fun String.isDailyBriefQuestion(): Boolean = containsAny(
+        "daily brief", "today brief", "today's brief", "what should i know", "what is important today",
+        "what's important today", "aaj kya important", "aaj kya zaroori", "aaj kya jaruri",
+        "aaj ka brief", "mera brief"
+    )
+
     private fun String.isCombinedContextQuestion(): Boolean =
         containsAny("context status", "mayra context", "local context status", "context kya hai")
 
@@ -186,9 +263,14 @@ object MayraLocalContextAnswers {
 
     private fun String.containsAny(vararg values: String): Boolean = values.any(::contains)
 
+    private data class BriefItem(val priority: Int, val text: String)
+
     private val ACTION_MARKERS = listOf(
         "set reminder", "reminder set", "reminder laga", "remind me", "yaad dilana",
         "call ", "phone ", "dial ", "message ", "send message", "send sms", "sms ",
         "open ", "launch ", "kholo", "khol ", "chalao"
     )
+
+    private const val MAX_DAILY_BRIEF_ITEMS = 4
+    private const val MAX_NOTIFICATION_BRIEF_AGE_MINUTES = 120L
 }
