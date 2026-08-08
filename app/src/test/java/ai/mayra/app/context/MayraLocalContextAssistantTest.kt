@@ -65,32 +65,119 @@ class MayraLocalContextAssistantTest {
         }
     }
 
-    private fun bundle() = MayraContextBundle(
+    @Test
+    fun dailyBriefRanksUrgentSignalsAndIsBounded() {
+        val answer = MayraLocalContextAnswers.answer(
+            "aaj kya important hai",
+            bundle(
+                power = PowerState(isCharging = false, batteryPercent = 12),
+                connectivity = ConnectivityState.OFFLINE,
+                busyNow = true,
+                calendarNextMinutes = 15,
+                dueReminders = 2,
+                notificationAttention = 3,
+                libraryNeedsAttention = 2
+            )
+        ).orEmpty()
+
+        val bullets = answer.lineSequence().count { it.startsWith("• ") }
+        assertTrue(answer.startsWith("Daily brief:"))
+        assertTrue(answer.contains("2 reminders are due or overdue"))
+        assertTrue(answer.contains("Calendar shows you are busy now"))
+        assertTrue(answer.contains("3 notifications may need attention"))
+        assertTrue(answer.contains("Battery is low at 12%"))
+        assertFalse(answer.contains("Device is offline"))
+        assertFalse(answer.contains("Library has 2 documents"))
+        assertTrue(bullets == 4)
+    }
+
+    @Test
+    fun staleNotificationAttentionIsExcludedFromDailyBrief() {
+        val answer = MayraLocalContextAnswers.answer(
+            "daily brief",
+            bundle(
+                notificationAttention = 4,
+                notificationCapturedAt = now.minusMinutes(121),
+                dueReminders = 0,
+                calendarRemaining = 0,
+                calendarNextMinutes = null,
+                libraryNeedsAttention = 1
+            )
+        ).orEmpty()
+
+        assertFalse(answer.contains("notification", ignoreCase = true))
+        assertTrue(answer.contains("Library has 1 document needing indexing or refresh"))
+    }
+
+    @Test
+    fun dailyBriefHasCalmFallbackWhenNothingIsUrgent() {
+        val answer = MayraLocalContextAnswers.answer(
+            "what should I know",
+            bundle(
+                dueReminders = 0,
+                reminderNextMinutes = 180,
+                calendarRemaining = 0,
+                calendarNextMinutes = null,
+                notificationAttention = 0,
+                power = PowerState(isCharging = false, batteryPercent = 80),
+                connectivity = ConnectivityState.ONLINE,
+                libraryNeedsAttention = 0
+            )
+        ).orEmpty()
+
+        assertTrue(answer.contains("nothing urgent", ignoreCase = true))
+        assertFalse(answer.contains("• "))
+    }
+
+    private fun bundle(
+        power: PowerState = PowerState(isCharging = false, batteryPercent = 72),
+        connectivity: ConnectivityState = ConnectivityState.ONLINE,
+        calendarRemaining: Int = 2,
+        busyNow: Boolean = false,
+        calendarNextMinutes: Long? = 45,
+        dueReminders: Int = 1,
+        reminderNextMinutes: Long? = 20,
+        notificationAttention: Int = 2,
+        notificationCapturedAt: LocalDateTime = now,
+        libraryNeedsAttention: Int = 1
+    ) = MayraContextBundle(
         capturedAt = now,
         device = MayraContextSnapshot(
             capturedAt = now,
             dayPart = DayPart.MORNING,
-            connectivity = ContextValue.Available(ConnectivityState.ONLINE, ContextSource.CONNECTIVITY_MANAGER),
-            power = ContextValue.Available(PowerState(isCharging = false, batteryPercent = 72), ContextSource.BATTERY_MANAGER)
+            connectivity = ContextValue.Available(connectivity, ContextSource.CONNECTIVITY_MANAGER),
+            power = ContextValue.Available(power, ContextSource.BATTERY_MANAGER)
         ),
         calendar = CalendarContextSnapshot(
             now,
             ContextValue.Available(
-                CalendarAggregate(remainingEventsToday = 2, busyNow = false, minutesUntilNextEvent = 45),
+                CalendarAggregate(
+                    remainingEventsToday = calendarRemaining,
+                    busyNow = busyNow,
+                    minutesUntilNextEvent = calendarNextMinutes
+                ),
                 ContextSource.CALENDAR_PROVIDER
             )
         ),
         reminders = ReminderContextSnapshot(
             now,
             ContextValue.Available(
-                ReminderAggregate(activeCount = 3, dueOrOverdueCount = 1, minutesUntilNextReminder = 20),
+                ReminderAggregate(
+                    activeCount = maxOf(dueReminders, if (reminderNextMinutes != null) 1 else 0),
+                    dueOrOverdueCount = dueReminders,
+                    minutesUntilNextReminder = reminderNextMinutes
+                ),
                 ContextSource.REMINDERS
             )
         ),
         notifications = NotificationContextSnapshot(
-            now,
+            notificationCapturedAt,
             ContextValue.Available(
-                NotificationAggregate(activeCount = 6, attentionCount = 2, categoryCounts = emptyMap()),
+                NotificationAggregate(
+                    activeCount = maxOf(6, notificationAttention),
+                    attentionCount = notificationAttention,
+                    categoryCounts = emptyMap()
+                ),
                 ContextSource.NOTIFICATION_ACCESS
             )
         ),
@@ -112,7 +199,11 @@ class MayraLocalContextAssistantTest {
             capturedAt = now,
             memory = ContextValue.Available(MemoryAggregate(4), ContextSource.MEMORY),
             documents = ContextValue.Available(
-                DocumentAggregate(savedCount = 3, currentIndexedCount = 2, needsAttentionCount = 1),
+                DocumentAggregate(
+                    savedCount = 3,
+                    currentIndexedCount = 3 - libraryNeedsAttention,
+                    needsAttentionCount = libraryNeedsAttention
+                ),
                 ContextSource.DOCUMENT_LIBRARY
             )
         )
