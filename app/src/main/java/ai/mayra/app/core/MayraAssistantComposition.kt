@@ -3,6 +3,7 @@ package ai.mayra.app.core
 import ai.mayra.app.MayraRuntime
 import ai.mayra.app.context.MayraContextRepository
 import ai.mayra.app.context.MayraLocalContextAssistant
+import ai.mayra.app.context.MayraLocalNextSuggestionAssistant
 import ai.mayra.app.context.MayraRemoteContextPolicy
 import ai.mayra.app.document.DocumentInsightAwareMayraAssistant
 import ai.mayra.app.memory.PersonalMemoryAwareMayraAssistant
@@ -47,8 +48,14 @@ object MayraAssistantComposition {
 
         // Explicit context/status questions are answered before any remote provider call. The local
         // layer sees only J6 normalized aggregates; normal conversation and actions delegate unchanged.
-        val conversationalAssistant: MayraAssistant = MayraLocalContextAssistant(
+        val contextAssistant: MayraAssistant = MayraLocalContextAssistant(
             delegate = providerOrLocalAssistant,
+            contextSource = { contextRepository.snapshot() }
+        )
+
+        // "What next" guidance is also local-only and uses the same coarse Context Fabric boundary.
+        val conversationalAssistant: MayraAssistant = MayraLocalNextSuggestionAssistant(
+            delegate = contextAssistant,
             contextSource = { contextRepository.snapshot() }
         )
 
