@@ -41,8 +41,16 @@ class ChatViewModel(
         _uiState.value = ChatUiState()
     }
 
-    fun sendMessage() {
-        val text = _uiState.value.input.trim()
+    fun sendMessage() = sendText(_uiState.value.input)
+
+    /**
+     * Sends a trusted UI preset through the exact same typed runtime, confirmation and memory-safety
+     * pipeline as manually entered chat text. This avoids Compose state races from updateInput()+send.
+     */
+    fun sendPreset(text: String) = sendText(text)
+
+    private fun sendText(rawText: String) {
+        val text = rawText.trim()
         if (text.isEmpty() || _uiState.value.isThinking || hasPendingApproval()) return
         val userMessage = MayraMessage(text, MayraMessage.Sender.USER)
         val conversation = _uiState.value.messages + userMessage
