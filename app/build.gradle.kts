@@ -37,7 +37,7 @@ android {
         applicationId = "ai.mayra.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
+        versionCode = 8
         versionName = "0.2.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "VOICE_SESSION_RECOGNITION_ENABLED", "false")
