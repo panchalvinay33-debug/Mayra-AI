@@ -1,0 +1,57 @@
+name: One-shot cleanup Actions artifacts
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'chore: run one-shot Actions artifact cleanup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Keep newest 12 artifacts and delete the rest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keepCount = 12;
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            artifacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const keep = artifacts.slice(0, keepCount);
+            const remove = artifacts.slice(keepCount);
+            const keepIds = new Set(keep.map(a => a.id));
+
+            let deleted = 0;
+            let bytes = 0;
+            let failed = 0;
+
+            core.notice(`Found ${artifacts.length} artifacts. Keeping newest ${keep.length}; deleting ${remove.length}.`);
+            for (const artifact of remove) {
+              try {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deleted += 1;
+                bytes += artifact.size_in_bytes || 0;
+                if (deleted % 100 === 0) {
+                  core.info(`Deleted ${deleted}/${remove.length} artifacts...`);
+                }
+              } catch (error) {
+                failed += 1;
+                core.warning(`Could not delete artifact ${artifact.id} (${artifact.name}): ${error.message}`);
+              }
+            }
+
+            core.notice(`Cleanup complete: deleted ${deleted} artifacts, kept ${keepIds.size}, failed ${failed}; requested storage cleanup ${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB.`);
