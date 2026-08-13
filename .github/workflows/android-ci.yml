@@ -7,9 +7,40 @@ on:
     branches: [main]
 
 permissions:
+  actions: write
   contents: read
 
 jobs:
+  cleanup_artifacts:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'chore: run artifact cleanup via Android CI'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Actions artifacts created before 2026-08-12
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const cutoff = new Date('2026-08-12T00:00:00Z');
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            let deleted = 0;
+            let bytes = 0;
+            for (const artifact of artifacts) {
+              if (new Date(artifact.created_at) < cutoff) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deleted += 1;
+                bytes += artifact.size_in_bytes || 0;
+                if (deleted % 100 === 0) core.info(`Deleted ${deleted} artifacts...`);
+              }
+            }
+            core.notice(`Deleted ${deleted} artifacts; requested storage cleanup ${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB.`);
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
