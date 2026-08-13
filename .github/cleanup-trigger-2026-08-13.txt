@@ -1,0 +1,1 @@
+One-shot trigger for deleting GitHub Actions artifacts created before 2026-07-20. No source code or release content is modified.
