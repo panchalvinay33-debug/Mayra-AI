@@ -1,0 +1,41 @@
+name: One-shot cleanup old Actions artifacts
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    if: github.event.head_commit.message == 'chore: one-shot cleanup of pre-2026-07-20 Actions artifacts'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Actions artifacts created before 2026-07-20
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const cutoff = new Date('2026-07-20T00:00:00Z');
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            let deleted = 0;
+            let bytes = 0;
+            for (const artifact of artifacts) {
+              const created = new Date(artifact.created_at);
+              if (created < cutoff) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deleted += 1;
+                bytes += artifact.size_in_bytes || 0;
+                core.info(`Deleted ${artifact.id} ${artifact.name} ${artifact.created_at} ${artifact.size_in_bytes || 0} bytes`);
+              }
+            }
+            core.notice(`Deleted ${deleted} artifacts; requested storage cleanup ${(bytes / 1024 / 1024).toFixed(1)} MiB.`);
