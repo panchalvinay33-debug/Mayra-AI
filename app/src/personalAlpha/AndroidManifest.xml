@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Owner-device Personal Alpha candidate. It inherits the production capability boundary from
+      the main manifest, but installs separately from any eventual release package.
+    -->
+    <application
+        android:label="Mayra AI Personal Alpha"
+        tools:replace="android:label" />
+</manifest>

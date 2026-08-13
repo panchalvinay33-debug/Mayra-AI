@@ -104,6 +104,38 @@ class AssistantIntentEngineTest {
     }
 
     @Test
+    fun timeFirstHinglishReminderSetKaroIsRecognized() {
+        assertEquals(
+            AssistantIntent.CreateReminder("5.20 ka"),
+            engine.parse("5.20 ka reminder set karo")
+        )
+    }
+
+    @Test
+    fun commandFirstHinglishReminderKeepsTimeRequest() {
+        assertEquals(
+            AssistantIntent.CreateReminder("5.20 ka"),
+            engine.parse("reminder set karo 5.20 ka")
+        )
+    }
+
+    @Test
+    fun tomorrowReminderCommandCanComeLast() {
+        assertEquals(
+            AssistantIntent.CreateReminder("kal 8 baje"),
+            engine.parse("kal 8 baje reminder laga do")
+        )
+    }
+
+    @Test
+    fun relativeReminderCommandCanComeLast() {
+        assertEquals(
+            AssistantIntent.CreateReminder("20 minute baad"),
+            engine.parse("20 minute baad reminder set karo")
+        )
+    }
+
+    @Test
     fun deviceInformationCommandsAreRecognized() {
         assertEquals(
             AssistantIntent.DeviceInfo(DeviceInfoType.TIME),

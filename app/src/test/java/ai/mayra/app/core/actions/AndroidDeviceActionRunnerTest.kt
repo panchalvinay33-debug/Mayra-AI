@@ -13,7 +13,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class AndroidDeviceActionRunnerTest {
     @Test
-    fun callIntentIsBuiltAndStarted() = runBlocking {
+    fun callIntentUsesReviewFirstDialer() = runBlocking {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
@@ -23,20 +23,21 @@ class AndroidDeviceActionRunnerTest {
         val output = runner.run(request)
         val intent = requireNotNull(captured)
 
-        assertEquals(AndroidDeviceActionSpecFactory.ACTION_CALL, intent.action)
+        assertEquals(AndroidDeviceActionSpecFactory.ACTION_DIAL, intent.action)
         assertEquals("tel:+91 98765 43210", intent.dataString)
         assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
-        assertEquals("Started call to +91 98765 43210.", output)
+        assertTrue(output.contains("dialer", ignoreCase = true))
+        assertTrue(output.contains("tap Call", ignoreCase = true))
     }
 
     @Test
-    fun messageIntentPreservesRecipientAndBody() = runBlocking {
+    fun messageIntentPreservesRecipientAndBodyForReview() = runBlocking {
         var captured: Intent? = null
         val runner = AndroidDeviceActionRunner(
             starter = AndroidIntentStarter { captured = it }
         )
 
-        runner.run(request(DeviceActionType.SEND_MESSAGE, "9876543210", "  Hello Mayra  "))
+        val output = runner.run(request(DeviceActionType.SEND_MESSAGE, "9876543210", "  Hello Mayra  "))
         val intent = requireNotNull(captured)
 
         assertEquals(AndroidDeviceActionSpecFactory.ACTION_SENDTO, intent.action)
@@ -45,6 +46,7 @@ class AndroidDeviceActionRunnerTest {
             "Hello Mayra",
             intent.getStringExtra(AndroidDeviceActionSpecFactory.EXTRA_TEXT)
         )
+        assertTrue(output.contains("tap Send", ignoreCase = true))
     }
 
     @Test

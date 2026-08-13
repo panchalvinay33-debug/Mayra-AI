@@ -2,6 +2,7 @@ package ai.mayra.app.background
 
 import ai.mayra.app.MainActivity
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -124,6 +125,7 @@ class BriefingCache(context: Context) {
 object MayraBriefingNotifier {
     private const val CHANNEL_ID = "mayra_briefings"
 
+    @SuppressLint("MissingPermission", "NotificationPermission")
     fun show(context: Context, kind: BriefingKind, text: String) {
         val appContext = context.applicationContext
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

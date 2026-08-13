@@ -1,0 +1,90 @@
+# Mayra AI — Idea Ledger
+
+Last updated: 2026-08-05
+
+This ledger records product ideas from acceptance through delivery, deferral, replacement or removal. Ideas must never disappear silently from the roadmap.
+
+## Status meanings
+
+- `ACCEPTED`: approved direction; not necessarily scheduled.
+- `IN_PROGRESS`: active implementation.
+- `DELIVERED`: implemented and relevant automated checks passed.
+- `DEVICE_VERIFY`: implemented/CI-verified; physical Motorola validation pending or partial.
+- `BENCHMARK`: feasibility direction recorded; candidate testing required before implementation/promotion.
+- `DEFERRED`: intentionally postponed.
+- `SUPERSEDED`: replaced by a better design; replacement recorded.
+- `REMOVED`: intentionally dropped; reason recorded.
+
+## Active ideas
+
+| ID | Idea | Status | Current implementation truth | Next gate |
+|---|---|---|---|---|
+| IDEA-001 | One personal Mayra app with one launcher | ACCEPTED / EVOLVED | Final product now explicitly targets one Mayra app plus an AI-native default Home/launcher shell; J1/J2/J3/J4 remain engineering packages | J4 exact-head green, then isolated J5 launcher proof |
+| IDEA-002 | Natural Hindi/Hinglish/English companion | DEVICE_VERIFY | Recognition works physically; Android TTS speaks but owner rates voice robotic; pluggable speech-output + neural benchmark foundation added | Natural Hindi neural voice benchmark + full local-brain bridge |
+| IDEA-003 | Mayra must work without OpenAI/API | BENCHMARK | Deterministic offline engine exists; local LLM/LiteRT-LM work exists; current J4 head requires CI repair before promotion | Repair J4 and finish Motorola quality/RAM/thermal/cancel gate |
+| IDEA-004 | Optional cloud intelligence, not cloud dependency | DEVICE_VERIFY | Responses-compatible provider, Keystore credentials, live enable/disable and local fallback implemented | Owner API-key/failure-mode test |
+| IDEA-005 | Owner-approved personal memory | DEVICE_VERIFY | Propose/approve/use/edit/delete/expiry and trusted provenance implemented | Motorola recovery/lifecycle checks |
+| IDEA-006 | Private document intelligence | DEVICE_VERIFY | TXT/PDF/DOCX import, indexing, search, summary and grounded answers implemented | Physical PDF/DOCX acceptance |
+| IDEA-007 | Mayra-owned reminders | DEVICE_VERIFY | Persistent parser/scheduler/notification/actions/follow-up/reboot recovery implemented | Timing, Doze, Snooze, Complete and reboot tests |
+| IDEA-008 | Open apps and prepare phone actions | DEVICE_VERIFY | App open, contact resolution, dialer/composer handoffs and expiring confirmations implemented | Motorola action acceptance |
+| IDEA-009 | Animated Mayra presence | DEVICE_VERIFY | Orb physically invoked on Motorola; direct dismissal and repeat lifecycle pass | Preserve regression behavior |
+| IDEA-010 | Mayra as Android system Assistant | DEVICE_VERIFY | Motorola accepts/selects Mayra and Power-button invocation launches session | Consolidated privacy/voice regression |
+| IDEA-011 | Always-available `Mayra` wake phrase | BENCHMARK | Dedicated KWS architecture preflight recorded; continuous SpeechRecognizer loop rejected; sherpa-onnx first candidate only | KWS false-trigger/battery benchmark |
+| IDEA-012 | Background/lock-screen voice operation | DEVICE_VERIFY | Already-locked invocation works; privacy-safe rendering/TTS suppression implemented | Physical privacy regression on latest candidate |
+| IDEA-013 | Advanced incoming-call control | ACCEPTED | Phone-role preflight recorded; no Phone takeover implemented | Build complete isolated Dialer/InCallService UI/runtime before role request |
+| IDEA-014 | Caller announce, answer, reject, mute, speaker | ACCEPTED | Public Telecom path documented; deterministic call-command state machine required | Phone UI/runtime tests, then Motorola role acceptance |
+| IDEA-015 | AI takes a message from caller | ACCEPTED | Direct arbitrary SIM audio path rejected; call-forwarding/VoIP/telephony endpoint architecture documented | Select provider/carrier route + privacy/retention design |
+| IDEA-016 | Proactive notification intelligence | ACCEPTED | NotificationListener foundation exists; local-first/sensitive-filter preflight recorded | Owner controls, filter tests and Motorola Notification Access acceptance |
+| IDEA-017 | Personal Owner Mode with fewer repeated confirmations | ACCEPTED | Routine low-risk actions can be streamlined; destructive guards remain | Formal J7 GREEN/AMBER/RED trust policy |
+| IDEA-018 | Production-signed final Mayra | IN_PROGRESS | Minified release audit and environment-only signing scaffold implemented | Private signing/provenance/trusted distribution |
+| IDEA-019 | Stable owner APK updates without uninstall | IN_PROGRESS | Personal Alpha/J1/J2 can use secret-backed owner signing when configured; trusted-install preflight recorded | Configure secrets + A→B update/data-retention proof |
+| IDEA-020 | Very simple first-start setup | IN_PROGRESS | Two-step permission + Assistant-role onboarding committed | Trusted full-app Motorola first-launch test |
+| IDEA-021 | Zero-permission J1 Assistant test APK | DEVICE_VERIFY | `ai.mayra.app.j1` selection and unlocked invocation physically proven | Preserve as regression baseline |
+| IDEA-022 | Isolated J2 real voice proof | DEVICE_VERIFY | On-device recognition, spoken reply and lifecycle physically work; privacy/TTS foundation exists | Preserve latest privacy + natural voice regression |
+| IDEA-023 | Invocation-time local speech before local LLM | DEVICE_VERIFY | Device → hi-IN → en-IN → en-US bounded recognition path physically produces transcripts | Connect to full typed Mayra runtime |
+| IDEA-024 | Dedicated local wake-word engine | BENCHMARK | Wake preflight + Motorola benchmark contract recorded; no production dependency integrated | Compare KWS candidate behavior on device |
+| IDEA-025 | LiteRT-LM local brain runtime | IN_PROGRESS / REPAIR GATE | J4 local-brain runtime/provenance work exists, but current head has Room/KSP truncated-schema CI failure | Restore exact-head green before further expansion |
+| IDEA-026 | Complete Mayra default-Phone runtime | ACCEPTED | Safety gate requires full Dialer/InCallService UI before asking for Phone role | Isolated call UI/state/adapters + CI |
+| IDEA-027 | Mayra-managed caller-message service | ACCEPTED | Supported forwarding/VoIP architecture required; local SIM-audio shortcut rejected | Telephony provider/carrier proof with test number |
+| IDEA-028 | Local-first notification summaries | ACCEPTED | Notification Access architecture/sensitive exclusions documented | Policy tests + owner device acceptance |
+| IDEA-029 | Reliable cross-app workflows | ACCEPTED | API/intents/deep-link-first policy recorded; generic LLM Accessibility tapping rejected | Add typed adapters per real workflow |
+| IDEA-030 | Trusted Play/Internal owner distribution | IN_PROGRESS | Stable-signing + Internal Testing architecture documented | Play Console/internal track + signed A→B install test |
+| IDEA-031 | Free natural offline Mayra neural voice | BENCHMARK | `MayraSpeechOutput`, model license gate, sherpa-onnx preflight and Motorola neural-TTS benchmark matrix implemented | Production-clear model selection |
+| IDEA-032 | AI-native Mayra default launcher / Home shell | ACCEPTED | Canonical master plan + ADR-033 recorded; launcher must stay usable without heavy AI | J4 green baseline, then J5 HOME/app-drawer/fallback proof |
+| IDEA-033 | Typed Mayra context fabric | ACCEPTED | Existing reminders, memory, documents, notifications and contacts are future context sources; free-form text is not trusted state | J6 provenance-aware context contract after J5 reliability |
+| IDEA-034 | GREEN/AMBER/RED trust-gated action orchestration | ACCEPTED | Existing confirmation/action boundaries are foundation; model never directly executes | J7 policy + tests + audit history |
+| IDEA-035 | Proactive My Day / pending-items Mayra | ACCEPTED | Briefing/reminder/notification foundations exist | J8 privacy, quality, battery and quiet-mode gates |
+| IDEA-036 | Multimodal Mayra vision/screen understanding | ACCEPTED / LATER | Explicit camera/document/screen understanding accepted in principle | J9 device privacy/RAM/thermal benchmark |
+| IDEA-037 | Owner-defined personal routines | ACCEPTED / LATER | Typed workflow model accepted; generic autonomous tapping remains rejected | J10 after J7 action trust layer |
+| IDEA-038 | Major-step baseline discipline | ACCEPTED / GOVERNANCE | Every major phase must have idea/decision/blueprint/roadmap/test records, immutable snapshot and exact-green protected baseline before next risky phase | Encode/check continuously; never promote red/pending head |
+
+## Deferred ideas
+
+| ID | Idea | Status | Reason / promotion condition |
+|---|---|---|---|
+| IDEA-101 | Scanned document OCR | DEFERRED | Promote after PDF/DOCX pipeline and local-brain performance are stable |
+| IDEA-102 | Legacy binary `.doc` parsing | DEFERRED | Users can convert to DOCX; not blocking current product |
+| IDEA-103 | Exact-alarm permission | DEFERRED | Promote only if physical reminder tests prove owner need |
+| IDEA-104 | Root-only unrestricted phone control | DEFERRED | Fragile/high-risk; official Android roles first |
+| IDEA-105 | Generic autonomous Accessibility tapping | DEFERRED | Official APIs/intents first; only narrow deterministic workflows can be reconsidered |
+| IDEA-106 | Continuous SpeechRecognizer hotword loop | DEFERRED | API is not intended for continuous recognition; dedicated wake detector required |
+
+## Superseded or removed ideas
+
+| ID | Previous idea | Status | Replaced by / reason |
+|---|---|---|---|
+| IDEA-X01 | Multiple user-facing apps | SUPERSEDED | One final Mayra app; J1/J2/J3/J4 are temporary engineering proof packages |
+| IDEA-X02 | Direct `CALL_PHONE` execution | SUPERSEDED | Review-first dialer; advanced control through complete Phone role runtime |
+| IDEA-X03 | Direct silent `SEND_SMS` execution | SUPERSEDED | Message composer with owner final Send action |
+| IDEA-X04 | Memory attribution inside visible text markers | REMOVED | Typed trusted response metadata prevents spoofing |
+| IDEA-X05 | Persist raw confirmation token across process death | REMOVED | Stale tokens expire; action must be requested again |
+| IDEA-X06 | Treat low-permission Full Test as final app | REMOVED | Full Test is engineering-only |
+| IDEA-X07 | Scatter required permissions across feature screens | SUPERSEDED | Minimal first-launch owner setup, with recovery controls only when needed |
+| IDEA-X08 | Use Accessibility as Mayra's universal action engine | REMOVED | Typed APIs/intents/roles first; Accessibility only narrow deterministic per-workflow if ever justified |
+| IDEA-X09 | Direct cellular AI answering through ordinary InCallService audio | REMOVED | Supported forwarding/VoIP/telephony endpoint required for real AI caller conversation/message-taking |
+
+## Update rule
+
+Whenever the owner introduces or changes an idea, update this ledger, roadmap, blueprint when applicable, latest snapshot and decision/changelog records. Removed ideas remain recorded with reasons.
+
+For every major capability, the corresponding planning record must also define validation and rollback. Exact-green milestones receive immutable snapshots and protected recovery baselines before the next risky phase begins.

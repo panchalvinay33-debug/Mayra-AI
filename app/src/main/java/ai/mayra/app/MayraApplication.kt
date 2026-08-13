@@ -15,24 +15,48 @@ import ai.mayra.app.brain.MayraRuntimeOrchestrator
 import ai.mayra.app.brain.MayraSkillRegistry
 import ai.mayra.app.brain.MayraTaskPlanner
 import ai.mayra.app.brain.registerBuiltInDeviceSkills
-import ai.mayra.app.core.ActionDispatcher
-import ai.mayra.app.core.LocalCommandEngine
-import ai.mayra.app.core.LocalMayraAssistant
+import ai.mayra.app.core.MayraAndroidRuntimeComposition
+import ai.mayra.app.core.MayraAnswerProvider
 import ai.mayra.app.core.MayraAssistant
+import ai.mayra.app.core.MayraAssistantComposition
+import ai.mayra.app.core.LocalMayraAssistant
+import ai.mayra.app.memory.AndroidMayraPendingMemoryProposalStore
+import ai.mayra.app.memory.AndroidMayraPersonalMemoryStore
+import ai.mayra.app.memory.MayraPersonalMemoryManager
 import ai.mayra.app.platform.device.AndroidActionExecutor
+import ai.mayra.app.reminder.MayraReminderRuntime
 import android.app.Application
 import java.util.Calendar
+import kotlinx.coroutines.runBlocking
 
 class MayraApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        val actionExecutor = AndroidActionExecutor(applicationContext)
-        MayraRuntime.assistant = LocalMayraAssistant(
-            LocalCommandEngine(
-                actionDispatcher = ActionDispatcher(actionExecutor)
-            )
+        val personalMemoryStore = AndroidMayraPersonalMemoryStore(applicationContext)
+        val pendingMemoryStore = AndroidMayraPendingMemoryProposalStore(applicationContext)
+        val personalMemory = MayraPersonalMemoryManager(
+            store = personalMemoryStore,
+            proposalStore = pendingMemoryStore
         )
+        MayraRuntime.installPersonalMemory(personalMemoryStore, personalMemory)
+        personalMemory.activeMemories()
+        personalMemory.pendingProposals()
+
+        val actionExecutor = AndroidActionExecutor(applicationContext)
+        MayraAssistantComposition.rebuild(applicationContext).onFailure {
+            // Startup must remain available even if provider configuration is unexpectedly corrupt.
+            MayraRuntime.assistant = LocalMayraAssistant()
+        }
+
+        val typedRuntime = MayraAndroidRuntimeComposition(
+            context = applicationContext,
+            answerProvider = MayraAnswerProvider { message ->
+                runBlocking { MayraRuntime.assistant.reply(message, emptyList()).getOrThrow() }
+            },
+            enableSafeFilePickerAction = true
+        )
+        MayraRuntime.installTypedRuntime(typedRuntime)
 
         val eventBus = BrainEventBus()
         val skillRegistry = MayraSkillRegistry().apply {
@@ -55,10 +79,7 @@ class MayraApplication : Application() {
                 userAvailable = true
             )
         }
-        val brain = MayraBrainCoordinator(
-            eventBus = eventBus,
-            contextProvider = contextProvider
-        )
+        val brain = MayraBrainCoordinator(eventBus = eventBus, contextProvider = contextProvider)
         val planRuntime = MayraPlanRuntime(
             planner = taskPlanner,
             store = planStore,
@@ -88,8 +109,10 @@ class MayraApplication : Application() {
         planStore.prune()
         pendingActions.expireDue()
         pendingActions.prune()
-        MayraBackgroundRuntime.initialize(applicationContext)
-        MayraBriefingScheduler.sync(applicationContext)
+
+        runCatching { MayraBackgroundRuntime.initialize(applicationContext) }
+        runCatching { MayraBriefingScheduler.sync(applicationContext) }
+        runCatching { MayraReminderRuntime.rescheduleAll(applicationContext) }
     }
 }
 
@@ -98,6 +121,12 @@ object MayraRuntime {
     @Volatile
     var assistant: MayraAssistant = LocalMayraAssistant()
 
+    lateinit var typedRuntime: MayraAndroidRuntimeComposition
+        private set
+    lateinit var personalMemoryStore: AndroidMayraPersonalMemoryStore
+        private set
+    lateinit var personalMemory: MayraPersonalMemoryManager
+        private set
     lateinit var brain: MayraBrainCoordinator
         private set
     lateinit var skills: MayraSkillRegistry
@@ -113,8 +142,18 @@ object MayraRuntime {
     lateinit var orchestrator: MayraRuntimeOrchestrator
         private set
 
-    val installed: Boolean
-        get() = ::orchestrator.isInitialized
+    val installed: Boolean get() = ::orchestrator.isInitialized
+    val typedRuntimeInstalled: Boolean get() = ::typedRuntime.isInitialized
+    val personalMemoryInstalled: Boolean get() = ::personalMemory.isInitialized
+
+    fun installTypedRuntime(runtime: MayraAndroidRuntimeComposition) {
+        typedRuntime = runtime
+    }
+
+    fun installPersonalMemory(store: AndroidMayraPersonalMemoryStore, manager: MayraPersonalMemoryManager) {
+        personalMemoryStore = store
+        personalMemory = manager
+    }
 
     fun install(
         brain: MayraBrainCoordinator,

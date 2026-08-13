@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+    <uses-permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+    <queries tools:node="removeAll" />
+    <application android:name=".j4.J4TestApplication" android:label="Mayra J4 Local Brain Test" tools:replace="android:name,android:label">
+        <activity android:name=".MainActivity" tools:node="remove" />
+        <activity android:name=".document.MayraDocumentActivity" tools:node="remove" />
+        <activity android:name=".memory.MayraMemoryCenterActivity" tools:node="remove" />
+        <activity android:name=".core.MayraProviderSettingsActivity" tools:node="remove" />
+        <activity android:name=".document.MayraDocumentHealthActivity" tools:node="remove" />
+        <activity android:name=".core.MayraActivityHistoryActivity" tools:node="remove" />
+        <activity android:name=".j4.J4LocalLlmTestActivity" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity>
+        <service android:name=".j4.J4LocalBrainRuntimeService" android:exported="false" android:process=":localbrain" />
+        <service android:name=".assistant.MayraVoiceInteractionService" tools:node="remove" />
+        <service android:name=".assistant.MayraVoiceInteractionSessionService" tools:node="remove" />
+        <service android:name=".assistant.MayraRecognitionService" tools:node="remove" />
+        <service android:name=".background.MayraNotificationListener" tools:node="remove" />
+        <receiver android:name=".reminder.MayraReminderActionReceiver" tools:node="remove" />
+        <receiver android:name=".background.MayraBootReceiver" tools:node="remove" />
+        <provider android:name="androidx.startup.InitializationProvider" tools:node="remove" />
+        <service android:name="androidx.work.impl.background.systemjob.SystemJobService" tools:node="remove" />
+        <service android:name="androidx.work.impl.foreground.SystemForegroundService" tools:node="remove" />
+        <receiver android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver" tools:node="remove" />
+        <receiver android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver" tools:node="remove" />
+        <receiver android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver" tools:node="remove" />
+        <service android:name="androidx.room.MultiInstanceInvalidationService" tools:node="remove" />
+        <receiver android:name="androidx.profileinstaller.ProfileInstallReceiver" tools:node="remove" tools:ignore="MissingClass" />
+    </application>
+</manifest>

@@ -8,7 +8,10 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class MayraRuntimeIntegrationTest {
     private lateinit var context: Context
     private lateinit var memory: MayraContextMemory
@@ -29,9 +32,10 @@ class MayraRuntimeIntegrationTest {
         memory = MayraContextMemory(context)
         registry = MayraSkillRegistry()
         planner = MayraTaskPlanner()
-        brain = MayraBrainCoordinator(BrainEventBus()) {
-            BrainContextSnapshot(10, 0, 0, true, 0)
-        }
+        brain = MayraBrainCoordinator(
+            eventBus = BrainEventBus(),
+            contextProvider = { BrainContextSnapshot(10, 0, 0, true, 0) }
+        )
     }
 
     @Test

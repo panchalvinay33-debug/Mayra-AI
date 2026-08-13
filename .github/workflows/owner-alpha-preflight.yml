@@ -1,0 +1,57 @@
+name: Owner Alpha Preflight
+
+on:
+  push:
+    branches: [main, "agent/**"]
+    paths:
+      - app/build.gradle.kts
+      - app/src/main/**
+      - app/src/ownerAlpha/**
+      - .github/workflows/owner-alpha-preflight.yml
+      - .github/workflows/owner-alpha.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - app/build.gradle.kts
+      - app/src/main/**
+      - app/src/ownerAlpha/**
+      - .github/workflows/owner-alpha-preflight.yml
+      - .github/workflows/owner-alpha.yml
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-owner-alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Compile owner variant without private signing material
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
+          gradle --no-daemon :app:compileOwnerAlphaKotlin --stacktrace --console=plain
+
+      - name: Lint owner variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf app/schemas
+          mkdir -p app/schemas
+          gradle --no-daemon :app:lintOwnerAlpha --stacktrace --console=plain

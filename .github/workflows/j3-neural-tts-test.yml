@@ -1,0 +1,152 @@
+name: J3 Neural TTS Test
+
+on:
+  push:
+    branches: [main, "agent/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: j3-neural-tts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Fetch pinned sherpa runtime and benchmark-only Hindi model
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs app/src/j3NeuralTtsTest/assets build/j3-inputs
+
+          AAR_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/sherpa-onnx-1.13.2.aar"
+          AAR="app/libs/sherpa-onnx-1.13.2.aar"
+          AAR_SHA256="aa5505c0ec4f8bdaee5f214a64ba3012be64f2aecc022e82a64f33392b8dd245"
+          curl --fail --location --retry 3 --output "$AAR" "$AAR_URL"
+          echo "$AAR_SHA256  $AAR" | sha256sum --check
+
+          MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-hi_IN-priyamvada-medium.tar.bz2"
+          MODEL_ARCHIVE="build/j3-inputs/vits-piper-hi_IN-priyamvada-medium.tar.bz2"
+          MODEL_ARCHIVE_SHA256="399d91cc97eb288725633261f26b715f9a971e3bf7ec4fa1d7910cd0080d37eb"
+          curl --fail --location --retry 3 --output "$MODEL_ARCHIVE" "$MODEL_URL"
+          echo "$MODEL_ARCHIVE_SHA256  $MODEL_ARCHIVE" | sha256sum --check
+          tar -xjf "$MODEL_ARCHIVE" -C app/src/j3NeuralTtsTest/assets
+
+          MODEL="app/src/j3NeuralTtsTest/assets/vits-piper-hi_IN-priyamvada-medium/hi_IN-priyamvada-medium.onnx"
+          TOKENS="app/src/j3NeuralTtsTest/assets/vits-piper-hi_IN-priyamvada-medium/tokens.txt"
+          DATA_DIR="app/src/j3NeuralTtsTest/assets/vits-piper-hi_IN-priyamvada-medium/espeak-ng-data"
+          test -s "$MODEL"
+          test -s "$TOKENS"
+          test -d "$DATA_DIR"
+
+          # Pin the exact sherpa-converted neural model inside the verified archive.
+          MODEL_SHA256="8871f3e07adb6ca490f8dbcd3956a8647c53c35b5d0a1c2a8d097b3bf721a31b"
+          echo "$MODEL_SHA256  $MODEL" | sha256sum --check
+
+          sha256sum "$AAR" "$MODEL_ARCHIVE" "$MODEL" | tee build/j3-inputs/hashes.txt
+          du -sh app/src/j3NeuralTtsTest/assets/vits-piper-hi_IN-priyamvada-medium | tee build/j3-inputs/model-size.txt
+
+      - name: Compile, unit test and lint J3 neural TTS test
+        run: gradle --no-daemon :app:compileJ3NeuralTtsTestKotlin :app:testJ3NeuralTtsTestUnitTest :app:lintJ3NeuralTtsTest --stacktrace --console=plain
+
+      - name: Assemble J3 neural TTS APK
+        run: gradle --no-daemon :app:assembleJ3NeuralTtsTest --stacktrace --console=plain
+
+      - name: Audit zero-permission neural voice boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/j3-ci
+          APK="$(find app/build/outputs/apk/j3NeuralTtsTest -name '*.apk' -type f | head -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)"
+          test -n "$APK"
+          test -x "$AAPT"
+
+          "$AAPT" dump permissions "$APK" | tee build/j3-ci/permissions.log
+          "$AAPT" dump badging "$APK" | tee build/j3-ci/badging.log
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee build/j3-ci/manifest.log
+
+          permission_count="$(grep -c '^uses-permission:' build/j3-ci/permissions.log || true)"
+          if [ "$permission_count" -ne 0 ]; then
+            echo "J3 Neural TTS Test must request zero Android permissions; found $permission_count" >&2
+            exit 1
+          fi
+
+          grep -Fq "package: name='ai.mayra.app.j3'" build/j3-ci/badging.log
+          grep -Fq "application-label:'Mayra J3 Neural Voice Test'" build/j3-ci/badging.log
+          launcher_count="$(grep -c '^launchable-activity:' build/j3-ci/badging.log || true)"
+          test "$launcher_count" -eq 1
+          grep -Fq "launchable-activity: name='ai.mayra.app.j3.J3NeuralTtsTestActivity'" build/j3-ci/badging.log
+
+          required_components=(
+            ai.mayra.app.j3.J3TestApplication
+            ai.mayra.app.j3.J3NeuralTtsTestActivity
+          )
+          for component in "${required_components[@]}"; do
+            grep -Fq "$component" build/j3-ci/manifest.log
+          done
+
+          forbidden_components=(
+            ai.mayra.app.MainActivity
+            ai.mayra.app.MayraApplication
+            ai.mayra.app.assistant.MayraVoiceInteractionService
+            ai.mayra.app.assistant.MayraVoiceInteractionSessionService
+            ai.mayra.app.assistant.MayraRecognitionService
+            ai.mayra.app.background.MayraNotificationListener
+            ai.mayra.app.background.MayraBootReceiver
+            ai.mayra.app.reminder.MayraReminderActionReceiver
+            androidx.startup.InitializationProvider
+            androidx.work.impl.background.systemjob.SystemJobService
+            androidx.work.impl.foreground.SystemForegroundService
+            androidx.room.MultiInstanceInvalidationService
+            androidx.profileinstaller.ProfileInstallReceiver
+          )
+          for component in "${forbidden_components[@]}"; do
+            if grep -Fq "$component" build/j3-ci/manifest.log; then
+              echo "Unexpected component in J3 Neural TTS Test: $component" >&2
+              exit 1
+            fi
+          done
+
+          sha256sum "$APK" | tee build/j3-ci/apk-sha256.txt
+          stat --printf='APK bytes: %s\n' "$APK" | tee build/j3-ci/apk-size.txt
+
+      - name: Upload J3 neural voice APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayra-j3-neural-voice-apk-${{ github.run_number }}
+          path: app/build/outputs/apk/j3NeuralTtsTest/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload J3 audit and input provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayra-j3-neural-voice-audit-${{ github.run_number }}
+          path: |
+            build/j3-ci/
+            build/j3-inputs/
+            app/build/reports/lint-results-j3NeuralTtsTest.html
+            app/build/reports/tests/testJ3NeuralTtsTestUnitTest/
+          if-no-files-found: warn
+          retention-days: 7

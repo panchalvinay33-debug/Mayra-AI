@@ -1,5 +1,6 @@
 package ai.mayra.app.background
 
+import ai.mayra.app.TestMayraApplication
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
@@ -11,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], application = TestMayraApplication::class)
 class MayraAmbientControlCenterTest {
     private lateinit var context: Context
 

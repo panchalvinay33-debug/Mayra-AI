@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permanent owner-device update lane. Installs side-by-side with transient .alpha builds. -->
+    <application
+        android:label="Mayra AI Owner"
+        tools:replace="android:label" />
+</manifest>

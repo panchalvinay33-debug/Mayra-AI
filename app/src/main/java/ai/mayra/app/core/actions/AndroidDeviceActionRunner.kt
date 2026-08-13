@@ -42,8 +42,8 @@ class AndroidDeviceActionRunner(
 
     private fun successMessage(request: DeviceActionRequest): String = when (request.type) {
         DeviceActionType.OPEN_APP -> "Opened ${request.target}."
-        DeviceActionType.CALL_CONTACT -> "Started call to ${request.target}."
-        DeviceActionType.SEND_MESSAGE -> "Opened message for ${request.target}."
-        DeviceActionType.CREATE_REMINDER -> "Opened reminder for ${request.target}."
+        DeviceActionType.CALL_CONTACT -> "Opened the dialer for ${request.target}. Review the number and tap Call when ready."
+        DeviceActionType.SEND_MESSAGE -> "Opened a message for ${request.target}. Review it and tap Send when ready."
+        DeviceActionType.CREATE_REMINDER -> "Opened reminder setup for ${request.target}."
     }
 }

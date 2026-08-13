@@ -3,12 +3,22 @@ package ai.mayra.app.background
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import ai.mayra.app.context.NotificationAggregate
+import ai.mayra.app.context.NotificationContextStore
 
 /** Receives notifications only after explicit Notification Access is enabled by the user. */
 class MayraNotificationListener : NotificationListenerService() {
     private val intelligence by lazy { NotificationIntelligenceEngine() }
+    private val contextStore by lazy { NotificationContextStore(applicationContext) }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        publishAggregate()
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        publishAggregate()
+
         val notification = sbn?.notification ?: return
         if (sbn.packageName == packageName) return
 
@@ -43,6 +53,27 @@ class MayraNotificationListener : NotificationListenerService() {
                 )
             )
         }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        publishAggregate()
+    }
+
+    private fun publishAggregate() {
+        val active = runCatching {
+            activeNotifications.orEmpty().filterNot { it.packageName == packageName }
+        }.getOrDefault(emptyList())
+        val attention = active.count { item ->
+            val notification = item.notification
+            notification.priority >= Notification.PRIORITY_HIGH || notification.fullScreenIntent != null
+        }
+        contextStore.write(
+            NotificationAggregate(
+                activeCount = active.size,
+                attentionCount = attention,
+                categoryCounts = emptyMap()
+            )
+        )
     }
 
     private companion object {

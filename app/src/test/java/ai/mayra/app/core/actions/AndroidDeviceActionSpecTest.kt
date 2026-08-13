@@ -21,12 +21,12 @@ class AndroidDeviceActionSpecTest {
     }
 
     @Test
-    fun `call spec uses tel uri`() {
+    fun `call spec uses review first dial uri`() {
         val spec = AndroidDeviceActionSpecFactory.create(
             request(DeviceActionType.CALL_CONTACT, "+91 98765 43210")
         )
 
-        assertEquals(AndroidDeviceActionSpecFactory.ACTION_CALL, spec.action)
+        assertEquals(AndroidDeviceActionSpecFactory.ACTION_DIAL, spec.action)
         assertEquals("tel:+91 98765 43210", spec.data)
     }
 
@@ -42,7 +42,7 @@ class AndroidDeviceActionSpecTest {
     }
 
     @Test
-    fun `reminder spec contains title and optional detail`() {
+    fun `reminder fallback spec contains title and optional detail`() {
         val spec = AndroidDeviceActionSpecFactory.create(
             request(DeviceActionType.CREATE_REMINDER, "Medicine", "At 8 PM")
         )
@@ -53,16 +53,14 @@ class AndroidDeviceActionSpecTest {
     }
 
     @Test
-    fun `permission bridge maps runtime permissions`() {
-        assertEquals(
-            "android.permission.CALL_PHONE",
-            AndroidDeviceActionSpecFactory.androidPermissionName(DevicePermission.CALL_PHONE)
-        )
-        assertEquals(
-            "android.permission.SEND_SMS",
-            AndroidDeviceActionSpecFactory.androidPermissionName(DevicePermission.SEND_MESSAGES)
-        )
+    fun `direct phone permissions are intentionally not mapped`() {
+        assertNull(AndroidDeviceActionSpecFactory.androidPermissionName(DevicePermission.CALL_PHONE))
+        assertNull(AndroidDeviceActionSpecFactory.androidPermissionName(DevicePermission.SEND_MESSAGES))
         assertNull(AndroidDeviceActionSpecFactory.androidPermissionName(DevicePermission.QUERY_APPS))
+        assertEquals(
+            "android.permission.READ_CONTACTS",
+            AndroidDeviceActionSpecFactory.androidPermissionName(DevicePermission.READ_CONTACTS)
+        )
     }
 
     @Test

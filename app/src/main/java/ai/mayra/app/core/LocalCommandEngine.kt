@@ -24,7 +24,12 @@ class LocalCommandEngine(
         val clean = message.trim()
         require(clean.isNotEmpty()) { "Message cannot be empty" }
 
-        val intent = intentEngine.parse(clean)
+        val parsedIntent = intentEngine.parse(clean)
+        val intent = if (parsedIntent is AssistantIntent.Chat) {
+            resolveFollowUpIntent(clean, recentMessages) ?: parsedIntent
+        } else {
+            parsedIntent
+        }
         actionDispatcher.dispatch(intent)?.let { return it }
 
         return when (intent) {
@@ -49,16 +54,40 @@ class LocalCommandEngine(
         }
     }
 
+    /**
+     * Completes narrow multi-turn commands without treating arbitrary previous chat as an action.
+     * Only an immediately preceding Mayra clarification can activate this continuation.
+     */
+    private fun resolveFollowUpIntent(
+        message: String,
+        recentMessages: List<MayraMessage>
+    ): AssistantIntent? {
+        val previous = recentMessages
+            .dropLastWhile { it.sender == MayraMessage.Sender.USER && it.text.trim() == message }
+            .lastOrNull()
+            ?: return null
+        if (previous.sender != MayraMessage.Sender.MAYRA) return null
+
+        val prompt = previous.text.trim().lowercase(Locale.ROOT)
+        return when {
+            prompt.contains("what should i remind you about") ||
+                prompt.contains("kis baat ki yaad") ||
+                prompt.contains("क्या याद") -> AssistantIntent.CreateReminder(message)
+            else -> null
+        }
+    }
+
     private fun respondToChat(message: String, recentMessages: List<MayraMessage>): String {
         val normalized = message.lowercase(Locale.ROOT)
         return when {
+            normalized.isWellbeingQuestion() ->
+                "Main bilkul theek hoon 😊 Aap kaise ho? Batao, aaj main aapki kya madad karun?"
+
             normalized.isGreeting() -> greeting()
             normalized.containsAny("who are you", "tum kaun", "aap kaun", "तुम कौन", "आप कौन") ->
-                "I’m Mayra, your personal AI assistant. I can already chat, accept voice input, remember the current conversation, understand common phone commands, and work offline."
+                "I’m Mayra, your private on-device assistant. I can chat offline, accept voice input, use approved personal memory, search imported documents, and safely prepare supported phone actions."
 
-            normalized.containsAny("help", "what can you do", "kya kar sakti", "क्या कर सकती", "madad", "मदद") ->
-                "You can ask for the date or time, use voice input, or say commands such as open an app, call someone, send a message, create a reminder, check battery, or clear chat. Device actions are being connected safely with confirmation."
-
+            normalized.isCapabilityQuestion() -> capabilitySummary()
             normalized.containsAny("date", "today", "aaj", "tarikh", "आज", "तारीख") -> currentDate()
             normalized.containsAny("thank", "thanks", "dhanyavad", "shukriya", "धन्यवाद", "शुक्रिया") ->
                 "You’re welcome 😊"
@@ -70,6 +99,18 @@ class LocalCommandEngine(
         }
     }
 
+    private fun capabilitySummary(): String =
+        """
+        Abhi main ye kaam kar sakti hoon:
+        • Hindi/Hinglish text aur voice input samajhna.
+        • Aapki approval ke baad personal baatein local memory mein save, use, edit aur delete karna.
+        • TXT, PDF aur DOCX documents import karke unmein search, summary aur grounded answers dena.
+        • Time/date batana aur supported phone actions—app kholna, contact call, message draft, reminder—safe confirmation ke saath prepare karna.
+        • Activity History, Device readiness aur privacy controls dikhana.
+
+        Abhi internet-based general AI aur fresh web knowledge connected nahi hai, isliye open-ended questions par meri offline intelligence limited rahegi.
+        """.trimIndent()
+
     private fun greeting(): String {
         val hour = timeProvider().hour
         val dayPart = when (hour) {
@@ -78,7 +119,7 @@ class LocalCommandEngine(
             in 17..21 -> "Good evening"
             else -> "Hello"
         }
-        return "$dayPart! I’m Mayra. How can I help you?"
+        return "$dayPart! Main Mayra hoon 😊 Batao, main aapki kya madad karun?"
     }
 
     private fun currentTime(): String {
@@ -98,14 +139,32 @@ class LocalCommandEngine(
             ?.text
 
         return if (previousUserMessage == null) {
-            "I understood: “$message”. My offline brain is active, but a full AI provider is not connected yet."
+            "I understood: “$message”. Main abhi offline mode mein hoon; general AI provider connected nahi hai. Aap voice, memory, documents, time/date ya supported device actions try kar sakte hain."
         } else {
-            "I understood: “$message”. I’m keeping our recent conversation in context, including “$previousUserMessage”, while the full AI provider is being connected."
+            "I understood: “$message”. Main recent context—“$previousUserMessage”—yaad rakh rahi hoon, lekin general AI provider connected nahi hone se open-ended answer limited hai."
         }
     }
 
     private fun String.isGreeting(): Boolean =
-        trim() in setOf("hi", "hello", "hey", "namaste", "नमस्ते", "good morning", "good evening")
+        trim() in setOf(
+            "hi", "hello", "hey", "namaste", "नमस्ते", "good morning", "good evening",
+            "hii", "helo", "hello mayra", "hi mayra"
+        )
+
+    private fun String.isWellbeingQuestion(): Boolean =
+        containsAny(
+            "how are you", "how r u", "kaisi ho", "kesi ho", "kaise ho", "kese ho",
+            "tum kaisi ho", "tum kesi ho", "aap kaise ho", "aap kesi hain",
+            "कैसी हो", "कैसे हो", "आप कैसी हैं", "आप कैसे हैं"
+        )
+
+    private fun String.isCapabilityQuestion(): Boolean =
+        containsAny(
+            "help", "what can you do", "what are your capabilities", "your capabilities", "capability",
+            "capabilities", "kya kar sakti", "kya kya kar sakti", "kya kya kar sakte", "tum kya kar sakti",
+            "tm kya kar sakti", "tumhari capability", "tmhari capability", "aap kya kar sakte", "madad", "मदद",
+            "क्या कर सकती", "क्या क्या कर सकती", "क्षमता", "खासियत"
+        )
 
     private fun String.containsAny(vararg values: String): Boolean = values.any(::contains)
 }

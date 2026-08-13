@@ -18,6 +18,7 @@ class AssistantIntentEngine(
                 AssistantIntent.DeviceInfo(DeviceInfoType.TIME)
             normalized.matchesAny("battery", "charge kitna", "battery kitni", "charge kitni") ->
                 AssistantIntent.DeviceInfo(DeviceInfoType.BATTERY)
+            REMINDER_COMMANDS.any(normalized::contains) -> parseReminderIntent(original, normalized)
             normalized.findCommand(MESSAGE_COMMANDS) != null -> parseMessageIntent(original, normalized)
             normalized.findCommand(CALL_COMMANDS) != null -> parseTargetIntent(
                 normalized,
@@ -31,7 +32,6 @@ class AssistantIntentEngine(
                 "Which app should I open?",
                 AssistantIntent::OpenApp
             )
-            REMINDER_COMMANDS.any(normalized::contains) -> parseReminderIntent(original, normalized)
             else -> AssistantIntent.Chat(original)
         }
     }
@@ -57,15 +57,20 @@ class AssistantIntentEngine(
         val match = normalized.findCommand(MESSAGE_COMMANDS)
             ?: return AssistantIntent.Invalid("Who should I message?")
 
-        val before = normalized.substring(0, match.index).cleanCommandSide()
+        val originalMatchIndex = original.lowercase(locale).indexOf(match.keyword)
+        val beforeOriginal = if (originalMatchIndex >= 0) {
+            original.substring(0, originalMatchIndex).cleanOriginalCommandSide()
+        } else {
+            normalized.substring(0, match.index).cleanCommandSide()
+        }
         val afterNormalized = normalized.substring(match.index + match.keyword.length)
             .trim().removeLeadingWords(MESSAGE_ACTION_WORDS)
         val afterOriginal = original.substringAfterKeyword(match.keyword)
             .trim().removeLeadingWordsIgnoreCase(MESSAGE_ACTION_WORDS)
 
-        if (before.isUsefulTarget()) {
+        if (beforeOriginal.isUsefulOriginalTarget()) {
             val body = afterOriginal.trim().trimStart(':').trim().ifBlank { null }
-            return AssistantIntent.ComposeMessage(before, body)
+            return AssistantIntent.ComposeMessage(beforeOriginal, body)
         }
 
         if (afterNormalized.isBlank()) return AssistantIntent.Invalid("Who should I message?")
@@ -88,13 +93,39 @@ class AssistantIntentEngine(
         }
     }
 
+    /**
+     * Reminder commands are commonly spoken either before or after the time phrase in Hinglish.
+     * Keep the owner's original punctuation (for example 5.20) and select whichever side of the
+     * command contains the useful reminder request.
+     */
     private fun parseReminderIntent(original: String, normalized: String): AssistantIntent {
         val match = REMINDER_COMMANDS
             .mapNotNull { keyword -> normalized.indexOf(keyword).takeIf { it >= 0 }?.let { CommandMatch(keyword, it) } }
-            .minByOrNull(CommandMatch::index)
+            .sortedWith(compareBy<CommandMatch> { it.index }.thenByDescending { it.keyword.length })
+            .firstOrNull()
             ?: return AssistantIntent.Invalid("What should I remind you about?")
-        val request = original.substringAfterKeyword(match.keyword)
-            .trim().removeLeadingWordsIgnoreCase(REMINDER_FILLER_WORDS)
+
+        val originalLower = original.lowercase(locale)
+        val originalMatchIndex = originalLower.indexOf(match.keyword)
+        val beforeOriginal = if (originalMatchIndex >= 0) {
+            original.substring(0, originalMatchIndex)
+        } else {
+            normalized.substring(0, match.index)
+        }
+        val afterOriginal = if (originalMatchIndex >= 0) {
+            original.substring(originalMatchIndex + match.keyword.length)
+        } else {
+            normalized.substring(match.index + match.keyword.length)
+        }
+
+        val after = afterOriginal.cleanReminderSide()
+        val before = beforeOriginal.cleanReminderSide()
+        val request = when {
+            after.isUsefulReminderRequest() -> after
+            before.isUsefulReminderRequest() -> before
+            else -> ""
+        }
+
         return if (request.isBlank()) {
             AssistantIntent.Invalid("What should I remind you about?")
         } else {
@@ -123,8 +154,29 @@ class AssistantIntentEngine(
         .removeTrailingWords(COMMAND_TRAILING_WORDS)
         .cleanTarget()
 
+    private fun String.cleanOriginalCommandSide(): String = trim()
+        .removeLeadingWordsIgnoreCase(COMMAND_FILLER_WORDS)
+        .removeTrailingWordsIgnoreCase(COMMAND_TRAILING_WORDS)
+        .cleanTarget()
+
+    private fun String.cleanReminderSide(): String = trim()
+        .removeLeadingWordsIgnoreCase(REMINDER_SIDE_FILLER_WORDS)
+        .removeTrailingWordsIgnoreCase(REMINDER_SIDE_FILLER_WORDS)
+        .cleanTarget()
+
     private fun String.isUsefulTarget(): Boolean =
         isNotBlank() && split(' ').any { it !in COMMAND_FILLER_WORDS && it !in COMMAND_TRAILING_WORDS }
+
+    private fun String.isUsefulOriginalTarget(): Boolean =
+        isNotBlank() && split(' ').any {
+            val normalized = it.lowercase(locale)
+            normalized !in COMMAND_FILLER_WORDS && normalized !in COMMAND_TRAILING_WORDS
+        }
+
+    private fun String.isUsefulReminderRequest(): Boolean =
+        isNotBlank() && split(Regex("\\s+")).any {
+            it.lowercase(locale) !in REMINDER_SIDE_FILLER_WORDS
+        }
 
     private fun String.removeLeadingWords(words: Set<String>): String {
         val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
@@ -141,6 +193,12 @@ class AssistantIntentEngine(
     private fun String.removeLeadingWordsIgnoreCase(words: Set<String>): String {
         val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
         while (tokens.firstOrNull()?.lowercase(locale) in words) tokens.removeAt(0)
+        return tokens.joinToString(" ")
+    }
+
+    private fun String.removeTrailingWordsIgnoreCase(words: Set<String>): String {
+        val tokens = split(Regex("\\s+")).filter(String::isNotBlank).toMutableList()
+        while (tokens.lastOrNull()?.lowercase(locale) in words) tokens.removeAt(tokens.lastIndex)
         return tokens.joinToString(" ")
     }
 
@@ -173,7 +231,20 @@ private fun String.matchesAny(vararg values: String): Boolean = values.any(::con
 private val OPEN_COMMANDS = listOf("open", "launch", "khol", "kholo", "chalao", "start")
 private val CALL_COMMANDS = listOf("call", "phone", "dial", "lagao", "milao")
 private val MESSAGE_COMMANDS = listOf("send message to", "send sms to", "message", "text", "sms", "msg")
-private val REMINDER_COMMANDS = listOf("remind me", "set reminder", "yaad dilana", "reminder laga")
+private val REMINDER_COMMANDS = listOf(
+    "reminder set kar do",
+    "reminder set karo",
+    "reminder set karna",
+    "reminder laga do",
+    "reminder lagao",
+    "set reminder",
+    "remind me",
+    "yaad dilana",
+    "reminder set",
+    "reminder laga",
+    "रिमाइंडर सेट करो",
+    "रिमाइंडर लगा दो"
+)
 
 private val COMMAND_FILLER_WORDS = setOf(
     "mayra", "mira", "please", "jara", "zara", "mera", "meri", "mere", "the",
@@ -184,5 +255,8 @@ private val COMMAND_TRAILING_WORDS = setOf(
     "open", "call", "phone", "dial", "launch", "start", "khol", "kholo", "chalao"
 )
 private val MESSAGE_ACTION_WORDS = setOf("to", "ko", "likho", "bolo", "saying", "that")
-private val REMINDER_FILLER_WORDS = setOf("to", "ki", "please", "mujhe")
+private val REMINDER_SIDE_FILLER_WORDS = setOf(
+    "please", "mayra", "mira", "mera", "meri", "mere", "mujhe", "to", "ko",
+    "karo", "kar", "karna", "do", "de", "laga", "lagao", "set"
+)
 private val MESSAGE_SEPARATORS = listOf(":", " saying ", " that ", " bolo ", " likho ")

@@ -5,6 +5,30 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+fun env(name: String): String? = System.getenv(name)?.takeIf(String::isNotBlank)
+
+val mayraReleaseStoreFile = env("MAYRA_RELEASE_STORE_FILE")
+val mayraReleaseStorePassword = env("MAYRA_RELEASE_STORE_PASSWORD")
+val mayraReleaseKeyAlias = env("MAYRA_RELEASE_KEY_ALIAS")
+val mayraReleaseKeyPassword = env("MAYRA_RELEASE_KEY_PASSWORD")
+val mayraReleaseSigningAvailable = listOf(
+    mayraReleaseStoreFile,
+    mayraReleaseStorePassword,
+    mayraReleaseKeyAlias,
+    mayraReleaseKeyPassword
+).all { it != null }
+
+val mayraOwnerStoreFile = env("MAYRA_OWNER_STORE_FILE")
+val mayraOwnerStorePassword = env("MAYRA_OWNER_STORE_PASSWORD")
+val mayraOwnerKeyAlias = env("MAYRA_OWNER_KEY_ALIAS")
+val mayraOwnerKeyPassword = env("MAYRA_OWNER_KEY_PASSWORD")
+val mayraOwnerSigningAvailable = listOf(
+    mayraOwnerStoreFile,
+    mayraOwnerStorePassword,
+    mayraOwnerKeyAlias,
+    mayraOwnerKeyPassword
+).all { it != null }
+
 android {
     namespace = "ai.mayra.app"
     compileSdk = 35
@@ -13,12 +37,141 @@ android {
         applicationId = "ai.mayra.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 8
+        versionName = "0.2.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "VOICE_SESSION_RECOGNITION_ENABLED", "false")
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    signingConfigs {
+        if (mayraReleaseSigningAvailable) {
+            create("mayraRelease") {
+                storeFile = file(mayraReleaseStoreFile!!)
+                storePassword = mayraReleaseStorePassword
+                keyAlias = mayraReleaseKeyAlias
+                keyPassword = mayraReleaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+        if (mayraOwnerSigningAvailable) {
+            create("mayraOwner") {
+                storeFile = file(mayraOwnerStoreFile!!)
+                storePassword = mayraOwnerStorePassword
+                keyAlias = mayraOwnerKeyAlias
+                keyPassword = mayraOwnerKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfigs.findByName("mayraRelease")?.let { signingConfig = it }
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        create("personalAlpha") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".alpha"
+            versionNameSuffix = "-alpha"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
+        create("ownerAlpha") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".owner"
+            versionNameSuffix = "-owner"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfigs.findByName("mayraOwner")?.let { signingConfig = it }
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
+        create("j1AssistantTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j1"
+            versionNameSuffix = "-j1"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
+        create("j2VoiceTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j2"
+            versionNameSuffix = "-j2"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            buildConfigField("boolean", "VOICE_SESSION_RECOGNITION_ENABLED", "true")
+            matchingFallbacks += listOf("debug")
+        }
+        create("j3NeuralTtsTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j3"
+            versionNameSuffix = "-j3"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
+        create("j4LocalLlmTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".j4"
+            versionNameSuffix = "-j4"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("mayraOwner") ?: signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", mayraOwnerSigningAvailable.toString())
+            matchingFallbacks += listOf("debug")
+        }
+        create("fullTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".fulltest"
+            versionNameSuffix = "-fulltest"
+            isDebuggable = true
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
+            matchingFallbacks += listOf("debug")
+        }
+        create("documentTest") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".documenttest"
+            isDebuggable = false
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "STABLE_OWNER_SIGNING", "false")
+            matchingFallbacks += listOf("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -62,6 +215,18 @@ dependencies {
     implementation("androidx.room:room-runtime:2.7.2")
     implementation("androidx.room:room-ktx:2.7.2")
     ksp("androidx.room:room-compiler:2.7.2")
+
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // CI places the pinned official sherpa-onnx AAR here only for the isolated J3 neural-TTS test.
+    add("j3NeuralTtsTestImplementation", files("libs/sherpa-onnx-1.13.2.aar"))
+
+    // J4 only: CI downloads the exact verified LiteRT-LM AAR into app/libs. Using the local AAR
+    // avoids Maven POM/transitive Kotlin 2.2 dependencies entering Kotlin 2.0/KSP resolution.
+    // J4 accesses LiteRT exclusively through reflection in the isolated :localbrain process.
+    add("j4LocalLlmTestRuntimeOnly", files("libs/litertlm-android-0.15.0.aar"))
+    // LiteRT-LM 0.15.0 requires Gson at runtime; keep it J4-only and off normal Mayra variants.
+    add("j4LocalLlmTestRuntimeOnly", "com.google.code.gson:gson:2.13.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
