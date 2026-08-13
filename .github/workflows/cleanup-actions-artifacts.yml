@@ -1,9 +1,8 @@
-name: One-shot cleanup Actions artifacts
+name: One-shot cleanup old Actions artifacts
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   actions: write
@@ -11,33 +10,24 @@ permissions:
 
 jobs:
   cleanup:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'chore: run one-shot Actions artifact cleanup'
+    if: github.event.head_commit.message == 'chore: one-shot cleanup pre-2026-08-12 artifacts'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
-      - name: Keep newest 12 artifacts and delete the rest
+      - name: Delete Actions artifacts created before 2026-08-12
         uses: actions/github-script@v7
         with:
           script: |
-            const keepCount = 12;
+            const cutoff = new Date('2026-08-12T00:00:00Z');
             const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               per_page: 100,
             });
-
-            artifacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            const keep = artifacts.slice(0, keepCount);
-            const remove = artifacts.slice(keepCount);
-            const keepIds = new Set(keep.map(a => a.id));
-
             let deleted = 0;
             let bytes = 0;
-            let failed = 0;
-
-            core.notice(`Found ${artifacts.length} artifacts. Keeping newest ${keep.length}; deleting ${remove.length}.`);
-            for (const artifact of remove) {
-              try {
+            for (const artifact of artifacts) {
+              const created = new Date(artifact.created_at);
+              if (created < cutoff) {
                 await github.rest.actions.deleteArtifact({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -45,13 +35,7 @@ jobs:
                 });
                 deleted += 1;
                 bytes += artifact.size_in_bytes || 0;
-                if (deleted % 100 === 0) {
-                  core.info(`Deleted ${deleted}/${remove.length} artifacts...`);
-                }
-              } catch (error) {
-                failed += 1;
-                core.warning(`Could not delete artifact ${artifact.id} (${artifact.name}): ${error.message}`);
+                if (deleted % 100 === 0) core.info(`Deleted ${deleted} artifacts...`);
               }
             }
-
-            core.notice(`Cleanup complete: deleted ${deleted} artifacts, kept ${keepIds.size}, failed ${failed}; requested storage cleanup ${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB.`);
+            core.notice(`Deleted ${deleted} artifacts; requested storage cleanup ${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB.`);
